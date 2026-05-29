@@ -1,0 +1,31 @@
+# Configuration using ByteDance Volcano Engine (火山引擎) as the provider.
+# Chat model: doubao-seed-2-0-lite (supports image input)
+# Image model: doubao-seedream-5-0-260128
+# Video model: doubao-seedance-2-0-fast-260128
+#
+# Set your API key below or export ARK_API_KEY in the environment.
+
+chat_model:
+  init_args:
+    model: doubao-seed-2-0-lite-260428
+    model_provider: volcengine
+    api_key:
+    # base_url is auto-resolved to https://ark.cn-beijing.volces.com/api/v3
+  max_requests_per_minute: 500
+  max_requests_per_day: 2000
+
+image_generator:
+  class_path: tools.ImageGeneratorDoubaoSeedreamVolcengineAPI
+  init_args:
+    api_key:
+  max_requests_per_minute: 10
+  max_requests_per_day: 500
+
+video_generator:
+  class_path: tools.VideoGeneratorDoubaoSeedanceVolcengineAPI
+  init_args:
+    api_key:
+  max_requests_per_minute: 2
+  max_requests_per_day: 10
+
+working_dir: .working_dir/idea2video

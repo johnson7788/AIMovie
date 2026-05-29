@@ -1,0 +1,43 @@
+# ============================================================
+# ViMax 环境配置文件模板
+# ============================================================
+# 使用说明：
+#   1. 复制此文件为 .env: cp .env.example .env
+#   2. 根据实际情况填写 API Key 等配置
+#   3. 只需要填写你打算使用的 AI 服务商的 Key，其他可以留空
+# ============================================================
+
+# ============================================================
+# AI 服务商 API Key（至少配置一个）
+# ============================================================
+# 豆包/火山引擎 ARK（推荐国内用户）
+# 获取地址: https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey
+ARK_API_KEY=
+ARK_MODEL=doubao-seedance-1-0-pro-fast-251015
+
+# 腾讯混元
+# 获取地址: https://console.cloud.tencent.com/hunyuan
+HUNYUAN_API_KEY=
+HUNYUAN_VISION_API_KEY=
+
+# MiniMax
+# 获取地址: https://platform.minimaxi.com/
+MINIMAX_API_KEY=
+
+# OpenAI
+# 获取地址: https://platform.openai.com/api-keys
+OPENAI_API_KEY=
+
+# Google Gemini
+# 获取地址: https://aistudio.google.com/apikey
+GOOGLE_API_KEY=
+
+# ============================================================
+# 后端服务配置
+# ============================================================
+SERVER_PORT=36300
+
+# ============================================================
+# 前端配置
+# ============================================================
+VITE_REQUEST_BASE_URL=http://localhost:36300

@@ -1,0 +1,62 @@
+// 方向
+$direction: top, right, bottom, left;
+// 边距
+$spacing: 3px;
+// 圆角
+$rounded-size: 2px;
+// 边框粗细
+$border-size: 1px;
+// 背景颜色
+$color-list: (
+    "white":var(--el-bg-color),
+    "primary":var(--el-color-primary),
+    "primary-light-3":var(--el-color-primary-light-3),
+    "primary-light-9":var(--el-color-primary-light-9),
+    "success":var(--el-color-success),
+    "success-light-3":var(--el-color-success-light-3),
+    "warning":var(--el-color-warning),
+    "warning-light-3":var(--el-color-warning-light-3),
+    "danger":var(--el-color-danger),
+    "danger-light-3":var(--el-color-danger-light-3),
+    "danger-dark-2":var(--el-color-danger-dark-2),
+    "error":var(--el-color-error),
+    "hover":var(--el-bg-color-page),
+    "overlay":var(--el-bg-color-overlay),
+    "mask":var(--el-mask-color),
+    "mask-light":var(--el-mask-color-extra-light),
+    "dark":var(--el-color-black),
+    "page":var(--el-bg-color-page),
+    "info":var(--el-color-info),
+    "gray":#272727
+);
+// 文字颜色
+$text-color-list: (
+    "primary":var(--el-color-primary),
+    "primary-light-3":var(--el-color-primary-light-3),
+    "success":var(--el-color-success),
+    "danger":var(--el-color-danger),
+    "warning":var(--el-color-warning),
+    "error":var(--el-color-error),
+    "white":var(--el-bg-color),
+    "grey":var(--el-color-info),
+    "info":var(--el-color-info),
+    "text-primary":var(--el-text-color-primary),
+    "regular":var(--el-text-color-regular),
+    "secondary":var(--el-text-color-secondary),
+    "placeholder":var(--el-text-color-placeholder),
+    "disable":var(--el-text-color-disabled),
+    "dark":var(--el-text-color-primary),
+    "bg":var(--el-bg-color),
+    "price":#f56c6c
+);
+// 自适应断点
+$breakpoint: (
+    "m":375px,
+    "p":480px,
+    "xs": 768px,
+    "sm": 960px,
+    "md": 1280px,
+    "lg": 1440px,
+    "xl": 1920px,
+    "xxl": 2560px
+);
