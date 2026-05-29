@@ -306,9 +306,9 @@ onUnmounted(() => {
         position: relative;
         width: 71px;
         height: 71px;
-        background: #1E1E1E;
+        background: #f5f7fa;
         border-radius: 12px;
-        border: 1px solid #272727;
+        border: 1px solid #e4e7ed;
         font-size: 29px;
         font-weight: 600;
         color: #FFFFFF;
@@ -318,13 +318,13 @@ onUnmounted(() => {
         transition: all 0.3s ease;
 
         &:hover {
-            background: #272727;
+            background: #e4e7ed;
             border-color: #3a3a3a;
         }
 
         &.active {
             border-color: var(--el-color-success);
-            background: #272727;
+            background: #e4e7ed;
             box-shadow: 0 0 0 2px rgba(103, 194, 58, 0.2);
         }
 

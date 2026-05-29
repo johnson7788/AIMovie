@@ -42,10 +42,10 @@ const episodeSumList = ref<number[]>([60, 90, 120, 150, 180, 210, 240, 270, 300]
     padding-top: 2px;
     padding-bottom: 2px;
     &:hover {
-        background: rgba(255,255,255,0.08);
+        background: rgba(0, 0, 0, 0.06);
     }
     &.active {
-        background: rgba(255, 255, 255, 0.16);
+        background: rgba(0, 0, 0, 0.1);
     }
 }
 

@@ -285,9 +285,9 @@ onMounted(() => {
             flex-direction: column;
             gap: 28px;
 
-            background: rgba(30, 30, 30, 0.4);
+            background: rgba(0, 0, 0, 0.04);
             border-radius: 200px 200px 200px 200px;
-            border: 0.1px solid rgba(255, 255, 255, 0.2);
+            border: 0.1px solid rgba(0, 0, 0, 0.12);
 
             &-item {
                 width: 100%;
@@ -361,7 +361,7 @@ onMounted(() => {
 </style>
 <style>
 .el-popover {
-    --el-popover-bg-color: rgba(30, 30, 30, 0.4);
+    --el-popover-bg-color: rgba(0, 0, 0, 0.04);
     --el-popover-border-color: rgba(3255, 255, 255, 0.3);
     --el-box-shadow-light: none;
     --el-popover-border-radius: 20px;

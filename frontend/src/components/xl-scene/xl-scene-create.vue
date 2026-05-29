@@ -255,7 +255,7 @@ defineExpose({
         flex-shrink: 0;
         cursor: pointer;
         padding-left: 0;
-        background: #272727;
+        background: #e4e7ed;
         border-radius: 6px;
         border-radius: 6px;
         font-weight: 600;

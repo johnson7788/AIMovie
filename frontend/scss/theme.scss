@@ -96,22 +96,98 @@ html[data-theme="dark"] .el-empty {
 }
 
 html[data-theme="light"] {
-	--el-bg-color-rgb-r: 255;
-	--el-bg-color-rgb-g: 255;
-	--el-bg-color-rgb-b: 255;
+	color-scheme: light;
 	--el-color-primary: #006EFF;
 	--el-color-primary-light-3: rgb(77, 154, 255);
+	--el-color-primary-light-5: #a0cfff;
+	--el-color-primary-light-7: #c6e2ff;
+	--el-color-primary-light-8: #d9ecff;
+	--el-color-primary-light-9: #ecf5ff;
 	--el-color-primary-dark-2: rgb(4, 92, 208);
 	--el-color-success: #1BCD63;
 	--el-color-success-light-3: rgb(95, 220, 146);
+	--el-color-success-light-5: #b3f0d0;
+	--el-color-success-light-7: #d2f6e4;
+	--el-color-success-light-8: #e1f9ee;
+	--el-color-success-light-9: #f0fdf6;
 	--el-color-success-dark-2: rgb(26, 168, 83);
 	--el-color-warning: #FBAC15;
 	--el-color-warning-light-3: rgb(252, 197, 91);
+	--el-color-warning-light-5: #fde2b0;
+	--el-color-warning-light-7: #fef0d0;
+	--el-color-warning-light-8: #fef5e2;
+	--el-color-warning-light-9: #fefaf0;
 	--el-color-warning-dark-2: rgb(205, 142, 21);
 	--el-color-danger: #E4221C;
 	--el-color-danger-light-3: rgb(236, 100, 96);
+	--el-color-danger-light-5: #f5b3b1;
+	--el-color-danger-light-7: #f9d2d1;
+	--el-color-danger-light-8: #fbe1e0;
+	--el-color-danger-light-9: #fdf0ef;
 	--el-color-danger-dark-2: rgb(186, 31, 26);
 	--el-color-error: #E4221C;
 	--el-color-error-light-3: rgb(236, 100, 96);
+	--el-color-error-light-5: #f5b3b1;
+	--el-color-error-light-7: #f9d2d1;
+	--el-color-error-light-8: #fbe1e0;
+	--el-color-error-light-9: #fdf0ef;
 	--el-color-error-dark-2: rgb(186, 31, 26);
+	--el-color-info: #909399;
+	--el-color-info-light-3: #b1b3b8;
+	--el-color-info-light-5: #c8c9cc;
+	--el-color-info-light-7: #dedfe0;
+	--el-color-info-light-8: #e9e9eb;
+	--el-color-info-light-9: #f4f4f5;
+	--el-color-info-dark-2: #73767a;
+	--el-box-shadow: 0px 12px 32px 4px rgba(0, 0, 0, .08), 0px 8px 20px rgba(0, 0, 0, .12);
+	--el-box-shadow-light: 0px 0px 12px rgba(0, 0, 0, .08);
+	--el-box-shadow-lighter: 0px 0px 6px rgba(0, 0, 0, .04);
+	--el-box-shadow-dark: 0px 16px 48px 16px rgba(0, 0, 0, .08), 0px 12px 32px rgba(0, 0, 0, .12), 0px 8px 16px -8px rgba(0, 0, 0, .16);
+	--el-bg-color-page: #f2f3f5;
+	--el-bg-color: #ffffff;
+	--el-bg-color-rgb-r: 255;
+	--el-bg-color-rgb-g: 255;
+	--el-bg-color-rgb-b: 255;
+	--el-bg-color-overlay: #ffffff;
+	--el-text-color-primary: #303133;
+	--el-text-color-regular: #606266;
+	--el-text-color-secondary: #909399;
+	--el-text-color-placeholder: #a8abb2;
+	--el-text-color-disabled: #c0c4cc;
+	--el-border-color-darker: #cdd0d6;
+	--el-border-color-dark: #d4d7de;
+	--el-border-color: #dcdfe6;
+	--el-border-color-light: #e4e7ed;
+	--el-border-color-lighter: #ebeef5;
+	--el-border-color-extra-light: #f2f6fc;
+	--el-fill-color-darker: #e6e8eb;
+	--el-fill-color-dark: #ebedf0;
+	--el-fill-color: #f0f2f5;
+	--el-fill-color-light: #f5f7fa;
+	--el-fill-color-lighter: #fafafa;
+	--el-fill-color-extra-light: #fafcff;
+	--el-fill-color-blank: transparent;
+	--el-mask-color: rgba(0, 0, 0, .8);
+	--el-mask-color-extra-light: rgba(0, 0, 0, .3);
+}
+
+html[data-theme="light"] .el-button {
+	--el-button-disabled-text-color: rgba(0, 0, 0, .3)
+}
+
+html[data-theme="light"] .el-card {
+	--el-card-bg-color: var(--el-bg-color-overlay)
+}
+
+html[data-theme="light"] .el-empty {
+	--el-empty-fill-color-0: var(--el-color-white);
+	--el-empty-fill-color-1: #f5f5f5;
+	--el-empty-fill-color-2: #eeeeee;
+	--el-empty-fill-color-3: #e0e0e0;
+	--el-empty-fill-color-4: #dfdfdf;
+	--el-empty-fill-color-5: #e8e8e8;
+	--el-empty-fill-color-6: #ececec;
+	--el-empty-fill-color-7: #e5e5e5;
+	--el-empty-fill-color-8: #e2e2e2;
+	--el-empty-fill-color-9: #e0e0e0;
 }

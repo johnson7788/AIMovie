@@ -641,9 +641,9 @@ onUnmounted(() => {
 	max-width: 1000px;
 	padding: 2px;
 	// background-image: linear-gradient(90deg, rgba(120, 255, 255, 1), rgba(13, 242, 131, 1));
-	background: rgba(30, 30, 30, 0.4);
+	background: rgba(0, 0, 0, 0.04);
 	border-radius: 20px;
-	border: 0px solid rgba(255, 255, 255, 0.3);
+	border: 0px solid rgba(0, 0, 0, 0.15);
 	backdrop-filter: blur(8px);
 	-webkit-backdrop-filter: blur(10px);
 	// margin-top: 10px;
@@ -704,12 +704,12 @@ onUnmounted(() => {
 }
 
 .input-button {
-	background: rgba(255, 255, 255, 0.08);
+	background: rgba(0, 0, 0, 0.06);
 	cursor: pointer;
 	border-radius: 20px;
 
 	&:hover {
-		background: rgba(255, 255, 255, 0.16);
+		background: rgba(0, 0, 0, 0.1);
 	}
 }
 

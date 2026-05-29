@@ -14,7 +14,7 @@ const handleUpdateDrama = (drama: any) => {
     dramaInfo.value = drama;
 }
 const font = reactive({
-    color: 'rgba(255,255,255,0.03)',
+    color: 'rgba(0, 0, 0, 0.02)',
     fontSize: 16,
     fontWeight: 600,
     fontFamily: 'Arial, sans-serif',

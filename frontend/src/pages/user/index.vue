@@ -70,7 +70,7 @@ const xlUserinfoRef = ref<any>(null);
 
 .btn {
     border-radius: 50px 50px 50px 50px;
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    border: 1px solid rgba(0, 0, 0, 0.15);
     padding:8px 30px;
     font-size: 16px;
     cursor: pointer;

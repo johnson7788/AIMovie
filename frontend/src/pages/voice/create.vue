@@ -621,26 +621,26 @@ onUnmounted(() => {
 
     :deep(.el-upload-dragger) {
         width: 100%;
-        background: rgba(255, 255, 255, 0.06);
-        border: 1px dashed rgba(255, 255, 255, 0.2);
+        background: rgba(0, 0, 0, 0.04);
+        border: 1px dashed rgba(0, 0, 0, 0.12);
         border-radius: 12px;
         padding: 26px 12px;
     }
 
     .upload-icon {
         font-size: 26px;
-        color: rgba(255, 255, 255, 0.8);
+        color: rgba(0, 0, 0, 0.6);
         margin-bottom: 16px;
     }
 
     .upload-text {
-        color: rgba(255, 255, 255, 0.9);
+        color: rgba(0, 0, 0, 0.8);
         font-size: 14px;
         margin-bottom: 16px;
     }
 
     .upload-subtext {
-        color: rgba(255, 255, 255, 0.6);
+        color: rgba(0, 0, 0, 0.4);
         font-size: 12px;
     }
 
@@ -659,13 +659,13 @@ onUnmounted(() => {
         }
 
         .upload-text {
-            color: rgba(255, 255, 255, 0.9);
+            color: rgba(0, 0, 0, 0.8);
             font-size: 14px;
             margin-bottom: 8px;
         }
 
         .upload-subtext {
-            color: rgba(255, 255, 255, 0.6);
+            color: rgba(0, 0, 0, 0.4);
             font-size: 12px;
         }
     }
@@ -688,7 +688,7 @@ onUnmounted(() => {
     flex-direction: row;
     gap: 16px;
     padding: 16px;
-    background: rgba(255, 255, 255, 0.06);
+    background: rgba(0, 0, 0, 0.04);
     border-radius: 12px;
     width: 100%;
 
@@ -707,7 +707,7 @@ onUnmounted(() => {
         color: #fff;
 
         &:hover {
-            background: rgba(255, 255, 255, 0.2);
+            background: rgba(0, 0, 0, 0.12);
             transform: scale(1.05);
         }
 
@@ -738,7 +738,7 @@ onUnmounted(() => {
         min-width: 0;
 
         .audio-name {
-            color: rgba(255, 255, 255, 0.9);
+            color: rgba(0, 0, 0, 0.8);
             font-size: 14px;
             font-weight: 500;
             white-space: nowrap;
@@ -747,23 +747,23 @@ onUnmounted(() => {
         }
 
         .audio-meta {
-            color: rgba(255, 255, 255, 0.6);
+            color: rgba(0, 0, 0, 0.4);
             font-size: 12px;
         }
     }
 }
 
 .upload-label {
-    color: rgba(255, 255, 255, 0.9);
+    color: rgba(0, 0, 0, 0.8);
     font-weight: 600;
     margin-top: 4px;
 }
 
 .trial-textarea {
     :deep(.el-textarea__inner) {
-        background: rgba(255, 255, 255, 0.06);
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        color: rgba(255, 255, 255, 0.9);
+        background: rgba(0, 0, 0, 0.04);
+        border: 1px solid rgba(0, 0, 0, 0.06);
+        color: rgba(0, 0, 0, 0.8);
         border-radius: 12px;
     }
 }
@@ -781,13 +781,13 @@ onUnmounted(() => {
 }
 
 .input-button {
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.06);
     cursor: pointer;
     border-radius: 30px;
     width: 251px;
     padding: 12px 20px;
     &:hover {
-        background: rgba(255, 255, 255, 0.16);
+        background: rgba(0, 0, 0, 0.1);
     }
 }
 

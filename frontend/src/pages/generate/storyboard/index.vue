@@ -2658,7 +2658,7 @@ defineExpose({
 
         .icon-button {
             cursor: pointer;
-            background-color: rgba(255, 255, 255, 0.15);
+            background-color: rgba(0, 0, 0, 0.08);
             padding: 3px;
             border-radius: 4px;
 

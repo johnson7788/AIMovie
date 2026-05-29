@@ -128,15 +128,15 @@ onMounted(() => {
     border-color: var(--el-color-info);
 
     &:hover {
-        background-color: rgba(255, 255, 255, 0.08);
+        background-color: rgba(0, 0, 0, 0.06);
     }
 
     .bg {
-        background-color: rgba(255, 255, 255, 0.1);
+        background-color: rgba(0, 0, 0, 0.06);
     }
 
     &-b {
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(0, 0, 0, 0.06);
     }
 }
 

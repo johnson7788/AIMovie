@@ -87,12 +87,12 @@ onUnmounted(() => {
             <span class="h10">邀请好友得积分</span>
         </div>
         <div class="x-header-tool" v-if="showMenu?.includes('helper')" @click="toUse">
-            <el-icon alt="帮助" :size="26" class="x-header-tool-img"  color="rgba(255,255,255,0.5)">
+            <el-icon alt="帮助" :size="26" class="x-header-tool-img"  color="rgba(0, 0, 0, 0.3)">
                 <HelperSvg />
             </el-icon>
         </div>
         <div class="x-header-tool" v-if="showMenu?.includes('wechat')" @click="openWechatGroupDialog">
-            <el-icon alt="微信群" :size="26" class="x-header-tool-img" color="rgba(255,255,255,0.5)">
+            <el-icon alt="微信群" :size="26" class="x-header-tool-img" color="rgba(0, 0, 0, 0.3)">
                 <IconWechatSvg />
             </el-icon>
         </div>
@@ -113,9 +113,9 @@ onUnmounted(() => {
 <style scoped lang="scss">
 .x-header-tools {
     .btn {
-        background: rgba(30, 30, 30, 0.4);
+        background: rgba(0, 0, 0, 0.04);
         border-radius: 20px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(0, 0, 0, 0.06);
         backdrop-filter: blur(10px);
         -webkit-backdrop-filter: blur(10px);
         padding: 10px 16px;
@@ -126,7 +126,7 @@ onUnmounted(() => {
         cursor: pointer;
 
         &:hover {
-            background: rgba(255, 255, 255, 0.16);
+            background: rgba(0, 0, 0, 0.1);
         }
     }
 

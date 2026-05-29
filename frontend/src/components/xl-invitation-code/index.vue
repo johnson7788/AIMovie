@@ -158,7 +158,7 @@ defineExpose({
 
     .h8 {
         font-size: 14px;
-        color: rgba(255, 255, 255, 0.90);
+        color: rgba(0, 0, 0, 0.8);
         line-height: 1.5;
     }
 
@@ -174,8 +174,8 @@ defineExpose({
     .code-item {
         display: flex;
         gap: 8px;
-        background: #1E1E1E;
-        border: 1px solid #272727;
+        background: #f5f7fa;
+        border: 1px solid #e4e7ed;
         padding: 16px 20px;
         border-radius: 12px;
         cursor: pointer;

@@ -232,7 +232,7 @@ const handleSubmit = () => {
     height: 85px;
     border-radius: 50%;
     // background: radial-gradient(circle, #2d2d2d 0%, #1f1f1f 50%, #151515 100%);
-    border:4px solid #272727;
+    border:4px solid #e4e7ed;
     position: relative;
     display: flex;
     align-items: center;
@@ -320,18 +320,18 @@ const handleSubmit = () => {
 }
 
 :deep(.el-input__wrapper) {
-    --el-input-bg-color: #1e1e1e;
-    --el-input-border-color: #1e1e1e;
-    --el-input-focus-border-color: #1e1e1e;
+    --el-input-bg-color: #f5f7fa;
+    --el-input-border-color: #f5f7fa;
+    --el-input-focus-border-color: #f5f7fa;
     --el-input-border-radius: 8px;
     --el-border-radius-base: 8px;
     padding: 6px 8px;
 }
 
 :deep(.el-select__wrapper) {
-    --el-fill-color-blank: #1e1e1e;
-    --el-select-border-color: #1e1e1e;
-    --el-color-primary: #1e1e1e;
+    --el-fill-color-blank: #f5f7fa;
+    --el-select-border-color: #f5f7fa;
+    --el-color-primary: #f5f7fa;
     --el-select-border-radius: 8px;
     --el-border-radius-base: 8px;
     padding: 14px 16px;

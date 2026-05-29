@@ -34,7 +34,7 @@ const handleCustomInput = () => {
                 <span class="font-weight-600">{{ item }}</span>
             </div>
         </div>
-        <div v-if="allowInput" class="custom-input-area mt-4 pt-3" style="border-top: 1px solid rgba(255,255,255,0.1);">
+        <div v-if="allowInput" class="custom-input-area mt-4 pt-3" style="border-top: 1px solid rgba(0, 0, 0, 0.06);">
             <span class="h10">自定义集数</span>
             <div class="flex grid-gap-2 mt-2">
                 <input
@@ -64,11 +64,11 @@ const handleCustomInput = () => {
     padding-top: 2px;
     padding-bottom: 2px;
     &:hover {
-        background: rgba(255, 255, 255, 0.16);
+        background: rgba(0, 0, 0, 0.1);
     }
 
     &.active {
-        background: rgba(255, 255, 255, 0.16);
+        background: rgba(0, 0, 0, 0.1);
     }
 }
 
@@ -85,17 +85,17 @@ const handleCustomInput = () => {
     width: 100%;
     padding: 6px 10px;
     border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    background: rgba(0, 0, 0, 0.04);
     color: #fff;
     font-size: 13px;
     outline: none;
     transition: border-color 0.2s;
     &:focus {
-        border-color: rgba(255, 255, 255, 0.35);
+        border-color: rgba(0, 0, 0, 0.18);
     }
     &::placeholder {
-        color: rgba(255, 255, 255, 0.3);
+        color: rgba(0, 0, 0, 0.15);
     }
 }
 </style>

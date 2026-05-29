@@ -297,7 +297,7 @@ const handleDownloadEpisode = (item: any) => {
         width: 100%;
         height: 220px;
         border-radius: 8px;
-        --el-avatar-bg-color: #1E1E1E;
+        --el-avatar-bg-color: #f5f7fa;
         background-color: var(--el-avatar-bg-color);
 
         :deep(img) {

@@ -362,8 +362,8 @@ onUnmounted(() => {
         :deep(.el-upload-dragger) {
             width: 100%;
             padding: 24px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px dashed rgba(255, 255, 255, 0.2);
+            background: rgba(0, 0, 0, 0.04);
+            border: 1px dashed rgba(0, 0, 0, 0.12);
             border-radius: 8px;
         }
     }
@@ -449,10 +449,10 @@ onUnmounted(() => {
 }
 
 .creative-task-item {
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(0, 0, 0, 0.04);
     border-radius: 8px;
     padding: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(0, 0, 0, 0.06);
 
     .creative-task-header {
         display: flex;

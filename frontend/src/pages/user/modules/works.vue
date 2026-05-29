@@ -107,7 +107,7 @@ onMounted(() => {
 </script>
 <style scoped lang="scss">
 .box {
-    background-color: #1E1E1E;
+    background-color: #f5f7fa;
     border-radius: 20px;
     overflow: hidden;
     position: relative;
@@ -172,7 +172,7 @@ onMounted(() => {
         &-icon {
             width: 46px;
             height: 46px;
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.06);
             border-radius: 8px;
             display: flex;
             align-items: center;

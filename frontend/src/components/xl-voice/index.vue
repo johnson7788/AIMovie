@@ -165,14 +165,14 @@ defineExpose({
     cursor: pointer;
     border-width: 1px;
     border-style: solid;
-    border-color: rgba(255, 255, 255, 0.1);
+    border-color: rgba(0, 0, 0, 0.06);
 
     &:hover {
-        background-color: rgba(255, 255, 255, 0.08);
+        background-color: rgba(0, 0, 0, 0.06);
     }
 
     .bg {
-        background-color: rgba(255, 255, 255, 0.1);
+        background-color: rgba(0, 0, 0, 0.06);
     }
 
     &-selected {

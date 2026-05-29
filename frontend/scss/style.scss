@@ -75,14 +75,14 @@ a {
 }
 
 ::-webkit-scrollbar-thumb {
-    background-color: #E5EAF3;
+    background-color: #c0c4cc;
     border-radius: 10px;
     transition: all .2s ease-in-out
 }
 
 ::-webkit-scrollbar-thumb:hover {
     cursor: pointer;
-    background-color: #E5EAF3
+    background-color: #909399
 }
 
 .circular {
@@ -374,7 +374,7 @@ a {
 
     .el-dialog__header {
         padding: 20px;
-        border-bottom: 1px solid #262626;
+        border-bottom: 1px solid var(--el-border-color-light);
         position: relative;
 
         .el-dialog__headerbtn {
@@ -423,7 +423,7 @@ a {
 
     .el-dialog__header {
         padding: 20px;
-        border-bottom: 1px solid #262626;
+        border-bottom: 1px solid var(--el-border-color-light);
         position: relative;
 
         .el-dialog__headerbtn {
@@ -463,14 +463,13 @@ a {
 
 .tabs-segmented.el-segmented {
     --el-border-radius-base: 8px;
-    --el-segmented-bg-color: rgba(30, 30, 30, 0.4) !important;
-    --el-border-color: rgba(255, 255, 255, 0.3);
-    --el-segmented-item-hover-bg-color: rgba(255, 255, 255, 0.1);
-    --el-segmented-item-active-bg-color: rgba(255, 255, 255, 0.1);
+    --el-segmented-bg-color: rgba(0, 0, 0, 0.04) !important;
+    --el-border-color: rgba(0, 0, 0, 0.1);
+    --el-segmented-item-hover-bg-color: rgba(0, 0, 0, 0.06);
+    --el-segmented-item-active-bg-color: rgba(0, 0, 0, 0.06);
     --el-segmented-padding: 4px;
-    --el-segmented-item-selected-color: var(--el-bg-color);
-    --el-segmented-item-selected-bg-color: #FFFFFF;
-    --el-segmented-item-selected-color: var(--el-bg-color);
+    --el-segmented-item-selected-color: #FFFFFF;
+    --el-segmented-item-selected-bg-color: var(--el-color-primary);
     font-weight: 600;
 
     .el-segmented__item {
@@ -519,15 +518,15 @@ a {
 }
 
 .el-popper.model-popover {
-    --el-popover-bg-color: rgba(30, 30, 30, 0.5);
+    --el-popover-bg-color: rgba(255, 255, 255, 0.8);
     backdrop-filter: blur(20px);
     border-radius: 20px;
-    --el-popover-border-color: rgba(255, 255, 255, 0.1);
+    --el-popover-border-color: rgba(0, 0, 0, 0.08);
     --el-box-shadow-light: none;
 
-    /* border: 0px solid rgba(255,255,255,0.3); */
+    /* border: 0px solid rgba(0,0,0,0.1); */
     .el-popper__arrow::before {
-        background-color: rgba(30, 30, 30, 0.5);
+        background-color: rgba(255, 255, 255, 0.8);
     }
 }
 
@@ -604,9 +603,9 @@ a {
     padding-top: 2px;
     padding-bottom: 2px;
     &-selected {
-        background: rgba(255, 255, 255, 0.08);
+        background: rgba(0, 0, 0, 0.06);
     }
     &:hover {
-        background: rgba(255, 255, 255, 0.16);
+        background: rgba(0, 0, 0, 0.1);
     }
 }

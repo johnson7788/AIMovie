@@ -122,7 +122,7 @@ const xlInvitationCodeRef = ref<any>(null);
         text-align: center;
         border-radius: 20px;
         background: linear-gradient(90deg, #F4CF77 0%, #FFF1D0 100%);
-        border: 0px solid rgba(255, 255, 255, 0.3);
+        border: 0px solid rgba(0, 0, 0, 0.15);
         color: #3D2D09;
         margin-top: 16px;
         font-weight: bold;
@@ -143,6 +143,6 @@ const xlInvitationCodeRef = ref<any>(null);
 }
 
 .el-divider--horizontal {
-    --el-border-color: rgba(255, 255, 255, 0.1);
+    --el-border-color: rgba(0, 0, 0, 0.06);
 }
 </style>
