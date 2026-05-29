@@ -42,7 +42,7 @@ npm install
 ### 2. 配置环境变量
 
 ```bash
-cp backend/.env.example backend/.env
+cp backend/env_example backend/.env
 ```
 
 编辑 `backend/.env`，填入你的 API Key：
