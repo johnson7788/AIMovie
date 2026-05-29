@@ -25,6 +25,8 @@ video_generator:
   class_path: tools.VideoGeneratorDoubaoSeedanceVolcengineAPI
   init_args:
     api_key:
+    max_iterations: 200
+    max_retries: 2
   max_requests_per_minute: 2
   max_requests_per_day: 10
 

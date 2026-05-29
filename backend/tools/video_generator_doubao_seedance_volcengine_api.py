@@ -16,6 +16,8 @@ class VideoGeneratorDoubaoSeedanceVolcengineAPI:
         ff2v_model: str = "doubao-seedance-2-0-fast-260128",
         flf2v_model: str = "doubao-seedance-2-0-fast-260128",
         rate_limiter: Optional[RateLimiter] = None,
+        max_iterations: int = 200,
+        max_retries: int = 2,
     ):
         if not api_key:
             api_key = os.environ.get("ARK_API_KEY", "")
@@ -24,6 +26,8 @@ class VideoGeneratorDoubaoSeedanceVolcengineAPI:
         self.ff2v_model = ff2v_model
         self.flf2v_model = flf2v_model
         self.rate_limiter = rate_limiter
+        self.max_iterations = max_iterations
+        self.max_retries = max_retries
 
     async def create_video_generation_task(
         self,
@@ -132,7 +136,7 @@ class VideoGeneratorDoubaoSeedanceVolcengineAPI:
             'Content-Type': 'application/json'
         }
 
-        max_iterations = 90  # 90 * 2s = 180s total
+        max_iterations = self.max_iterations
         for iteration in range(1, max_iterations + 1):
             try:
                 timeout = aiohttp.ClientTimeout(total=30)
@@ -182,5 +186,20 @@ class VideoGeneratorDoubaoSeedanceVolcengineAPI:
         duration: Literal[5, 10] = 5,
     ) -> VideoOutput:
         task_id = await self.create_video_generation_task(prompt, reference_image_paths, resolution, aspect_ratio, fps, duration)
-        video_url = await self.query_video_generation_task(task_id)
+        for retry in range(self.max_retries + 1):
+            try:
+                video_url = await self.query_video_generation_task(task_id)
+                break
+            except TimeoutError:
+                if retry < self.max_retries:
+                    logging.warning(
+                        f"Video task {task_id} timed out, retrying query "
+                        f"({retry + 1}/{self.max_retries})..."
+                    )
+                else:
+                    raise TimeoutError(
+                        f"Video task {task_id} did not complete after "
+                        f"{self.max_retries + 1} query attempts "
+                        f"({(self.max_retries + 1) * self.max_iterations * 2}s total)"
+                    )
         return VideoOutput(fmt="url", ext="mp4", data=video_url)
