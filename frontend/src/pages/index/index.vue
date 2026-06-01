@@ -737,7 +737,7 @@ onUnmounted(() => {
 	backdrop-filter: blur(8px);
 	-webkit-backdrop-filter: blur(10px);
 	// margin-top: 10px;
-	margin-bottom: 350px;
+	margin-bottom: 20px;
 
 	.el-mention {
 		--el-input-border: none;
@@ -831,6 +831,7 @@ onUnmounted(() => {
 	align-items: center;
 	gap: 8px;
 	flex-wrap: wrap;
+	margin-bottom: 40px;
 
 	&-label {
 		font-size: 12px;
@@ -843,8 +844,8 @@ onUnmounted(() => {
 		padding: 4px 12px;
 		border-radius: 12px;
 		cursor: pointer;
-		background: rgba(255, 255, 255, 0.06);
-		border: 1px solid rgba(255, 255, 255, 0.1);
+		background: var(--el-fill-color-light);
+		border: 1px solid var(--el-border-color-lighter);
 		color: var(--el-text-color-regular);
 		white-space: nowrap;
 		transition: all 0.2s;
@@ -856,9 +857,6 @@ onUnmounted(() => {
 		}
 
 		&.is-drama {
-			background: rgba(121, 255, 255, 0.06);
-			border-color: rgba(121, 255, 255, 0.1);
-
 			&:hover {
 				background: rgba(121, 255, 255, 0.12);
 				border-color: rgba(121, 255, 255, 0.3);
