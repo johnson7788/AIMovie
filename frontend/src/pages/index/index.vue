@@ -37,6 +37,70 @@ const form = reactive({
 	episode_duration: 60
 })
 
+interface ExamplePreset {
+	label: string
+	mode: 'script' | 'drama'
+	prompt: string
+	style: string
+	aspect_ratio: string
+	episode_sum: number
+	episode_duration: number
+	model_id: string
+}
+
+const examplePresets: ExamplePreset[] = [
+	{
+		label: '橘猫探访书店',
+		mode: 'script',
+		prompt: 'A curious orange tabby cat explores a cozy old bookshop filled with towering shelves and warm golden lamplight. The cat leaps between stacked books, knocks over a pile, and chases a dust mote caught in a sunbeam. Between adventures, it curls up on an open novel by the window and purrs contentedly.',
+		style: 'storybook',
+		aspect_ratio: '9:16',
+		episode_sum: 3,
+		episode_duration: 60,
+		model_id: '',
+	},
+	{
+		label: '蝴蝶的第一次飞翔',
+		mode: 'script',
+		prompt: 'A newly emerged orange-striped butterfly takes its first flight in a spring garden. It accidentally picks up pollen while brushing flower buds, pauses on a kitten\'s paw, and touches an old grandma\'s half-finished butterfly embroidery. Finally it delivers carried pollen to a waiting rose, which unfurls all its petals.',
+		style: 'storybook',
+		aspect_ratio: '9:16',
+		episode_sum: 4,
+		episode_duration: 60,
+		model_id: '',
+	},
+	{
+		label: '赛博朋克侦探',
+		mode: 'script',
+		prompt: 'In a neon-lit cyberpunk city, a hard-boiled detective investigates a series of AI malfunctions. Rain-slicked streets reflect holographic ads as the detective follows digital breadcrumbs through underground hacker dens and corporate towers.',
+		style: 'cinematic',
+		aspect_ratio: '9:16',
+		episode_sum: 5,
+		episode_duration: 60,
+		model_id: '',
+	},
+	{
+		label: '都市爱情故事',
+		mode: 'drama',
+		prompt: '两个年轻人在繁忙的都市中偶然相遇，从误解到理解，从陌生到熟悉。在追逐梦想的路上，他们互相扶持，共同成长，一段温暖治愈的都市爱情故事徐徐展开。',
+		style: 'cinematic',
+		aspect_ratio: '9:16',
+		episode_sum: 20,
+		episode_duration: 60,
+		model_id: '',
+	},
+	{
+		label: '古装武侠传奇',
+		mode: 'drama',
+		prompt: '少年侠客初入江湖，意外卷入一场惊天阴谋。在刀光剑影中磨砺成长，在恩怨情仇中坚守本心。江湖路远，儿女情长，一段荡气回肠的武侠传奇就此展开。',
+		style: 'anime',
+		aspect_ratio: '9:16',
+		episode_sum: 40,
+		episode_duration: 60,
+		model_id: '',
+	},
+]
+
 const options = ref<MentionOption[]>([])
 const loading = ref(false)
 const mentionRef = ref();
@@ -306,6 +370,20 @@ const handleScriptChange = (val: any) => {
 			break;
 	}
 }
+const applyExample = (example: ExamplePreset) => {
+	form.script = example.mode;
+	form.prompt = example.prompt;
+	form.style = example.style;
+	form.aspect_ratio = example.aspect_ratio;
+	form.episode_sum = example.episode_sum;
+	form.episode_duration = example.episode_duration;
+	form.model = example.model_id;
+	styleFind.value = { id: example.style };
+	selectedModel.value = { id: '' };
+	nextTick(() => {
+		mentionRef.value?.input?.ref?.focus();
+	});
+}
 onMounted(() => {
 	addListener();
 })
@@ -419,6 +497,18 @@ onUnmounted(() => {
 					</div>
 				</div>
 			</div>
+		</div>
+		<div class="example-presets">
+			<span class="example-presets-label">示例：</span>
+			<span
+				v-for="example in examplePresets"
+				:key="example.label"
+				class="example-preset-chip"
+				:class="{ 'is-drama': example.mode === 'drama' }"
+				@click="applyExample(example)"
+			>
+				{{ example.label }}
+			</span>
 		</div>
 		<!-- <div class="input-box " v-if="form.script === 'drama'" v-loading="loading">
 			<div class="rounded-4 p-4 ">
@@ -731,6 +821,50 @@ onUnmounted(() => {
 
 	&:hover {
 		background-color: var(--el-fill-color-dark);
+	}
+}
+
+.example-presets {
+	width: 100%;
+	max-width: 1000px;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+
+	&-label {
+		font-size: 12px;
+		color: var(--el-text-color-secondary);
+		white-space: nowrap;
+	}
+
+	&-chip {
+		font-size: 12px;
+		padding: 4px 12px;
+		border-radius: 12px;
+		cursor: pointer;
+		background: rgba(255, 255, 255, 0.06);
+		border: 1px solid rgba(255, 255, 255, 0.1);
+		color: var(--el-text-color-regular);
+		white-space: nowrap;
+		transition: all 0.2s;
+
+		&:hover {
+			background: rgba(13, 242, 131, 0.12);
+			border-color: rgba(13, 242, 131, 0.3);
+			color: #0DF283;
+		}
+
+		&.is-drama {
+			background: rgba(121, 255, 255, 0.06);
+			border-color: rgba(121, 255, 255, 0.1);
+
+			&:hover {
+				background: rgba(121, 255, 255, 0.12);
+				border-color: rgba(121, 255, 255, 0.3);
+				color: #79FFFF;
+			}
+		}
 	}
 }
 </style>
