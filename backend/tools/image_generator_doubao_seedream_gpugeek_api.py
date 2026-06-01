@@ -2,7 +2,7 @@ import logging
 import os
 import aiohttp
 import asyncio
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from tenacity import retry, stop_after_attempt
 from utils.retry import after_func
 from utils.image import image_path_to_b64
@@ -20,6 +20,16 @@ def _map_size(size: Optional[str]) -> str:
         "2048x2048": "4K",
     }
     return mapping.get(size, size)
+
+
+def _extract_output(response_json: Dict[str, Any]) -> str:
+    """Extract the output URL from a prediction response."""
+    output = response_json.get("output")
+    if isinstance(output, list) and len(output) > 0:
+        return output[0]
+    elif isinstance(output, str):
+        return output
+    raise ValueError(f"Unexpected output format: {output}")
 
 
 class ImageGeneratorDoubaoSeedreamGPUGEEKAPI:
@@ -66,7 +76,7 @@ class ImageGeneratorDoubaoSeedreamGPUGEEKAPI:
             "Content-Type": "application/json",
         }
 
-        # Create prediction
+        # Create prediction — GPUGeek returns the result synchronously
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(self.base_url, json=payload, headers=headers) as response:
@@ -76,14 +86,25 @@ class ImageGeneratorDoubaoSeedreamGPUGEEKAPI:
             logging.error(f"Error creating image prediction: {e}")
             raise e
 
+        # Check if the create response already contains the completed result
+        status = response_json.get("status")
+        if status == "succeeded":
+            image_url = _extract_output(response_json)
+            logging.info(f"Image generation completed synchronously. URL: {image_url}")
+            return ImageOutput(fmt="url", ext="png", data=image_url)
+
+        if status == "failed":
+            error_msg = response_json.get("error", "Unknown error")
+            logging.error(f"Image generation failed: {error_msg}")
+            raise ValueError(f"Image generation failed: {error_msg}")
+
+        # Fallback: poll for async completion
         prediction_id = response_json.get("id")
         if not prediction_id:
             logging.error(f"No prediction ID in response: {response_json}")
             raise ValueError(f"Failed to create image prediction: {response_json}")
 
-        logging.info(f"Image prediction created. ID: {prediction_id}")
-
-        # Poll for completion
+        logging.info(f"Image prediction created. ID: {prediction_id}, status: {status}")
         image_url = await self._poll_prediction(prediction_id, headers)
         return ImageOutput(fmt="url", ext="png", data=image_url)
 
@@ -102,13 +123,7 @@ class ImageGeneratorDoubaoSeedreamGPUGEEKAPI:
 
             status = response_json.get("status")
             if status == "succeeded":
-                output = response_json.get("output")
-                if isinstance(output, list):
-                    image_url = output[0]
-                elif isinstance(output, str):
-                    image_url = output
-                else:
-                    raise ValueError(f"Unexpected output format: {output}")
+                image_url = _extract_output(response_json)
                 logging.info(f"Image generation completed. URL: {image_url}")
                 return image_url
             elif status == "failed":
