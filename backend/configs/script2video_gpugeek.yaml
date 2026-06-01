@@ -1,0 +1,31 @@
+# Configuration using GPUGeek (third-party proxy) as the provider.
+# Chat model: Vendor3/DeepSeek-V4-Flash via GPUGeek proxy
+# Image model: Volcengine/Doubao-Seedream-5.0-lite via GPUGeek predictions API
+# Video model: Volcengine/Doubao-Seedance-2.0-fast via GPUGeek predictions API
+#
+# Set your API key here or export GPUGEEK in the environment.
+
+chat_model:
+  init_args:
+    model: Vendor3/DeepSeek-V4-Flash
+    model_provider: gpugeek
+    api_key:
+    # base_url is auto-resolved to https://api.gpugeek.com/v1
+  max_requests_per_minute: null
+  max_requests_per_day: null
+
+image_generator:
+  class_path: tools.ImageGeneratorDoubaoSeedreamGPUGEEKAPI
+  init_args:
+    api_key:
+  max_requests_per_minute: 5
+  max_requests_per_day: 100
+
+video_generator:
+  class_path: tools.VideoGeneratorDoubaoSeedanceGPUGEEKAPI
+  init_args:
+    api_key:
+  max_requests_per_minute: 2
+  max_requests_per_day: 50
+
+working_dir: .working_dir/script2video

@@ -39,6 +39,7 @@ def _get_image_generator(model_id: Optional[str] = None, config_path: str = "con
       - "nanobanana" / "google" / "1" -> ImageGeneratorNanobananaGoogleAPI
       - "seedream" / "volcengine" / "2" -> ImageGeneratorDoubaoSeedreamVolcengineAPI
       - "hunyuan" / "tencent" / "3" -> ImageGeneratorHunyuanTencentAPI
+      - "gpugeek" / "4" -> ImageGeneratorDoubaoSeedreamGPUGEEKAPI
       - None -> use config default
     """
     from tools.render_backend import RenderBackend
@@ -53,6 +54,8 @@ def _get_image_generator(model_id: Optional[str] = None, config_path: str = "con
         config["image_generator"]["class_path"] = "tools.ImageGeneratorDoubaoSeedreamVolcengineAPI"
     elif model_id in ("3", "hunyuan", "tencent"):
         config["image_generator"]["class_path"] = "tools.ImageGeneratorHunyuanTencentAPI"
+    elif model_id in ("4", "gpugeek"):
+        config["image_generator"]["class_path"] = "tools.ImageGeneratorDoubaoSeedreamGPUGEEKAPI"
 
     backend = RenderBackend.from_config(config)
     return backend.image_generator
@@ -225,6 +228,7 @@ def _build_provider_image_generator(provider: str):
     from tools.image_generator_hunyuan_tencent_api import ImageGeneratorHunyuanTencentAPI
     from tools.image_generator_nanobanana_google_api import ImageGeneratorNanobananaGoogleAPI
     from tools.image_generator_doubao_seedream_volcengine_api import ImageGeneratorDoubaoSeedreamVolcengineAPI
+    from tools.image_generator_doubao_seedream_gpugeek_api import ImageGeneratorDoubaoSeedreamGPUGEEKAPI
 
     if provider == "tencent":
         return ImageGeneratorHunyuanTencentAPI()
@@ -232,6 +236,8 @@ def _build_provider_image_generator(provider: str):
         return ImageGeneratorNanobananaGoogleAPI(api_key=os.environ.get("GOOGLE_API_KEY", ""))
     elif provider == "volcengine":
         return ImageGeneratorDoubaoSeedreamVolcengineAPI()
+    elif provider == "gpugeek":
+        return ImageGeneratorDoubaoSeedreamGPUGEEKAPI()
     elif provider == "openai":
         return ImageGeneratorDoubaoSeedreamVolcengineAPI()
     else:
@@ -241,10 +247,13 @@ def _build_provider_image_generator(provider: str):
 def _build_provider_video_generator(provider: str):
     """Build a video generator for the given provider, or fall back to volcengine."""
     from tools.video_generator_doubao_seedance_volcengine_api import VideoGeneratorDoubaoSeedanceVolcengineAPI
+    from tools.video_generator_doubao_seedance_gpugeek_api import VideoGeneratorDoubaoSeedanceGPUGEEKAPI
     from tools.video_generator_veo_google_api import VideoGeneratorVeoGoogleAPI
 
     if provider == "google":
         return VideoGeneratorVeoGoogleAPI(api_key=os.environ.get("GOOGLE_API_KEY", ""))
+    elif provider == "gpugeek":
+        return VideoGeneratorDoubaoSeedanceGPUGEEKAPI()
     else:
         return VideoGeneratorDoubaoSeedanceVolcengineAPI()
 
@@ -321,6 +330,7 @@ MODELS_DATA = {
         {"id": "1", "name": "Hunyuan (Tencent)", "provider": "tencent", "model": "hunyuan-turbos-latest", "icon": "", "description": "Tencent's powerful large language model with excellent Chinese creative writing and reasoning."},
         {"id": "2", "name": "Gemini 2.5 Pro", "provider": "openai", "model": "gemini-2.5-pro", "icon": "", "description": "Google's most capable model for complex reasoning, coding, and creative writing tasks."},
         {"id": "3", "name": "GPT-4o", "provider": "openai", "model": "gpt-4o", "icon": "", "description": "OpenAI's fast multimodal flagship model with strong creative writing capabilities."},
+        {"id": "5", "name": "DeepSeek V4 (GPUGeek)", "provider": "gpugeek", "model": "Vendor3/DeepSeek-V4-Flash", "icon": "", "description": "DeepSeek's latest model via GPUGeek proxy with excellent reasoning and creative writing."},
     ],
     "creative_episode": [],
     "creative_scenes": [
@@ -335,18 +345,22 @@ MODELS_DATA = {
     "scene_image": [
         {"id": "1", "name": "Seedream 4.0", "provider": "volcengine", "model": "seedream-4.0", "icon": "", "description": "ByteDance's high-quality image generation model for cinematic scene creation."},
         {"id": "2", "name": "Nanobanana (Google)", "provider": "google", "model": "nanobanana", "icon": "", "description": "Google's efficient image generation model with fast inference speeds."},
+        {"id": "4", "name": "Seedream 5.0 (GPUGeek)", "provider": "gpugeek", "model": "Volcengine/Doubao-Seedream-5.0-lite", "icon": "", "description": "ByteDance's Seedream via GPUGeek proxy for high-quality image generation."},
     ],
     "actor_image": [
         {"id": "1", "name": "Seedream 4.0", "provider": "volcengine", "model": "seedream-4.0", "icon": "", "description": "High-quality character image generation with consistent facial features."},
         {"id": "2", "name": "Nanobanana (Google)", "provider": "google", "model": "nanobanana", "icon": "", "description": "Fast character portrait generation with good detail preservation."},
+        {"id": "4", "name": "Seedream 5.0 (GPUGeek)", "provider": "gpugeek", "model": "Volcengine/Doubao-Seedream-5.0-lite", "icon": "", "description": "ByteDance's Seedream via GPUGeek proxy with consistent facial features."},
     ],
     "actor_three_view_image": [
         {"id": "1", "name": "Seedream 4.0", "provider": "volcengine", "model": "seedream-4.0", "icon": "", "description": "Generate consistent three-view character reference sheets for animation."},
+        {"id": "4", "name": "Seedream 5.0 (GPUGeek)", "provider": "gpugeek", "model": "Volcengine/Doubao-Seedream-5.0-lite", "icon": "", "description": "ByteDance's Seedream via GPUGeek proxy for character reference sheets."},
     ],
     "storyboard_image": [
         {"id": "1", "name": "Seedream 4.0", "provider": "volcengine", "model": "seedream-4.0", "icon": "", "description": "High-quality storyboard frame generation with cinematic composition."},
         {"id": "2", "name": "Nanobanana (Google)", "provider": "google", "model": "nanobanana", "icon": "", "description": "Fast storyboard image generation for rapid prototyping."},
         {"id": "3", "name": "Hunyuan (Tencent)", "provider": "tencent", "model": "hy-image-v3.0", "icon": "", "description": "Tencent's powerful image generation model with strong text-to-image capabilities."},
+        {"id": "4", "name": "Seedream 5.0 (GPUGeek)", "provider": "gpugeek", "model": "Volcengine/Doubao-Seedream-5.0-lite", "icon": "", "description": "ByteDance's Seedream via GPUGeek proxy for cinematic storyboard frames."},
     ],
     "character_look_costume": [],
     "actor_costume": [],
@@ -356,6 +370,7 @@ MODELS_DATA = {
     "storyboard_video": [
         {"id": "1", "name": "Seedance 1.5 Pro", "provider": "volcengine", "model": "seedance-1.5-pro", "icon": "", "description": "ByteDance's professional video generation model with smooth motion and high fidelity."},
         {"id": "2", "name": "Veo 3 (Google)", "provider": "google", "model": "veo-3", "icon": "", "description": "Google's state-of-the-art video generation model with exceptional quality and consistency."},
+        {"id": "3", "name": "Seedance 2.0 (GPUGeek)", "provider": "gpugeek", "model": "Volcengine/Doubao-Seedance-2.0-fast", "icon": "", "description": "ByteDance's Seedance via GPUGeek proxy for smooth video generation."},
     ],
     "dialogue_voice": [],
     "storyboard_narration_voice": [],
@@ -364,6 +379,7 @@ MODELS_DATA = {
     "creative_video": [
         {"id": "1", "name": "Seedance 1.5 Pro", "provider": "volcengine", "model": "seedance-1.5-pro", "icon": "", "description": "Professional video generation with flexible style control and high output quality."},
         {"id": "2", "name": "Veo 3 (Google)", "provider": "google", "model": "veo-3", "icon": "", "description": "Google's flagship video model, excelling at complex scenes and natural motion."},
+        {"id": "3", "name": "Seedance 2.0 (GPUGeek)", "provider": "gpugeek", "model": "Volcengine/Doubao-Seedance-2.0-fast", "icon": "", "description": "ByteDance's Seedance via GPUGeek proxy with professional video generation quality."},
     ],
 }
 

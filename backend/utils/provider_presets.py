@@ -71,6 +71,15 @@ PROVIDER_PRESETS: Dict[str, Dict[str, Any]] = {
         ],
         "temperature_range": (0.0, 2.0),
     },
+    "gpugeek": {
+        "base_url": "https://api.gpugeek.com/v1",
+        "env_key": "GPUGEEK",
+        "default_model": "Vendor3/DeepSeek-V4-Flash",
+        "models": [
+            "Vendor3/DeepSeek-V4-Flash",
+        ],
+        "temperature_range": (0.0, 2.0),
+    },
 }
 
 
