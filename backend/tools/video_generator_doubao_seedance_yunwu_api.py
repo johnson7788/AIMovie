@@ -49,7 +49,7 @@ class VideoGeneratorDoubaoSeedanceYunwuAPI:
         else:
             raise ValueError("reference_image_paths must contain 1 or 2 images.")
 
-        logging.info(f"Calling {model} to generate video...")
+        logging.info(f"Sending video generation request to {model}...")
 
         url = "https://yunwu.ai/volc/v1/contents/generations/tasks"
 
@@ -91,16 +91,25 @@ class VideoGeneratorDoubaoSeedanceYunwuAPI:
             'Content-Type': 'application/json'
         }
 
+        timeout = aiohttp.ClientTimeout(total=300)  # 5 min timeout
         while True:
             try:
-                async with aiohttp.ClientSession() as session:
+                async with aiohttp.ClientSession(timeout=timeout) as session:
                     async with session.post(url, headers=headers, json=payload) as response:
+                        logging.info(f"Video create request HTTP status: {response.status}")
                         response_json = await response.json()
                         logging.debug(f"Response: {response_json}")
+                        if "error" in response_json:
+                            logging.error(f"Video create API error: {response_json['error']}")
+                            raise ValueError(f"Video creation failed: {response_json['error']}")
                         task_id = response_json["id"]
+            except (aiohttp.ClientTimeout, asyncio.TimeoutError):
+                logging.error(f"Video create request timed out. Retrying in 2 seconds...")
+                await asyncio.sleep(2)
+                continue
             except Exception as e:
-                logging.error(f"Error occurred while creating video generation task.\nRetrying in 1 seconds...")
-                await asyncio.sleep(1)
+                logging.error(f"Error occurred while creating video generation task.\nRetrying in 2 seconds...")
+                await asyncio.sleep(2)
                 continue
             break
 
@@ -129,12 +138,17 @@ class VideoGeneratorDoubaoSeedanceYunwuAPI:
         last_log_time = start_time
         LOG_INTERVAL = 30  # only log progress every 30 seconds
 
+        poll_timeout = aiohttp.ClientTimeout(total=30)  # 30s per poll
         while True:
             try:
-                async with aiohttp.ClientSession() as session:
+                async with aiohttp.ClientSession(timeout=poll_timeout) as session:
                     async with session.get(url, headers=headers) as response:
                         response_json = await response.json()
 
+            except (aiohttp.ClientTimeout, asyncio.TimeoutError):
+                logging.warning(f"Video poll request timed out. Retrying in 2 seconds...")
+                await asyncio.sleep(2)
+                continue
             except Exception as e:
                 logging.error(f"Error occurred while querying video generation task: {e}. Retrying in 1 seconds...")
                 await asyncio.sleep(1)

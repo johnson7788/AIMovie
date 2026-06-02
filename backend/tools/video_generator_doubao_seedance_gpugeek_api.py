@@ -51,7 +51,7 @@ class VideoGeneratorDoubaoSeedanceGPUGEEKAPI:
         else:
             raise ValueError("reference_image_paths must contain 0, 1, or 2 images.")
 
-        logging.info(f"Calling GPUGEEK {model} to generate video...")
+        logging.info(f"Sending video generation request to GPUGEEK {model}...")
 
         resolution_map = {"480p": "480p", "720p": "720p", "1080p": "1080p"}
         ratio_map = {"16:9": "adaptive", "9:16": "adaptive", "1:1": "adaptive"}
@@ -80,16 +80,25 @@ class VideoGeneratorDoubaoSeedanceGPUGEEKAPI:
             "Content-Type": "application/json",
         }
 
+        timeout = aiohttp.ClientTimeout(total=300)  # 5 min timeout for task creation
         while True:
             try:
-                async with aiohttp.ClientSession() as session:
+                async with aiohttp.ClientSession(timeout=timeout) as session:
                     async with session.post(self.base_url, headers=headers, json=payload) as response:
+                        logging.info(f"Video create request HTTP status: {response.status}")
                         response_json = await response.json()
                         logging.debug(f"Create video prediction response: {response_json}")
+                        if "error" in response_json:
+                            logging.error(f"Video create API error: {response_json['error']}")
+                            raise ValueError(f"Video creation failed: {response_json['error']}")
                         return response_json
+            except (aiohttp.ClientTimeout, asyncio.TimeoutError):
+                logging.error(f"Video create request timed out. Retrying in 2 seconds...")
+                await asyncio.sleep(2)
+                continue
             except Exception as e:
-                logging.error(f"Error creating video generation task: {e}. Retrying in 1 second...")
-                await asyncio.sleep(1)
+                logging.error(f"Error creating video generation task: {e}. Retrying in 2 seconds...")
+                await asyncio.sleep(2)
                 continue
 
     async def _poll_prediction(self, prediction_id: str, headers: dict) -> str:
@@ -99,12 +108,17 @@ class VideoGeneratorDoubaoSeedanceGPUGEEKAPI:
         last_log_time = start_time
         LOG_INTERVAL = 30  # only log progress every 30 seconds
 
+        timeout = aiohttp.ClientTimeout(total=30)  # 30s timeout per poll
         for _ in range(max_polls):
             try:
-                async with aiohttp.ClientSession() as session:
+                async with aiohttp.ClientSession(timeout=timeout) as session:
                     async with session.get(url, headers=headers) as response:
                         response_json = await response.json()
                         logging.debug(f"Poll response: {response_json}")
+            except (aiohttp.ClientTimeout, asyncio.TimeoutError):
+                logging.warning(f"Poll request timed out. Retrying in 2 seconds...")
+                await asyncio.sleep(2)
+                continue
             except Exception as e:
                 logging.error(f"Error polling video task: {e}. Retrying in 2 seconds...")
                 await asyncio.sleep(2)

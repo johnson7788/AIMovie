@@ -53,7 +53,7 @@ class ImageGeneratorDoubaoSeedreamGPUGEEKAPI:
         size: Optional[str] = None,
         **kwargs,
     ) -> ImageOutput:
-        logging.info(f"Calling GPUGEEK {self.model} to generate image...")
+        logging.info(f"Sending image generation request to GPUGEEK {self.model}...")
 
         input_data = {
             "prompt": prompt,
@@ -78,11 +78,16 @@ class ImageGeneratorDoubaoSeedreamGPUGEEKAPI:
         }
 
         # Create prediction — GPUGeek returns the result synchronously
+        timeout = aiohttp.ClientTimeout(total=300)  # 5 min timeout
         try:
-            async with aiohttp.ClientSession() as session:
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.post(self.base_url, json=payload, headers=headers) as response:
+                    logging.info(f"Image create request HTTP status: {response.status}")
                     response_json = await response.json()
                     logging.debug(f"Create prediction response: {response_json}")
+        except (aiohttp.ClientTimeout, asyncio.TimeoutError):
+            logging.error(f"Image create request timed out after 300s")
+            raise TimeoutError(f"Image generation request to GPUGEEK {self.model} timed out")
         except Exception as e:
             logging.error(f"Error creating image prediction: {e}")
             raise e
@@ -116,12 +121,17 @@ class ImageGeneratorDoubaoSeedreamGPUGEEKAPI:
         last_log_time = start_time
         LOG_INTERVAL = 30  # only log progress every 30 seconds
 
+        timeout = aiohttp.ClientTimeout(total=30)  # 30s timeout per poll
         for _ in range(max_polls):
             try:
-                async with aiohttp.ClientSession() as session:
+                async with aiohttp.ClientSession(timeout=timeout) as session:
                     async with session.get(url, headers=headers) as response:
                         response_json = await response.json()
                         logging.debug(f"Poll response: {response_json}")
+            except (aiohttp.ClientTimeout, asyncio.TimeoutError):
+                logging.warning(f"Poll request timed out. Retrying in 2 seconds...")
+                await asyncio.sleep(2)
+                continue
             except Exception as e:
                 logging.error(f"Error polling prediction: {e}. Retrying in 2 seconds...")
                 await asyncio.sleep(2)
