@@ -1,4 +1,5 @@
 import logging
+import time
 from typing import List, Optional
 import asyncio
 from google import genai
@@ -83,10 +84,18 @@ class VideoGeneratorVeoGoogleAPI:
                 else:
                     raise
 
+        start_time = time.time()
+        last_log_time = start_time
+        LOG_INTERVAL = 30  # only log progress every 30 seconds
+
         while not operation.done:
+            now = time.time()
+            elapsed = now - start_time
+            if now - last_log_time >= LOG_INTERVAL:
+                logging.info(f"Video generation in progress (elapsed: {elapsed:.0f}s)...")
+                last_log_time = now
             await asyncio.sleep(2)
             operation = self.client.operations.get(operation)
-            logging.info(f"Video generation not completed, waiting 2 seconds...")
 
         # Check if operation completed successfully
         if operation.error:

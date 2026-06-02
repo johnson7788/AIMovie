@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 import aiohttp
 import asyncio
 from typing import Any, Dict, List, Literal
@@ -93,7 +94,12 @@ class VideoGeneratorDoubaoSeedanceGPUGEEKAPI:
 
     async def _poll_prediction(self, prediction_id: str, headers: dict) -> str:
         url = f"{self.base_url}/{prediction_id}"
-        while True:
+        max_polls = 600  # 20 minutes max
+        start_time = time.time()
+        last_log_time = start_time
+        LOG_INTERVAL = 30  # only log progress every 30 seconds
+
+        for _ in range(max_polls):
             try:
                 async with aiohttp.ClientSession() as session:
                     async with session.get(url, headers=headers) as response:
@@ -106,17 +112,25 @@ class VideoGeneratorDoubaoSeedanceGPUGEEKAPI:
 
             status = response_json.get("status")
             if status == "succeeded":
+                elapsed = time.time() - start_time
                 video_url = _extract_output(response_json)
-                logging.info(f"Video generation completed. URL: {video_url}")
+                logging.info(f"Video generation completed (elapsed: {elapsed:.0f}s). URL: {video_url}")
                 return video_url
             elif status == "failed":
+                elapsed = time.time() - start_time
                 error_msg = response_json.get("error", "Unknown error")
-                logging.error(f"Video generation failed: {error_msg}")
+                logging.error(f"Video generation failed after {elapsed:.0f}s: {error_msg}")
                 raise ValueError(f"Video generation failed: {error_msg}")
             else:
-                logging.info(f"Video generation status: {status}. Retrying in 2 seconds...")
+                now = time.time()
+                elapsed = now - start_time
+                if now - last_log_time >= LOG_INTERVAL:
+                    logging.info(f"Video generation in progress (status={status}, elapsed: {elapsed:.0f}s)...")
+                    last_log_time = now
                 await asyncio.sleep(2)
                 continue
+
+        raise TimeoutError(f"Video generation timed out after {max_polls} polls")
 
     async def generate_single_video(
         self,

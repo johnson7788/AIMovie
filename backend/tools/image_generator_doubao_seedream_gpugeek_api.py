@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 import aiohttp
 import asyncio
 from typing import Any, Dict, List, Optional
@@ -110,7 +111,12 @@ class ImageGeneratorDoubaoSeedreamGPUGEEKAPI:
 
     async def _poll_prediction(self, prediction_id: str, headers: dict) -> str:
         url = f"{self.base_url}/{prediction_id}"
-        while True:
+        max_polls = 600  # 20 minutes max
+        start_time = time.time()
+        last_log_time = start_time
+        LOG_INTERVAL = 30  # only log progress every 30 seconds
+
+        for _ in range(max_polls):
             try:
                 async with aiohttp.ClientSession() as session:
                     async with session.get(url, headers=headers) as response:
@@ -123,14 +129,22 @@ class ImageGeneratorDoubaoSeedreamGPUGEEKAPI:
 
             status = response_json.get("status")
             if status == "succeeded":
+                elapsed = time.time() - start_time
                 image_url = _extract_output(response_json)
-                logging.info(f"Image generation completed. URL: {image_url}")
+                logging.info(f"Image generation completed (elapsed: {elapsed:.0f}s). URL: {image_url}")
                 return image_url
             elif status == "failed":
+                elapsed = time.time() - start_time
                 error_msg = response_json.get("error", "Unknown error")
-                logging.error(f"Image generation failed: {error_msg}")
+                logging.error(f"Image generation failed after {elapsed:.0f}s: {error_msg}")
                 raise ValueError(f"Image generation failed: {error_msg}")
             else:
-                logging.info(f"Image generation status: {status}. Retrying in 2 seconds...")
+                now = time.time()
+                elapsed = now - start_time
+                if now - last_log_time >= LOG_INTERVAL:
+                    logging.info(f"Image generation in progress (status={status}, elapsed: {elapsed:.0f}s)...")
+                    last_log_time = now
                 await asyncio.sleep(2)
                 continue
+
+        raise TimeoutError(f"Image generation timed out after {max_polls} polls")

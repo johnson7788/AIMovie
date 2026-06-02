@@ -217,9 +217,11 @@ class Idea2VideoPipeline:
 
         scene_scripts = await self.write_script_based_on_story(story=story, user_requirement=user_requirement)
 
+        total_scenes = len(scene_scripts)
         all_video_paths = []
 
         for idx, scene_script in enumerate(scene_scripts):
+            print(f"🎬 [Scene {idx + 1}/{total_scenes}] Processing scene...")
             scene_working_dir = os.path.join(self.working_dir, f"scene_{idx}")
             os.makedirs(scene_working_dir, exist_ok=True)
             script2video_pipeline = Script2VideoPipeline(

@@ -123,6 +123,8 @@ class Script2VideoPipeline:
         )
 
         priority_shot_idxs = [camera.parent_cam_idx for camera in camera_tree if camera.parent_cam_idx is not None]
+        total_shots = len(shot_descriptions)
+        print(f"📋 Processing {total_shots} shots across {len(camera_tree)} camera(s)...")
         tasks = [
             self.generate_frames_for_single_camera(
                 camera=camera,

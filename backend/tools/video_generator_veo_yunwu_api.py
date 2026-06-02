@@ -1,4 +1,5 @@
 import logging
+import time
 from typing import List, Optional
 from PIL import Image
 import asyncio
@@ -95,6 +96,10 @@ class VideoGeneratorVeoYunwuAPI:
             'Authorization': f'Bearer {self.api_key}',
         }
 
+        start_time = time.time()
+        last_log_time = start_time
+        LOG_INTERVAL = 30  # only log progress every 30 seconds
+
         while True:
             try:
                 async with aiohttp.ClientSession() as session:
@@ -108,13 +113,19 @@ class VideoGeneratorVeoYunwuAPI:
                 continue
 
             if status == "completed":
-                logging.info(f"Video generation completed successfully")
+                elapsed = time.time() - start_time
+                logging.info(f"Video generation completed successfully (elapsed: {elapsed:.0f}s)")
                 video_url = payload["video_url"]
                 return VideoOutput(fmt="url", ext="mp4", data=video_url)
             elif status == "failed":
-                logging.error(f"Video generation failed: \n{payload}")
+                elapsed = time.time() - start_time
+                logging.error(f"Video generation failed after {elapsed:.0f}s: \n{payload}")
                 break
             else:
-                logging.info(f"Video generation status: {status}, waiting 1 second...")
+                now = time.time()
+                elapsed = now - start_time
+                if now - last_log_time >= LOG_INTERVAL:
+                    logging.info(f"Video generation in progress (status={status}, elapsed: {elapsed:.0f}s)...")
+                    last_log_time = now
                 await asyncio.sleep(1)
                 continue

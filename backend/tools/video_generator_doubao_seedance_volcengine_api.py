@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 from typing import List, Literal, Optional
 import asyncio
 import aiohttp
@@ -137,17 +138,19 @@ class VideoGeneratorDoubaoSeedanceVolcengineAPI:
         }
 
         max_iterations = self.max_iterations
+        start_time = time.time()
+        last_log_time = start_time
+        LOG_INTERVAL = 30  # only log progress every 30 seconds
+
         for iteration in range(1, max_iterations + 1):
             try:
                 timeout = aiohttp.ClientTimeout(total=30)
                 async with aiohttp.ClientSession(timeout=timeout) as session:
-                    logging.info(f"Querying video task {task_id} (iteration {iteration}/{max_iterations}, timeout=30s)...")
                     async with session.get(url, headers=headers) as response:
-                        logging.info(f"Video task query HTTP status: {response.status}")
                         response_json = await response.json()
 
             except aiohttp.ClientTimeout:
-                logging.warning(f"Video task query timed out (iteration {iteration}/{max_iterations})")
+                logging.warning(f"Video task {task_id} query timed out (iteration {iteration}/{max_iterations})")
                 if iteration == max_iterations:
                     raise TimeoutError(f"Video task query timed out after {max_iterations} iterations")
                 await asyncio.sleep(2)
@@ -161,18 +164,25 @@ class VideoGeneratorDoubaoSeedanceVolcengineAPI:
 
             status = response_json["status"]
             if status == "succeeded":
+                elapsed = time.time() - start_time
                 video_url = response_json["content"]["video_url"]
-                logging.info(f"Video generation completed successfully. Video URL: {video_url}")
+                logging.info(f"Video generation completed successfully (elapsed: {elapsed:.0f}s). Video URL: {video_url}")
                 break
             elif status == "failed":
-                logging.error(f"Video generation failed. Response: {response_json}")
+                elapsed = time.time() - start_time
+                logging.error(f"Video generation failed after {elapsed:.0f}s. Response: {response_json}")
                 raise ValueError("Video generation failed.")
             else:
-                logging.info(f"Video generation is still in progress (status={status}). Checking again in 2 seconds...")
+                now = time.time()
+                elapsed = now - start_time
+                if now - last_log_time >= LOG_INTERVAL:
+                    logging.info(f"Video generation in progress (status={status}, elapsed: {elapsed:.0f}s)...")
+                    last_log_time = now
                 await asyncio.sleep(2)
                 continue
         else:
-            raise TimeoutError(f"Video task {task_id} did not complete after {max_iterations} iterations (~{max_iterations * 2}s)")
+            elapsed = time.time() - start_time
+            raise TimeoutError(f"Video task {task_id} did not complete after {max_iterations} iterations (~{elapsed:.0f}s)")
 
         return video_url
 
