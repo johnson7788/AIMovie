@@ -99,7 +99,11 @@ class VideoGeneratorDoubaoSeedanceYunwuAPI:
                         logging.info(f"Video create request HTTP status: {response.status}")
                         response_json = await response.json()
                         logging.debug(f"Response: {response_json}")
-                        if "error" in response_json:
+                        if response.status >= 400:
+                            error_detail = response_json.get("error") or response_json.get("detail") or str(response_json)
+                            logging.error(f"Video create request failed with HTTP {response.status}: {error_detail}")
+                            raise ValueError(f"Video creation failed (HTTP {response.status}): {error_detail}")
+                        if response_json.get("error"):
                             logging.error(f"Video create API error: {response_json['error']}")
                             raise ValueError(f"Video creation failed: {response_json['error']}")
                         task_id = response_json["id"]

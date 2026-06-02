@@ -83,7 +83,11 @@ class VideoGeneratorVeoYunwuAPI:
                         logging.info(f"Video create request HTTP status: {response.status}")
                         response = await response.json()
                         logging.debug(f"Response: {response}")
-                        if "error" in response:
+                        if response.status >= 400:
+                            error_detail = response.get("error") or response.get("detail") or str(response)
+                            logging.error(f"Video create request failed with HTTP {response.status}: {error_detail}")
+                            raise ValueError(f"Video creation failed (HTTP {response.status}): {error_detail}")
+                        if response.get("error"):
                             logging.error(f"Video create API error: {response['error']}")
                             raise ValueError(f"Video creation failed: {response['error']}")
                         task_id = response["id"]
