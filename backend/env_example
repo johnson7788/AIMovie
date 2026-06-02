@@ -32,6 +32,9 @@ OPENAI_API_KEY=
 # 获取地址: https://aistudio.google.com/apikey
 GOOGLE_API_KEY=
 
+#第三方代理key, https://gpugeek.com
+GPUGEEK=xxxx
+
 # ============================================================
 # 后端服务配置
 # ============================================================
