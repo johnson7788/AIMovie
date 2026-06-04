@@ -14,6 +14,13 @@ chat_model:
   max_requests_per_minute: null
   max_requests_per_day: null
 
+# Multimodal model for image understanding (reference image selection)
+multimodal_chat_model:
+  init_args:
+    model: Vendor3/qwen3-vl-plus
+    model_provider: gpugeek
+    api_key:
+
 image_generator:
   class_path: tools.ImageGeneratorDoubaoSeedreamGPUGEEKAPI
   init_args:

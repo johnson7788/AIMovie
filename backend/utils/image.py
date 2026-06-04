@@ -12,7 +12,7 @@ def download_image(url, save_path):
     try:
         logging.info(f"Downloading image from {url} to {save_path}")
 
-        response = requests.get(url, stream=True)
+        response = requests.get(url, stream=True, proxies={"http": None, "https": None})
         response.raise_for_status() # Check for HTTP errors
 
         with open(save_path, 'wb') as file:

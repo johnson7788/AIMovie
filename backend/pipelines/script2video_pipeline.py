@@ -28,6 +28,7 @@ class Script2VideoPipeline:
         image_generator,
         video_generator,
         working_dir: str,
+        multimodal_chat_model=None,
     ):
 
         self.chat_model = chat_model
@@ -38,7 +39,7 @@ class Script2VideoPipeline:
         self.character_portraits_generator = CharacterPortraitsGenerator(image_generator=self.image_generator)
         self.storyboard_artist = StoryboardArtist(chat_model=self.chat_model)
         self.camera_image_generator = CameraImageGenerator(chat_model=self.chat_model, image_generator=self.image_generator, video_generator=self.video_generator)
-        self.reference_image_selector = ReferenceImageSelector(chat_model=self.chat_model)
+        self.reference_image_selector = ReferenceImageSelector(chat_model=self.chat_model, multimodal_model=multimodal_chat_model)
 
         self.working_dir = working_dir
         os.makedirs(self.working_dir, exist_ok=True)
@@ -52,6 +53,12 @@ class Script2VideoPipeline:
 
         chat_model_args = resolve_chat_model_config(config["chat_model"]["init_args"])
         chat_model = init_chat_model(**chat_model_args)
+
+        multimodal_chat_model = None
+        if "multimodal_chat_model" in config:
+            multimodal_args = resolve_chat_model_config(config["multimodal_chat_model"]["init_args"])
+            multimodal_chat_model = init_chat_model(**multimodal_args)
+
         backend = RenderBackend.from_config(config)
 
         return cls(
@@ -59,6 +66,7 @@ class Script2VideoPipeline:
             image_generator=backend.image_generator,
             video_generator=backend.video_generator,
             working_dir=config["working_dir"],
+            multimodal_chat_model=multimodal_chat_model,
         )
 
     async def __call__(

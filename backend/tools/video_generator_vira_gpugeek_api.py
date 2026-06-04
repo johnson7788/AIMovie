@@ -1,11 +1,15 @@
+import base64
 import logging
 import os
 import time
 import aiohttp
 import asyncio
+from io import BytesIO
 from typing import Any, Dict, List, Literal
+
+from PIL import Image
+
 from interfaces.video_output import VideoOutput
-from utils.image import image_path_to_b64
 
 
 def _extract_output(response_json: Dict[str, Any]) -> str:
@@ -16,6 +20,19 @@ def _extract_output(response_json: Dict[str, Any]) -> str:
     elif isinstance(output, str):
         return output
     raise ValueError(f"Unexpected output format: {output}")
+
+
+def _compress_image_to_b64(image_path: str, max_size: int = 768, quality: int = 85) -> str:
+    """Resize image to fit within max_size and return as JPEG base64 data URI."""
+    img = Image.open(image_path).convert("RGB")
+    w, h = img.size
+    if max(w, h) > max_size:
+        ratio = max_size / max(w, h)
+        img = img.resize((int(w * ratio), int(h * ratio)), Image.LANCZOS)
+    buf = BytesIO()
+    img.save(buf, format="JPEG", quality=quality)
+    b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+    return f"data:image/jpeg;base64,{b64}"
 
 
 class VideoGeneratorViraGPUGEEKAPI:
@@ -69,7 +86,7 @@ class VideoGeneratorViraGPUGEEKAPI:
 
         if len(reference_image_paths) >= 1:
             input_data["images"] = [
-                image_path_to_b64(path, mime=True) for path in reference_image_paths
+                _compress_image_to_b64(path) for path in reference_image_paths
             ]
 
         payload = {

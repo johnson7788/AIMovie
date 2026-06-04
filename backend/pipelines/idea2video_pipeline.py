@@ -238,6 +238,7 @@ class Idea2VideoPipeline:
             "type": "artifact", "stage": "characters", "file_type": "json",
             "file_path": "characters.json",
             "character_count": len(characters),
+            "content_preview": json.dumps([c.model_dump() for c in characters], ensure_ascii=False, indent=2)[:500],
         })
         await cb({"type": "stage_end", "stage": "characters", "duration_ms": int((time.time() - t0) * 1000)})
 
@@ -258,6 +259,7 @@ class Idea2VideoPipeline:
         await cb({
             "type": "artifact", "stage": "script", "file_type": "json",
             "file_path": "script.json",
+            "content_preview": json.dumps(scene_scripts, ensure_ascii=False, indent=2)[:500],
         })
         await cb({"type": "stage_end", "stage": "script", "duration_ms": int((time.time() - t0) * 1000), "scene_count": len(scene_scripts)})
 
@@ -277,13 +279,21 @@ class Idea2VideoPipeline:
                 video_generator=self.video_generator,
                 working_dir=scene_working_dir,
             )
+            # Wrap callback to scope artifact paths under this scene directory
+            rel_scene_dir = os.path.relpath(scene_working_dir, self.working_dir)
+            async def scoped_cb(event):
+                if event.get("type") == "artifact" and "file_path" in event:
+                    event = dict(event)
+                    event["file_path"] = os.path.join(rel_scene_dir, event["file_path"])
+                await cb(event)
+
             final_video_path = await script2video_pipeline(
                 script=scene_script,
                 user_requirement=user_requirement,
                 style=style,
                 characters=characters,
                 character_portraits_registry=character_portraits_registry,
-                progress_callback=cb,
+                progress_callback=scoped_cb,
             )
             await cb({
                 "type": "artifact", "stage": scene_stage, "file_type": "video",
