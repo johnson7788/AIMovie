@@ -276,6 +276,9 @@ const submit = () => {
 			resetForm();
 			if (res.data.drama_id) {
 				router.push('/works/' + res.data.drama_id)
+			} else if (res.data.task_id) {
+				const mode = form.script === 'script' ? 'idea2video' : 'idea2video';
+				router.push(`/progress/${res.data.task_id}?mode=${mode}`)
 			} else {
 				xlLoading.open();
 				uuids.push(res.data.uuid);

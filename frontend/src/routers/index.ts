@@ -132,6 +132,14 @@ const router = createRouter({
             }
         },
         {
+            path: '/progress/:task_id',
+            name: 'progress',
+            component: () => import("@/pages/generate/progress/index.vue"),
+            meta: {
+                title: '生成进度',
+            }
+        },
+        {
             path: '/generate/:drama_id/:episode_id?',
             name: 'generate',
             component: () => import("@/pages/generate/index.vue"),

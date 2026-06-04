@@ -1,9 +1,10 @@
 import os
 import logging
+import time
 from agents import Screenwriter, CharacterExtractor, CharacterPortraitsGenerator
 from pipelines.script2video_pipeline import Script2VideoPipeline
 from interfaces import CharacterInScene
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Callable, Awaitable
 import asyncio
 import json
 from moviepy import VideoFileClip, concatenate_videoclips
@@ -180,6 +181,16 @@ class Idea2VideoPipeline:
         print(
             f"☑️ Completed character portrait generation for {character.identifier_in_scene}.")
 
+        # Emit portrait artifact events
+        cb = getattr(self, "_progress_callback", None)
+        if cb:
+            for view_name, path in [("front", front_portrait_path), ("side", side_portrait_path), ("back", back_portrait_path)]:
+                await cb({
+                    "type": "artifact", "stage": "character_portraits", "file_type": "image",
+                    "file_path": os.path.relpath(path, self.working_dir),
+                    "character_name": character.identifier_in_scene, "view": view_name,
+                })
+
         return {
             character.identifier_in_scene: {
                 "front": {
@@ -203,24 +214,60 @@ class Idea2VideoPipeline:
         user_requirement: str,
         style: str,
         episode_count: int = 0,
+        progress_callback: Optional[Callable[[dict], Awaitable[None]]] = None,
     ):
+        cb = progress_callback or (lambda e: None)
+        self._progress_callback = cb
 
+        # Stage: Story
+        await cb({"type": "stage_start", "stage": "story", "message": "Developing story from idea..."})
+        t0 = time.time()
         story = await self.develop_story(idea=idea, user_requirement=user_requirement, episode_count=episode_count)
+        story_path = os.path.join(self.working_dir, "story.txt")
+        await cb({
+            "type": "artifact", "stage": "story", "file_type": "text",
+            "file_path": "story.txt", "content_preview": story[:500],
+        })
+        await cb({"type": "stage_end", "stage": "story", "duration_ms": int((time.time() - t0) * 1000)})
 
+        # Stage: Characters
+        await cb({"type": "stage_start", "stage": "characters", "message": "Extracting characters from story..."})
+        t0 = time.time()
         characters = await self.extract_characters(story=story)
+        await cb({
+            "type": "artifact", "stage": "characters", "file_type": "json",
+            "file_path": "characters.json",
+            "character_count": len(characters),
+        })
+        await cb({"type": "stage_end", "stage": "characters", "duration_ms": int((time.time() - t0) * 1000)})
 
+        # Stage: Character Portraits
+        await cb({"type": "stage_start", "stage": "character_portraits", "message": f"Generating portraits for {len(characters)} characters..."})
+        t0 = time.time()
         character_portraits_registry = await self.generate_character_portraits(
             characters=characters,
             character_portraits_registry=None,
             style=style,
         )
+        await cb({"type": "stage_end", "stage": "character_portraits", "duration_ms": int((time.time() - t0) * 1000)})
 
+        # Stage: Script
+        await cb({"type": "stage_start", "stage": "script", "message": "Writing script based on story..."})
+        t0 = time.time()
         scene_scripts = await self.write_script_based_on_story(story=story, user_requirement=user_requirement)
+        await cb({
+            "type": "artifact", "stage": "script", "file_type": "json",
+            "file_path": "script.json",
+        })
+        await cb({"type": "stage_end", "stage": "script", "duration_ms": int((time.time() - t0) * 1000), "scene_count": len(scene_scripts)})
 
+        # Stage: Per-scene processing
         total_scenes = len(scene_scripts)
         all_video_paths = []
 
         for idx, scene_script in enumerate(scene_scripts):
+            scene_stage = f"scene_{idx}"
+            await cb({"type": "stage_start", "stage": scene_stage, "message": f"Processing scene {idx + 1}/{total_scenes}...", "scene_index": idx, "total_scenes": total_scenes})
             print(f"🎬 [Scene {idx + 1}/{total_scenes}] Processing scene...")
             scene_working_dir = os.path.join(self.working_dir, f"scene_{idx}")
             os.makedirs(scene_working_dir, exist_ok=True)
@@ -236,17 +283,34 @@ class Idea2VideoPipeline:
                 style=style,
                 characters=characters,
                 character_portraits_registry=character_portraits_registry,
+                progress_callback=cb,
             )
+            await cb({
+                "type": "artifact", "stage": scene_stage, "file_type": "video",
+                "file_path": os.path.relpath(final_video_path, self.working_dir),
+            })
             all_video_paths.append(final_video_path)
+            await cb({"type": "stage_end", "stage": scene_stage, "message": f"Scene {idx + 1}/{total_scenes} completed"})
 
+        # Stage: Concatenate
         final_video_path = os.path.join(self.working_dir, "final_video.mp4")
         if os.path.exists(final_video_path):
             print(f"🚀 Skipped concatenating videos, already exists.")
         else:
+            await cb({"type": "stage_start", "stage": "concatenate", "message": "Concatenating all scene videos..."})
+            t0 = time.time()
             print(f"🎬 Starting concatenating videos...")
             video_clips = [VideoFileClip(final_video_path)
                            for final_video_path in all_video_paths]
             final_video = concatenate_videoclips(video_clips)
             final_video.write_videofile(final_video_path)
             print(f"☑️ Concatenated videos, saved to {final_video_path}.")
+            await cb({"type": "stage_end", "stage": "concatenate", "duration_ms": int((time.time() - t0) * 1000)})
+
+        await cb({
+            "type": "artifact", "stage": "concatenate", "file_type": "video",
+            "file_path": "final_video.mp4",
+        })
+
+        self._progress_callback = None
         return final_video_path

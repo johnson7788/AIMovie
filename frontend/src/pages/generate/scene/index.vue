@@ -155,7 +155,11 @@ const handleGenerateImage = () => {
     generateImageLoading.value = true;
     $http.post('/app/shortplay/api/Generate/sceneImage', { ...currentSceneForm.value, model_id: model.value.id }).then((res: any) => {
         if (res.code === ResponseCode.SUCCESS) {
-            currentScene.value.image_state = 1;
+            if (res.data?.task_id) {
+                router.push(`/progress/${res.data.task_id}?mode=scene_image`);
+            } else {
+                currentScene.value.image_state = 1;
+            }
         } else {
             ElMessage.error(res.msg);
         }

@@ -12,6 +12,7 @@ import IconClothesSvg from '@/svg/icon/icon-clothes.vue';
 import IconSelectSvg from '@/svg/icon/icon-select.vue';
 import { useUserStore, useRefs, useModelStore } from '@/stores';
 import { useRoute } from 'vue-router';
+import router from '@/routers';
 import { Loading } from '@element-plus/icons-vue';
 import { formatDuration, truncate } from '@/common/functions';
 import { useAVCanvas } from '@/composables/useAVCanvas';
@@ -239,8 +240,12 @@ const handleGenerateImage = () => {
     generateImageLoading.value = true;
     $http.post('/app/shortplay/api/Generate/storyboardImage', { ...currentStoryboardForm.value, prompt: currentStoryboardForm.value.image_prompt, model_id: model.value.id }).then((res: any) => {
         if (res.code === ResponseCode.SUCCESS) {
-            currentStoryboard.value.image_state = 1;
-            getTaskList();
+            if (res.data?.task_id) {
+                router.push(`/progress/${res.data.task_id}?mode=storyboard_image`);
+            } else {
+                currentStoryboard.value.image_state = 1;
+                getTaskList();
+            }
         } else {
             ElMessage.error(res.msg);
         }

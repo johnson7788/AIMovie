@@ -11,8 +11,10 @@ load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
 
 import asyncio
 import hashlib
+import json as json_module
 import sqlite3
 import tempfile
+import time
 import uuid
 from contextlib import contextmanager
 from datetime import datetime
@@ -22,8 +24,9 @@ import aiohttp
 import yaml
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
+from progress_manager import ProgressManager
 
 def _import_pipelines():
     """Lazy import pipelines to avoid import errors when deps are missing."""
@@ -104,9 +107,15 @@ def init_db():
             status TEXT NOT NULL,
             result TEXT,
             error TEXT,
+            working_dir TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    # Add working_dir column if it doesn't exist (migration for existing DBs)
+    try:
+        conn.execute("ALTER TABLE tasks ADD COLUMN working_dir TEXT")
+    except sqlite3.OperationalError:
+        pass  # column already exists
     conn.commit()
     return conn
 
@@ -129,6 +138,44 @@ def success_response(data):
 
 def error_response(code: int, msg: str):
     return {"code": code, "data": None, "msg": msg}
+
+
+# --- Log handler that forwards to ProgressManager ---
+class TaskLogHandler(logging.Handler):
+    """Forwards log records to ProgressManager as 'log' events for the active task."""
+
+    def __init__(self, task_id: str):
+        super().__init__()
+        self.task_id = task_id
+
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            pm = ProgressManager.get_instance()
+            pm.emit(self.task_id, {
+                "type": "log",
+                "level": record.levelname,
+                "message": msg,
+            })
+        except Exception:
+            self.handleError(record)
+
+
+def _install_log_handler(task_id: str) -> TaskLogHandler:
+    """Install a log handler that forwards to ProgressManager for the given task."""
+    handler = TaskLogHandler(task_id)
+    handler.setFormatter(logging.Formatter(
+        "%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+        datefmt="%H:%M:%S",
+    ))
+    # Attach to root logger to capture all logging output
+    logging.getLogger().addHandler(handler)
+    return handler
+
+
+def _remove_log_handler(handler: TaskLogHandler):
+    """Remove a previously installed log handler."""
+    logging.getLogger().removeHandler(handler)
 
 
 # --- Request models ---
@@ -159,6 +206,8 @@ class TaskResponse(BaseModel):
 # --- Background runners ---
 async def run_script2video(task_id: str, req: Script2VideoRequest):
     Script2VideoPipeline, _ = _import_pipelines()
+    pm = ProgressManager.get_instance()
+    log_handler = _install_log_handler(task_id)
     try:
         pipeline = Script2VideoPipeline.init_from_config(config_path=req.config_path)
         # Use a deterministic cache key so identical inputs reuse the same cache directory.
@@ -171,22 +220,43 @@ async def run_script2video(task_id: str, req: Script2VideoRequest):
         cache_key = hashlib.sha256(cache_key_raw.encode("utf-8")).hexdigest()[:16]
         pipeline.working_dir = os.path.join(pipeline.working_dir, cache_key)
         os.makedirs(pipeline.working_dir, exist_ok=True)
+
+        # Store working_dir for file serving and update task
+        pm.set_working_dir(task_id, pipeline.working_dir)
+        with get_db() as conn:
+            conn.execute(
+                "UPDATE tasks SET working_dir = ? WHERE task_id = ?",
+                (pipeline.working_dir, task_id),
+            )
+
+        async def progress_callback(event):
+            event["task_id"] = task_id
+            # Build file URL for artifact events
+            if event.get("type") == "artifact" and event.get("file_path"):
+                event["url"] = f"/api/tasks/{task_id}/files/{event['file_path']}"
+            pm.emit(task_id, event)
+
         result_path = await pipeline(
             script=req.script,
             user_requirement=req.user_requirement,
             style=req.style,
+            progress_callback=progress_callback,
         )
+        pm.emit(task_id, {"type": "complete", "result": result_path})
         with get_db() as conn:
             conn.execute(
                 "UPDATE tasks SET status = ?, result = ? WHERE task_id = ?",
                 ("completed", result_path, task_id),
             )
     except Exception as e:
+        pm.emit(task_id, {"type": "error", "error": str(e)})
         with get_db() as conn:
             conn.execute(
                 "UPDATE tasks SET status = ?, error = ? WHERE task_id = ?",
                 ("failed", str(e), task_id),
             )
+    finally:
+        _remove_log_handler(log_handler)
 
 
 def _find_model_by_id(model_id: str) -> dict | None:
@@ -260,6 +330,8 @@ def _build_provider_video_generator(provider: str):
 
 async def run_idea2video(task_id: str, req: Idea2VideoRequest):
     _, Idea2VideoPipeline = _import_pipelines()
+    pm = ProgressManager.get_instance()
+    log_handler = _install_log_handler(task_id)
     try:
         pipeline = Idea2VideoPipeline.init_from_config(config_path=req.config_path)
         # Use a deterministic cache key from input parameters so identical
@@ -276,6 +348,14 @@ async def run_idea2video(task_id: str, req: Idea2VideoRequest):
         pipeline.working_dir = os.path.join(pipeline.working_dir, cache_key)
         os.makedirs(pipeline.working_dir, exist_ok=True)
 
+        # Store working_dir for file serving and update task
+        pm.set_working_dir(task_id, pipeline.working_dir)
+        with get_db() as conn:
+            conn.execute(
+                "UPDATE tasks SET working_dir = ? WHERE task_id = ?",
+                (pipeline.working_dir, task_id),
+            )
+
         # Override generators based on selected model's provider
         if req.model_id:
             model_info = _find_model_by_id(req.model_id)
@@ -291,23 +371,34 @@ async def run_idea2video(task_id: str, req: Idea2VideoRequest):
                 pipeline.character_portraits_generator = CharacterPortraitsGenerator(
                     image_generator=pipeline.image_generator)
 
+        async def progress_callback(event):
+            event["task_id"] = task_id
+            if event.get("type") == "artifact" and event.get("file_path"):
+                event["url"] = f"/api/tasks/{task_id}/files/{event['file_path']}"
+            pm.emit(task_id, event)
+
         result_path = await pipeline(
             idea=req.idea,
             user_requirement=req.user_requirement,
             style=req.style,
             episode_count=req.episode_count,
+            progress_callback=progress_callback,
         )
+        pm.emit(task_id, {"type": "complete", "result": result_path})
         with get_db() as conn:
             conn.execute(
                 "UPDATE tasks SET status = ?, result = ? WHERE task_id = ?",
                 ("completed", result_path, task_id),
             )
     except Exception as e:
+        pm.emit(task_id, {"type": "error", "error": str(e)})
         with get_db() as conn:
             conn.execute(
                 "UPDATE tasks SET status = ?, error = ? WHERE task_id = ?",
                 ("failed", str(e), task_id),
             )
+    finally:
+        _remove_log_handler(log_handler)
 
 
 # --- Helper to generate simple colored SVG data URIs for placeholders ---
@@ -475,6 +566,94 @@ async def list_tasks():
         }
         for r in rows
     ])
+
+
+@app.get("/api/tasks/{task_id}/stream")
+async def stream_task_progress(task_id: str):
+    """SSE endpoint for real-time task progress streaming."""
+    pm = ProgressManager.get_instance()
+
+    async def event_generator():
+        index = 0
+        heartbeat_interval = 15  # seconds between heartbeats when idle
+        last_data_time = time.time()
+        try:
+            # Send initial connect event so frontend knows the stream is live
+            yield f"data: {json_module.dumps({'type': 'connected', 'task_id': task_id}, ensure_ascii=False)}\n\n"
+
+            while True:
+                # Wait for new events, or timeout for heartbeat
+                try:
+                    await pm.subscribe(task_id, from_index=index, timeout=heartbeat_interval)
+                except asyncio.CancelledError:
+                    return  # Client disconnected
+
+                # Get events (may have arrived during wait)
+                events = pm.get_events(task_id)
+                new_events = events[index:]
+
+                if new_events:
+                    for event in new_events:
+                        # Each yield is a potential disconnection point
+                        yield f"data: {json_module.dumps(event, ensure_ascii=False)}\n\n"
+                        # Yield control to allow cancellation to propagate
+                        await asyncio.sleep(0)
+                        if event.get("type") in ("complete", "error"):
+                            return
+                    index = len(events)
+                    last_data_time = time.time()
+
+                if pm.is_completed(task_id):
+                    return
+
+                # Send heartbeat only when no data has been sent recently
+                if time.time() - last_data_time >= heartbeat_interval:
+                    yield f": heartbeat {int(time.time())}\n\n"
+                    await asyncio.sleep(0)
+                    last_data_time = time.time()
+
+        except asyncio.CancelledError:
+            pass  # Client disconnected, clean exit
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@app.get("/api/tasks/{task_id}/files/{file_path:path}")
+async def serve_task_file(task_id: str, file_path: str):
+    """Serve an intermediate file from a task's working directory."""
+    pm = ProgressManager.get_instance()
+    working_dir = pm.get_working_dir(task_id)
+
+    if not working_dir:
+        # Fall back to DB lookup
+        with get_db() as conn:
+            row = conn.execute(
+                "SELECT working_dir FROM tasks WHERE task_id = ?", (task_id,)
+            ).fetchone()
+        if row and row["working_dir"]:
+            working_dir = row["working_dir"]
+
+    if not working_dir:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    full_path = os.path.normpath(os.path.join(working_dir, file_path))
+
+    # Security: ensure the resolved path is within the working_dir
+    if not full_path.startswith(os.path.normpath(working_dir)):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if not os.path.exists(full_path):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    return FileResponse(full_path)
 
 
 @app.get("/api/models")
@@ -729,9 +908,21 @@ async def run_scene_image_generation(
     model_id: Optional[str],
 ):
     """Run scene image generation in background."""
-    import logging
+    pm = ProgressManager.get_instance()
+    log_handler = _install_log_handler(task_id)
     ref_path = None
     try:
+        output_dir = os.path.join(".working_dir", "scenes")
+        os.makedirs(output_dir, exist_ok=True)
+        pm.set_working_dir(task_id, output_dir)
+        with get_db() as conn:
+            conn.execute(
+                "UPDATE tasks SET working_dir = ? WHERE task_id = ?",
+                (output_dir, task_id),
+            )
+
+        pm.emit(task_id, {"type": "stage_start", "stage": "scene_image", "message": "Starting scene image generation..."})
+
         gen = _get_image_generator(model_id)
         ref_paths = []
         if image_url:
@@ -754,12 +945,19 @@ async def run_scene_image_generation(
             )
 
         # Save image
-        output_dir = os.path.join(".working_dir", "scenes")
-        os.makedirs(output_dir, exist_ok=True)
         output_path = os.path.join(output_dir, f"scene_{task_id}.png")
         result.save(output_path)
 
         logging.info(f"Scene image saved to {output_path}")
+        pm.emit(task_id, {
+            "type": "artifact",
+            "stage": "scene_image",
+            "file_type": "image",
+            "file_path": f"scene_{task_id}.png",
+            "url": f"/api/tasks/{task_id}/files/scene_{task_id}.png",
+        })
+        pm.emit(task_id, {"type": "stage_end", "stage": "scene_image", "message": "Scene image generated"})
+        pm.emit(task_id, {"type": "complete", "result": output_path})
 
         with get_db() as conn:
             conn.execute(
@@ -767,14 +965,15 @@ async def run_scene_image_generation(
                 ("completed", output_path, task_id),
             )
     except Exception as e:
-        import logging
         logging.exception(f"Scene image generation failed for task {task_id}")
+        pm.emit(task_id, {"type": "error", "error": str(e)})
         with get_db() as conn:
             conn.execute(
                 "UPDATE tasks SET status = ?, error = ? WHERE task_id = ?",
                 ("failed", str(e), task_id),
             )
     finally:
+        _remove_log_handler(log_handler)
         # Clean up temp reference image
         if ref_path and os.path.exists(ref_path):
             try:
@@ -791,9 +990,21 @@ async def run_storyboard_image_generation(
     last_image: Optional[str] = None,
 ):
     """Run storyboard image generation in background."""
-    import logging
+    pm = ProgressManager.get_instance()
+    log_handler = _install_log_handler(task_id)
     ref_paths = []
     try:
+        output_dir = os.path.join(".working_dir", "storyboards")
+        os.makedirs(output_dir, exist_ok=True)
+        pm.set_working_dir(task_id, output_dir)
+        with get_db() as conn:
+            conn.execute(
+                "UPDATE tasks SET working_dir = ? WHERE task_id = ?",
+                (output_dir, task_id),
+            )
+
+        pm.emit(task_id, {"type": "stage_start", "stage": "storyboard_image", "message": "Starting storyboard image generation..."})
+
         gen = _get_image_generator(model_id)
         if first_image:
             ref_paths.append(await _download_image(first_image))
@@ -814,12 +1025,19 @@ async def run_storyboard_image_generation(
                 size="1600x900",
             )
 
-        output_dir = os.path.join(".working_dir", "storyboards")
-        os.makedirs(output_dir, exist_ok=True)
         output_path = os.path.join(output_dir, f"storyboard_{task_id}.png")
         result.save(output_path)
 
         logging.info(f"Storyboard image saved to {output_path}")
+        pm.emit(task_id, {
+            "type": "artifact",
+            "stage": "storyboard_image",
+            "file_type": "image",
+            "file_path": f"storyboard_{task_id}.png",
+            "url": f"/api/tasks/{task_id}/files/storyboard_{task_id}.png",
+        })
+        pm.emit(task_id, {"type": "stage_end", "stage": "storyboard_image", "message": "Storyboard image generated"})
+        pm.emit(task_id, {"type": "complete", "result": output_path})
 
         with get_db() as conn:
             conn.execute(
@@ -828,12 +1046,14 @@ async def run_storyboard_image_generation(
             )
     except Exception as e:
         logging.exception(f"Storyboard image generation failed for task {task_id}")
+        pm.emit(task_id, {"type": "error", "error": str(e)})
         with get_db() as conn:
             conn.execute(
                 "UPDATE tasks SET status = ?, error = ? WHERE task_id = ?",
                 ("failed", str(e), task_id),
             )
     finally:
+        _remove_log_handler(log_handler)
         for p in ref_paths:
             if p and os.path.exists(p):
                 try:
