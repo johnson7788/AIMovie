@@ -81,18 +81,18 @@ class VideoGeneratorVeoYunwuAPI:
                 async with aiohttp.ClientSession(timeout=create_timeout) as session:
                     async with session.post(url, headers=headers, json=payload) as response:
                         logging.info(f"Video create request HTTP status: {response.status}")
-                        response = await response.json()
-                        logging.debug(f"Response: {response}")
+                        response_json = await response.json()
+                        logging.debug(f"Response: {response_json}")
                         if response.status >= 400:
-                            error_detail = response.get("error") or response.get("detail") or str(response)
+                            error_detail = response_json.get("error") or response_json.get("detail") or str(response_json)
                             logging.error(f"Video create request failed with HTTP {response.status}: {error_detail}")
                             raise ValueError(f"Video creation failed (HTTP {response.status}): {error_detail}")
-                        if response.get("error"):
-                            logging.error(f"Video create API error: {response['error']}")
-                            raise ValueError(f"Video creation failed: {response['error']}")
-                        task_id = response["id"]
+                        if response_json.get("error"):
+                            logging.error(f"Video create API error: {response_json['error']}")
+                            raise ValueError(f"Video creation failed: {response_json['error']}")
+                        task_id = response_json["id"]
                         logging.info(f"Video generation task created successfully. Task ID: {task_id}")
-            except (aiohttp.ClientTimeout, asyncio.TimeoutError):
+            except asyncio.TimeoutError:
                 logging.error(f"Video create request timed out. Retrying in 2 seconds...")
                 await asyncio.sleep(2)
                 continue
@@ -121,7 +121,7 @@ class VideoGeneratorVeoYunwuAPI:
                         payload = await response.json()
                         logging.debug(f"Response: {payload}")
                         status = payload["status"]
-            except (aiohttp.ClientTimeout, asyncio.TimeoutError):
+            except asyncio.TimeoutError:
                 logging.warning(f"Video poll request timed out. Retrying in 2 seconds...")
                 await asyncio.sleep(2)
                 continue
@@ -138,7 +138,7 @@ class VideoGeneratorVeoYunwuAPI:
             elif status == "failed":
                 elapsed = time.time() - start_time
                 logging.error(f"Video generation failed after {elapsed:.0f}s: \n{payload}")
-                break
+                raise ValueError(f"Video generation failed after {elapsed:.0f}s")
             else:
                 now = time.time()
                 elapsed = now - start_time

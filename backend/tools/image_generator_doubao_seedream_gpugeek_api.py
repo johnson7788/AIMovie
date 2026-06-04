@@ -89,7 +89,7 @@ class ImageGeneratorDoubaoSeedreamGPUGEEKAPI:
                         error_detail = response_json.get("error") or response_json.get("detail") or str(response_json)
                         logging.error(f"Image create request failed with HTTP {response.status}: {error_detail}")
                         raise ValueError(f"Image creation failed (HTTP {response.status}): {error_detail}")
-        except (aiohttp.ClientTimeout, asyncio.TimeoutError):
+        except asyncio.TimeoutError:
             logging.error(f"Image create request timed out after 300s")
             raise TimeoutError(f"Image generation request to GPUGEEK {self.model} timed out")
         except Exception as e:
@@ -132,7 +132,7 @@ class ImageGeneratorDoubaoSeedreamGPUGEEKAPI:
                     async with session.get(url, headers=headers) as response:
                         response_json = await response.json()
                         logging.debug(f"Poll response: {response_json}")
-            except (aiohttp.ClientTimeout, asyncio.TimeoutError):
+            except asyncio.TimeoutError:
                 logging.warning(f"Poll request timed out. Retrying in 2 seconds...")
                 await asyncio.sleep(2)
                 continue

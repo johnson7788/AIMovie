@@ -108,7 +108,7 @@ class VideoGeneratorDoubaoSeedanceVolcengineAPI:
                         task_id = response_json["id"]
             except ValueError:
                 raise
-            except (aiohttp.ClientTimeout, TimeoutError):
+            except TimeoutError:
                 logging.error(f"Video task creation timed out (attempt {attempt}/{max_retries})")
                 if attempt == max_retries:
                     raise TimeoutError(f"Video task creation timed out after {max_retries} attempts")
@@ -149,7 +149,7 @@ class VideoGeneratorDoubaoSeedanceVolcengineAPI:
                     async with session.get(url, headers=headers) as response:
                         response_json = await response.json()
 
-            except aiohttp.ClientTimeout:
+            except asyncio.TimeoutError:
                 logging.warning(f"Video task {task_id} query timed out (iteration {iteration}/{max_iterations})")
                 if iteration == max_iterations:
                     raise TimeoutError(f"Video task query timed out after {max_iterations} iterations")

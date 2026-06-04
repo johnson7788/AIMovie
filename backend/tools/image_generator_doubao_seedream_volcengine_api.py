@@ -1,6 +1,7 @@
 import logging
 import os
 import aiohttp
+import asyncio
 from typing import List, Optional
 from tenacity import retry, stop_after_attempt
 from utils.retry import after_func
@@ -73,7 +74,7 @@ class ImageGeneratorDoubaoSeedreamVolcengineAPI:
                     logging.info(f"Image generation HTTP status: {response.status}")
                     response_json = await response.json()
                     logging.debug(f"Image generation response: {response_json}")
-        except aiohttp.ClientTimeout:
+        except asyncio.TimeoutError:
             logging.error(f"Image generation request timed out after 300s")
             raise TimeoutError(f"Image generation request to {self.model} timed out after 300s")
         except Exception as e:

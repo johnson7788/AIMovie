@@ -96,7 +96,7 @@ class VideoGeneratorDoubaoSeedanceGPUGEEKAPI:
                             logging.error(f"Video create API error: {response_json['error']}")
                             raise ValueError(f"Video creation failed: {response_json['error']}")
                         return response_json
-            except (aiohttp.ClientTimeout, asyncio.TimeoutError):
+            except asyncio.TimeoutError:
                 logging.error(f"Video create request timed out. Retrying in 2 seconds...")
                 await asyncio.sleep(2)
                 continue
@@ -119,7 +119,7 @@ class VideoGeneratorDoubaoSeedanceGPUGEEKAPI:
                     async with session.get(url, headers=headers) as response:
                         response_json = await response.json()
                         logging.debug(f"Poll response: {response_json}")
-            except (aiohttp.ClientTimeout, asyncio.TimeoutError):
+            except asyncio.TimeoutError:
                 logging.warning(f"Poll request timed out. Retrying in 2 seconds...")
                 await asyncio.sleep(2)
                 continue
