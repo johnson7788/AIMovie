@@ -313,7 +313,7 @@ class Idea2VideoPipeline:
             video_clips = [VideoFileClip(final_video_path)
                            for final_video_path in all_video_paths]
             final_video = concatenate_videoclips(video_clips)
-            final_video.write_videofile(final_video_path)
+            final_video.write_videofile(final_video_path, codec="libx264", preset="medium")
             print(f"☑️ Concatenated videos, saved to {final_video_path}.")
             await cb({"type": "stage_end", "stage": "concatenate", "duration_ms": int((time.time() - t0) * 1000)})
 
