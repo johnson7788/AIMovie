@@ -317,13 +317,13 @@ def _build_provider_image_generator(provider: str):
 def _build_provider_video_generator(provider: str):
     """Build a video generator for the given provider, or fall back to volcengine."""
     from tools.video_generator_doubao_seedance_volcengine_api import VideoGeneratorDoubaoSeedanceVolcengineAPI
-    from tools.video_generator_doubao_seedance_gpugeek_api import VideoGeneratorDoubaoSeedanceGPUGEEKAPI
+    from tools.video_generator_vira_gpugeek_api import VideoGeneratorViraGPUGEEKAPI
     from tools.video_generator_veo_google_api import VideoGeneratorVeoGoogleAPI
 
     if provider == "google":
         return VideoGeneratorVeoGoogleAPI(api_key=os.environ.get("GOOGLE_API_KEY", ""))
     elif provider == "gpugeek":
-        return VideoGeneratorDoubaoSeedanceGPUGEEKAPI()
+        return VideoGeneratorViraGPUGEEKAPI()
     else:
         return VideoGeneratorDoubaoSeedanceVolcengineAPI()
 

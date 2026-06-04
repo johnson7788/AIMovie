@@ -17,6 +17,7 @@ from .reranker_bge_silicon_api import RerankerBgeSiliconapi
 from .video_generator_doubao_seedance_volcengine_api import VideoGeneratorDoubaoSeedanceVolcengineAPI
 from .video_generator_doubao_seedance_yunwu_api import VideoGeneratorDoubaoSeedanceYunwuAPI
 from .video_generator_doubao_seedance_gpugeek_api import VideoGeneratorDoubaoSeedanceGPUGEEKAPI
+from .video_generator_vira_gpugeek_api import VideoGeneratorViraGPUGEEKAPI
 from .video_generator_veo_google_api import VideoGeneratorVeoGoogleAPI
 from .video_generator_veo_yunwu_api import VideoGeneratorVeoYunwuAPI
 
@@ -35,6 +36,7 @@ __all__ = [
     "VideoGeneratorDoubaoSeedanceVolcengineAPI",
     "VideoGeneratorDoubaoSeedanceYunwuAPI",
     "VideoGeneratorDoubaoSeedanceGPUGEEKAPI",
+    "VideoGeneratorViraGPUGEEKAPI",
     "VideoGeneratorVeoGoogleAPI",
     "VideoGeneratorVeoYunwuAPI",
 ]

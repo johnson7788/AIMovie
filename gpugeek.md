@@ -1,77 +1,3 @@
-curl -X POST "https://api.gpugeek.com/predictions" \
-  -H "Authorization: Bearer <API_KEY>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "Volcengine/Doubao-Seedance-2.0-fast",
-    "input": {
-      "task_type": "reference",
-      "prompt": "Your prompt",
-      "images": [
-        "https://example.com/assets/seedance-fast-reference-image-1.png",
-        "https://example.com/assets/seedance-fast-reference-image-2.png"
-      ],
-      "videos": [
-        "https://example.com/assets/seedance-fast-reference-video-1.mp4",
-        "https://example.com/assets/seedance-fast-reference-video-2.mp4"
-      ],
-      "audios": [
-        "https://example.com/assets/seedance-fast-reference-audio-1.wav",
-        "https://example.com/assets/seedance-fast-reference-audio-2.wav"
-      ],
-      "duration": 4,
-      "resolution": "720p",
-      "ratio": "adaptive",
-      "seed": 11,
-      "execution_expires_after": 3600,
-      "generate_audio": true,
-      "return_last_frame": true,
-      "watermark": false,
-      "tools": [
-        {
-          "type": "web_search"
-        }
-      ]
-    }
-  }'
-
-
-curl -X POST "https://api.gpugeek.com/predictions" \
-  -H "Authorization: Bearer <API_KEY>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "Volcengine/Doubao-Seedance-2.0-fast",
-    "input": {
-      "task_type": "reference",
-      "prompt": "Your prompt",
-      "images": [
-        "https://example.com/assets/seedance-fast-reference-image-1.png",
-        "https://example.com/assets/seedance-fast-reference-image-2.png"
-      ],
-      "videos": [
-        "https://example.com/assets/seedance-fast-reference-video-1.mp4",
-        "https://example.com/assets/seedance-fast-reference-video-2.mp4"
-      ],
-      "audios": [
-        "https://example.com/assets/seedance-fast-reference-audio-1.wav",
-        "https://example.com/assets/seedance-fast-reference-audio-2.wav"
-      ],
-      "duration": 4,
-      "resolution": "720p",
-      "ratio": "adaptive",
-      "seed": 11,
-      "execution_expires_after": 3600,
-      "generate_audio": true,
-      "return_last_frame": true,
-      "watermark": false,
-      "tools": [
-        {
-          "type": "web_search"
-        }
-      ]
-    }
-  }'
-
-
 文生图
 curl --location 'https://api.gpugeek.com/predictions' \
   --header 'Content-Type: application/json' \
@@ -120,4 +46,127 @@ curl --request POST \
 
 
 
+Vira生成视频
+# 发送生成请求 YOUR_API_KEY需替换为你创建的API_KEY
+curl -X POST https://api.gpugeek.com/predictions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -d '{
+	"model": "Vira/text2video",
+	"input": {
+		"model": "q3-turbo",
+		"prompt": "dance",
+		"style": "anime",
+		"duration": 16,
+		"aspect_ratio": "16:9",
+		"resolution": "720p",
+		"movement_amplitude": "auto",
+		"seed": 0
+	}
+}'
+
+# 查询处理状态 当 status 为 succeeded 时output 字段里会出现视频下载链接 (用浏览器下载需将'\u0026'替换为'&')
+# YOUR_API_KEY 需替换请求所用的API_KEY, REQUEST_BACK_ID需替换为请求返回的'id'
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+  https://api.gpugeek.com/predictions/REQUEST_BACK_ID
+
+
+图生成视频
+# 发送生成请求 YOUR_API_KEY需替换为你创建的API_KEY
+curl -X POST https://api.gpugeek.com/predictions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -d @- <<'EOF'
+{
+	"model": "Vira/image2video",
+	"input": {
+		"duration": 5,
+		"images": ["your_reference_picture"],
+		"model": "q2-turbo",
+		"movement_amplitude": "auto",
+		"prompt": "your_prompt",
+		"resolution": "720p"
+	}
+}
+EOF
+
+# 查询处理状态 当 status 为 succeeded 时output 字段里会出现视频下载链接 (用浏览器下载需将'\u0026'替换为'&')
+# YOUR_API_KEY 需替换请求所用的API_KEY, REQUEST_BACK_ID需替换为请求返回的'id'
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+  https://api.gpugeek.com/predictions/REQUEST_BACK_ID
+
+
+参考图片生成视频
+# 发送生成请求 YOUR_API_KEY需替换为你创建的API_KEY
+curl -X POST https://api.gpugeek.com/predictions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -d @- <<'EOF'
+{
+	"model": "Vira/reference2video",
+	"input": {
+		"aspect_ratio": "16:9",
+		"duration": 5,
+		"images": ["your_reference_picture1, your_reference_picture2"],
+		"model": "q2",
+		"movement_amplitude": "auto",
+		"prompt": "your_prompt",
+		"resolution": "720p"
+	}
+}
+EOF
+
+# 查询处理状态 当 status 为 succeeded 时output 字段里会出现视频下载链接 (用浏览器下载需将'\u0026'替换为'&')
+# YOUR_API_KEY 需替换请求所用的API_KEY, REQUEST_BACK_ID需替换为请求返回的'id'
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+  https://api.gpugeek.com/predictions/REQUEST_BACK_ID
+
+
+模版生成视频
+# 发送生成请求 YOUR_API_KEY需替换为你创建的API_KEY
+curl -X POST https://api.gpugeek.com/predictions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -d @- <<'EOF'
+{
+  "model": "Vira/template2video",
+  "input": {
+    "aspect_ratio": "9:16",
+    "bgm": false,
+    "images": ["your_reference_picture"],
+    "prompt": "Identify the expressions of each subject in the image, and ensure that their movements match their initial expression settings.\\nRequirement: \\nFixed camera.\\nMake the character's movements more expansive.\\nProhibited:\\nNo zooming in on any individual quadrant of the image",
+    "seed": 0,
+    "template": "漫画表情包"
+  }
+}
+EOF
+
+# 查询处理状态 当 status 为 succeeded 时output 字段里会出现视频下载链接 (用浏览器下载需将'\u0026'替换为'&')
+# YOUR_API_KEY 需替换请求所用的API_KEY, REQUEST_BACK_ID需替换为请求返回的'id'
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+  https://api.gpugeek.com/predictions/REQUEST_BACK_ID
+
+首尾帧生成视频
+# 发送生成请求 YOUR_API_KEY需替换为你创建的API_KEY
+curl -X POST https://api.gpugeek.com/predictions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -d @- <<'EOF'
+{
+	"model": "Vira/startEnd2video",
+	"input": {
+		"duration": 4,
+		"images": ["your_reference_picture1, your_reference_picture2"],
+		"model": "q2-pro",
+		"prompt": "your_prompt",
+		"resolution": "1080p",
+		"seed": null
+	}
+}
+EOF
+
+# 查询处理状态 当 status 为 succeeded 时output 字段里会出现视频下载链接 (用浏览器下载需将'\u0026'替换为'&')
+# YOUR_API_KEY 需替换请求所用的API_KEY, REQUEST_BACK_ID需替换为请求返回的'id'
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+  https://api.gpugeek.com/predictions/REQUEST_BACK_ID
 
