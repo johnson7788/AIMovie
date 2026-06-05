@@ -24,11 +24,23 @@ Style: {style}
 prompt_template_side = \
 """
 Generate a full-body, side-view portrait of character {identifier} based on the provided front-view portrait, with a pure white background. The character should be centered in the image, occupying most of the frame. Facing left. Standing with arms relaxed at sides.
+
+CRITICAL: The character's appearance (facial features, body shape, clothing, colors, proportions) must EXACTLY match the character shown in the front-view reference image. Only the viewing angle should change — the character itself must be IDENTICAL. Every detail of the costume, hairstyle, body type, and color palette must be faithfully replicated from the reference image.
+
+Character features (for identity anchoring):
+{features}
+Style: {style}
 """
 
 prompt_template_back = \
 """
 Generate a full-body, back-view portrait of character {identifier} based on the provided front-view portrait, with a pure white background. The character should be centered in the image, occupying most of the frame. No facial features should be visible.
+
+CRITICAL: The character's appearance (body shape, clothing, colors, proportions, hairstyle from behind) must EXACTLY match the character shown in the front-view reference image. Only the viewing angle should change — the character itself must be IDENTICAL. Every detail of the costume, body type, hair style/color, and color palette must be faithfully replicated from the reference image.
+
+Character features (for identity anchoring):
+{features}
+Style: {style}
 """
 
 
@@ -63,9 +75,13 @@ class CharacterPortraitsGenerator:
         self,
         character: CharacterInScene,
         front_image_path: str,
+        style: str,
     ) -> ImageOutput:
+        features = "(static) " + character.static_features + "; (dynamic) " + character.dynamic_features
         prompt = prompt_template_side.format(
             identifier=character.identifier_in_scene,
+            features=features,
+            style=style,
         )
         image_output = await self.image_generator.generate_single_image(
             prompt=prompt,
@@ -80,9 +96,13 @@ class CharacterPortraitsGenerator:
         self,
         character: CharacterInScene,
         front_image_path: str,
+        style: str,
     ) -> ImageOutput:
+        features = "(static) " + character.static_features + "; (dynamic) " + character.dynamic_features
         prompt = prompt_template_back.format(
             identifier=character.identifier_in_scene,
+            features=features,
+            style=style,
         )
         image_output = await self.image_generator.generate_single_image(
             prompt=prompt,

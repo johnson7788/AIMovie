@@ -168,14 +168,14 @@ class Idea2VideoPipeline:
         if os.path.exists(side_portrait_path):
             pass
         else:
-            side_portrait_output = await self.character_portraits_generator.generate_side_portrait(character, front_portrait_path)
+            side_portrait_output = await self.character_portraits_generator.generate_side_portrait(character, front_portrait_path, style)
             side_portrait_output.save(side_portrait_path)
 
         back_portrait_path = os.path.join(character_dir, "back.png")
         if os.path.exists(back_portrait_path):
             pass
         else:
-            back_portrait_output = await self.character_portraits_generator.generate_back_portrait(character, front_portrait_path)
+            back_portrait_output = await self.character_portraits_generator.generate_back_portrait(character, front_portrait_path, style)
             back_portrait_output.save(back_portrait_path)
 
         print(
