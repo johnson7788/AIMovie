@@ -5,7 +5,7 @@ import logging
 import asyncio
 import time
 from typing import Optional, Dict, List, Tuple, Literal, Callable, Awaitable
-from moviepy import VideoFileClip, concatenate_videoclips
+
 from PIL import Image
 from agents import *
 import yaml
@@ -169,12 +169,12 @@ class Script2VideoPipeline:
             await cb({"type": "stage_start", "stage": "concatenate", "message": "Concatenating shot videos..."})
             t0 = time.time()
             print(f"🎬 Starting concatenating videos...")
-            video_clips = [
-                VideoFileClip(os.path.join(self.working_dir, "shots", f"{shot_description.idx}", "video.mp4"))
+            from utils.video import concat_videos
+            shot_video_paths = [
+                os.path.join(self.working_dir, "shots", f"{shot_description.idx}", "video.mp4")
                 for shot_description in shot_descriptions
             ]
-            final_video = concatenate_videoclips(video_clips)
-            final_video.write_videofile(final_video_path, codec="libx264", preset="medium")
+            concat_videos(shot_video_paths, final_video_path)
             print(f"☑️ Concatenated videos, saved to {final_video_path}.")
             await cb({"type": "stage_end", "stage": "concatenate", "duration_ms": int((time.time() - t0) * 1000)})
 

@@ -7,7 +7,7 @@ from interfaces import CharacterInScene
 from typing import List, Dict, Optional, Callable, Awaitable
 import asyncio
 import json
-from moviepy import VideoFileClip, concatenate_videoclips
+
 import yaml
 from langchain.chat_models import init_chat_model
 from tools.render_backend import RenderBackend
@@ -310,10 +310,8 @@ class Idea2VideoPipeline:
             await cb({"type": "stage_start", "stage": "concatenate", "message": "Concatenating all scene videos..."})
             t0 = time.time()
             print(f"🎬 Starting concatenating videos...")
-            video_clips = [VideoFileClip(final_video_path)
-                           for final_video_path in all_video_paths]
-            final_video = concatenate_videoclips(video_clips)
-            final_video.write_videofile(final_video_path, codec="libx264", preset="medium")
+            from utils.video import concat_videos
+            concat_videos(all_video_paths, final_video_path)
             print(f"☑️ Concatenated videos, saved to {final_video_path}.")
             await cb({"type": "stage_end", "stage": "concatenate", "duration_ms": int((time.time() - t0) * 1000)})
 
