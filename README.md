@@ -1,4 +1,4 @@
-# ViMax - Agentic Video Generation
+#AIMovie - Agentic Video Generation
 
 AI 驱动的智能视频生成平台，支持创意到视频、剧本到视频等多种工作流。
 

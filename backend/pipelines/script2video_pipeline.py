@@ -547,14 +547,14 @@ class Script2VideoPipeline:
         if os.path.exists(side_portrait_path):
             pass
         else:
-            side_portrait_output = await self.character_portraits_generator.generate_side_portrait(character, front_portrait_path)
+            side_portrait_output = await self.character_portraits_generator.generate_side_portrait(character, front_portrait_path, style)
             side_portrait_output.save(side_portrait_path)
 
         back_portrait_path = os.path.join(character_dir, "back.png")
         if os.path.exists(back_portrait_path):
             pass
         else:
-            back_portrait_output = await self.character_portraits_generator.generate_back_portrait(character, front_portrait_path)
+            back_portrait_output = await self.character_portraits_generator.generate_back_portrait(character, front_portrait_path, style)
             back_portrait_output.save(back_portrait_path)
 
         self.character_portrait_events[character.idx].set()
@@ -571,19 +571,20 @@ class Script2VideoPipeline:
                     "character_name": character.identifier_in_scene, "view": view_name,
                 })
 
+        features_summary = f"{character.identifier_in_scene}: {character.static_features} {character.dynamic_features}"
         return {
             character.identifier_in_scene: {
                 "front": {
                     "path": front_portrait_path,
-                    "description": f"A front view portrait of {character.identifier_in_scene}.",
+                    "description": f"A front view portrait of {character.identifier_in_scene}. {features_summary}",
                 },
                 "side": {
                     "path": side_portrait_path,
-                    "description": f"A side view portrait of {character.identifier_in_scene}.",
+                    "description": f"A side view portrait of {character.identifier_in_scene}. {features_summary}",
                 },
                 "back": {
                     "path": back_portrait_path,
-                    "description": f"A back view portrait of {character.identifier_in_scene}.",
+                    "description": f"A back view portrait of {character.identifier_in_scene}. {features_summary}",
                 },
             }
         }

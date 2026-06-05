@@ -191,19 +191,20 @@ class Idea2VideoPipeline:
                     "character_name": character.identifier_in_scene, "view": view_name,
                 })
 
+        features_summary = f"{character.identifier_in_scene}: {character.static_features} {character.dynamic_features}"
         return {
             character.identifier_in_scene: {
                 "front": {
                     "path": front_portrait_path,
-                    "description": f"A front view portrait of {character.identifier_in_scene}.",
+                    "description": f"A front view portrait of {character.identifier_in_scene}. {features_summary}",
                 },
                 "side": {
                     "path": side_portrait_path,
-                    "description": f"A side view portrait of {character.identifier_in_scene}.",
+                    "description": f"A side view portrait of {character.identifier_in_scene}. {features_summary}",
                 },
                 "back": {
                     "path": back_portrait_path,
-                    "description": f"A back view portrait of {character.identifier_in_scene}.",
+                    "description": f"A back view portrait of {character.identifier_in_scene}. {features_summary}",
                 },
             }
         }
