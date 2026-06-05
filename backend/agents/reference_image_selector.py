@@ -139,9 +139,11 @@ class ReferenceImageSelector:
     def __init__(
         self,
         chat_model,
+        multimodal_model=None,
     ):
 
         self.chat_model = chat_model
+        self.multimodal_model = multimodal_model or chat_model
 
 
     @retry(
@@ -208,7 +210,7 @@ class ReferenceImageSelector:
             HumanMessage(content=human_content)
         ]
 
-        chain = self.chat_model | parser
+        chain = self.multimodal_model | parser
 
         try:
             response = await chain.ainvoke(messages)        

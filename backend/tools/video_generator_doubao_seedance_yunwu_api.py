@@ -107,7 +107,7 @@ class VideoGeneratorDoubaoSeedanceYunwuAPI:
                             logging.error(f"Video create API error: {response_json['error']}")
                             raise ValueError(f"Video creation failed: {response_json['error']}")
                         task_id = response_json["id"]
-            except (aiohttp.ClientTimeout, asyncio.TimeoutError):
+            except asyncio.TimeoutError:
                 logging.error(f"Video create request timed out. Retrying in 2 seconds...")
                 await asyncio.sleep(2)
                 continue
@@ -149,7 +149,7 @@ class VideoGeneratorDoubaoSeedanceYunwuAPI:
                     async with session.get(url, headers=headers) as response:
                         response_json = await response.json()
 
-            except (aiohttp.ClientTimeout, asyncio.TimeoutError):
+            except asyncio.TimeoutError:
                 logging.warning(f"Video poll request timed out. Retrying in 2 seconds...")
                 await asyncio.sleep(2)
                 continue

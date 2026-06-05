@@ -1,11 +1,15 @@
+import base64
 import logging
 import os
 import time
 import aiohttp
 import asyncio
+from io import BytesIO
 from typing import Any, Dict, List, Literal
+
+from PIL import Image
+
 from interfaces.video_output import VideoOutput
-from utils.image import image_path_to_b64
 
 
 def _extract_output(response_json: Dict[str, Any]) -> str:
@@ -18,21 +22,34 @@ def _extract_output(response_json: Dict[str, Any]) -> str:
     raise ValueError(f"Unexpected output format: {output}")
 
 
-class VideoGeneratorDoubaoSeedanceGPUGEEKAPI:
+def _compress_image_to_b64(image_path: str, max_size: int = 768, quality: int = 85) -> str:
+    """Resize image to fit within max_size and return as JPEG base64 data URI."""
+    img = Image.open(image_path).convert("RGB")
+    w, h = img.size
+    if max(w, h) > max_size:
+        ratio = max_size / max(w, h)
+        img = img.resize((int(w * ratio), int(h * ratio)), Image.LANCZOS)
+    buf = BytesIO()
+    img.save(buf, format="JPEG", quality=quality)
+    b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+    return f"data:image/jpeg;base64,{b64}"
+
+
+class VideoGeneratorViraGPUGEEKAPI:
     def __init__(
         self,
         api_key: str = "",
-        t2v_model: str = "Volcengine/Doubao-Seedance-2.0-fast",
-        ff2v_model: str = "Volcengine/Doubao-Seedance-2.0-fast",
-        flf2v_model: str = "Volcengine/Doubao-Seedance-2.0-fast",
+        t2v_internal_model: str = "q3-turbo",
+        i2v_internal_model: str = "q2-turbo",
+        s2v_internal_model: str = "q2-pro",
     ):
         if not api_key:
             api_key = os.environ.get("GPUGEEK", "")
         self.api_key = api_key
         self.base_url = "https://api.gpugeek.com/predictions"
-        self.t2v_model = t2v_model
-        self.ff2v_model = ff2v_model
-        self.flf2v_model = flf2v_model
+        self.t2v_internal_model = t2v_internal_model
+        self.i2v_internal_model = i2v_internal_model
+        self.s2v_internal_model = s2v_internal_model
 
     async def _create_prediction(
         self,
@@ -43,31 +60,33 @@ class VideoGeneratorDoubaoSeedanceGPUGEEKAPI:
         duration: Literal[4, 5, 10] = 5,
     ) -> Dict[str, Any]:
         if len(reference_image_paths) == 0:
-            model = self.t2v_model
+            model = "Vira/text2video"
+            internal_model = self.t2v_internal_model
         elif len(reference_image_paths) == 1:
-            model = self.ff2v_model
+            model = "Vira/image2video"
+            internal_model = self.i2v_internal_model
         elif len(reference_image_paths) == 2:
-            model = self.flf2v_model
+            model = "Vira/startEnd2video"
+            internal_model = self.s2v_internal_model
         else:
             raise ValueError("reference_image_paths must contain 0, 1, or 2 images.")
 
-        logging.info(f"Sending video generation request to GPUGEEK {model}...")
+        logging.info(f"Sending video generation request to GPUGEEK {model} (internal: {internal_model})...")
 
-        resolution_map = {"480p": "480p", "720p": "720p", "1080p": "1080p"}
-        ratio_map = {"16:9": "adaptive", "9:16": "adaptive", "1:1": "adaptive"}
-
-        input_data = {
-            "task_type": "reference",
+        input_data: Dict[str, Any] = {
+            "model": internal_model,
             "prompt": prompt,
             "duration": duration,
-            "resolution": resolution_map.get(resolution, "720p"),
-            "ratio": ratio_map.get(aspect_ratio, "adaptive"),
-            "watermark": False,
+            "resolution": resolution,
+            "movement_amplitude": "auto",
         }
+
+        if aspect_ratio != "1:1" and model != "Vira/image2video":
+            input_data["aspect_ratio"] = aspect_ratio
 
         if len(reference_image_paths) >= 1:
             input_data["images"] = [
-                image_path_to_b64(path, mime=True) for path in reference_image_paths
+                _compress_image_to_b64(path) for path in reference_image_paths
             ]
 
         payload = {
@@ -80,7 +99,7 @@ class VideoGeneratorDoubaoSeedanceGPUGEEKAPI:
             "Content-Type": "application/json",
         }
 
-        timeout = aiohttp.ClientTimeout(total=300)  # 5 min timeout for task creation
+        timeout = aiohttp.ClientTimeout(total=300)
         while True:
             try:
                 async with aiohttp.ClientSession(timeout=timeout) as session:
@@ -107,12 +126,12 @@ class VideoGeneratorDoubaoSeedanceGPUGEEKAPI:
 
     async def _poll_prediction(self, prediction_id: str, headers: dict) -> str:
         url = f"{self.base_url}/{prediction_id}"
-        max_polls = 600  # 20 minutes max
+        max_polls = 600
         start_time = time.time()
         last_log_time = start_time
-        LOG_INTERVAL = 30  # only log progress every 30 seconds
+        LOG_INTERVAL = 30
 
-        timeout = aiohttp.ClientTimeout(total=30)  # 30s timeout per poll
+        timeout = aiohttp.ClientTimeout(total=30)
         for _ in range(max_polls):
             try:
                 async with aiohttp.ClientSession(timeout=timeout) as session:
@@ -163,7 +182,6 @@ class VideoGeneratorDoubaoSeedanceGPUGEEKAPI:
             prompt, reference_image_paths, resolution, aspect_ratio, duration
         )
 
-        # GPUGeek may return the result synchronously
         status = response_json.get("status")
         if status == "succeeded":
             video_url = _extract_output(response_json)
@@ -175,7 +193,6 @@ class VideoGeneratorDoubaoSeedanceGPUGEEKAPI:
             logging.error(f"Video generation failed: {error_msg}")
             raise ValueError(f"Video generation failed: {error_msg}")
 
-        # Async: poll for completion
         task_id = response_json["id"]
         logging.info(f"Video generation task created. ID: {task_id}, status: {status}")
         video_url = await self._poll_prediction(task_id, {

@@ -4,8 +4,8 @@ import json
 import logging
 import asyncio
 import time
-from typing import Optional, Dict, List, Tuple, Literal
-from moviepy import VideoFileClip, concatenate_videoclips
+from typing import Optional, Dict, List, Tuple, Literal, Callable, Awaitable
+
 from PIL import Image
 from agents import *
 import yaml
@@ -28,6 +28,7 @@ class Script2VideoPipeline:
         image_generator,
         video_generator,
         working_dir: str,
+        multimodal_chat_model=None,
     ):
 
         self.chat_model = chat_model
@@ -38,7 +39,7 @@ class Script2VideoPipeline:
         self.character_portraits_generator = CharacterPortraitsGenerator(image_generator=self.image_generator)
         self.storyboard_artist = StoryboardArtist(chat_model=self.chat_model)
         self.camera_image_generator = CameraImageGenerator(chat_model=self.chat_model, image_generator=self.image_generator, video_generator=self.video_generator)
-        self.reference_image_selector = ReferenceImageSelector(chat_model=self.chat_model)
+        self.reference_image_selector = ReferenceImageSelector(chat_model=self.chat_model, multimodal_model=multimodal_chat_model)
 
         self.working_dir = working_dir
         os.makedirs(self.working_dir, exist_ok=True)
@@ -52,6 +53,12 @@ class Script2VideoPipeline:
 
         chat_model_args = resolve_chat_model_config(config["chat_model"]["init_args"])
         chat_model = init_chat_model(**chat_model_args)
+
+        multimodal_chat_model = None
+        if "multimodal_chat_model" in config:
+            multimodal_args = resolve_chat_model_config(config["multimodal_chat_model"]["init_args"])
+            multimodal_chat_model = init_chat_model(**multimodal_args)
+
         backend = RenderBackend.from_config(config)
 
         return cls(
@@ -59,6 +66,7 @@ class Script2VideoPipeline:
             image_generator=backend.image_generator,
             video_generator=backend.video_generator,
             working_dir=config["working_dir"],
+            multimodal_chat_model=multimodal_chat_model,
         )
 
     async def __call__(
@@ -68,21 +76,16 @@ class Script2VideoPipeline:
         style: str,
         characters: List[CharacterInScene] = None,
         character_portraits_registry: Optional[Dict[str, Dict[str, Dict[str, str]]]] = None,
+        progress_callback: Optional[Callable[[dict], Awaitable[None]]] = None,
     ):
-        if characters is None:
-            characters = await self.extract_characters(script=script)
+        cb = progress_callback or (lambda e: None)
+        self._progress_callback = cb
 
-            # characters_path = os.path.join(self.working_dir, "characters.json")
-            # if os.path.exists(characters_path):
-            #     with open(characters_path, "r", encoding="utf-8") as f:
-            #         characters = [CharacterInScene.model_validate(c) for c in json.load(f)]
-            #     print(f"🚀 Loaded {len(characters)} characters from existing file.")
-            # else:
-            #     print(f"🔍 Extracting characters from script...")
-            #     characters = await self.extract_characters(script=script)
-            #     with open(characters_path, "w", encoding="utf-8") as f:
-            #         json.dump([c.model_dump() for c in characters], f, ensure_ascii=False, indent=4)
-            #     print(f"☑️ Extracted {len(characters)} characters from script and saved to {characters_path}.")
+        if characters is None:
+            await cb({"type": "stage_start", "stage": "characters", "message": "Extracting characters from script..."})
+            t0 = time.time()
+            characters = await self.extract_characters(script=script)
+            await cb({"type": "stage_end", "stage": "characters", "duration_ms": int((time.time() - t0) * 1000)})
 
         if character_portraits_registry is None:
             character_portraits_registry_path = os.path.join(self.working_dir, "character_portraits_registry.json")
@@ -90,7 +93,10 @@ class Script2VideoPipeline:
                 with open(character_portraits_registry_path, "r", encoding="utf-8") as f:
                     character_portraits_registry = json.load(f)
                 print(f"🚀 Loaded {len(character_portraits_registry)} character portraits from existing file.")
+                await cb({"type": "log", "level": "INFO", "message": f"Loaded {len(character_portraits_registry)} character portraits from cache."})
             else:
+                await cb({"type": "stage_start", "stage": "character_portraits", "message": "Generating character portraits..."})
+                t0 = time.time()
                 print(f"🔍 Generating character portraits...")
                 character_portraits_registry = await self.generate_character_portraits(
                     characters=characters,
@@ -101,30 +107,40 @@ class Script2VideoPipeline:
                 with open(character_portraits_registry_path, "w", encoding="utf-8") as f:
                     json.dump(character_portraits_registry, f, ensure_ascii=False, indent=4)
                 print(f"☑️ Generated {len(character_portraits_registry)} character portraits and saved to {character_portraits_registry_path}.")
-
-
+                await cb({"type": "stage_end", "stage": "character_portraits", "duration_ms": int((time.time() - t0) * 1000)})
 
         # design shots
+        await cb({"type": "stage_start", "stage": "storyboard", "message": "Designing storyboard..."})
+        t0 = time.time()
         storyboard = await self.design_storyboard(
             script=script,
             characters=characters,
             user_requirement=user_requirement,
         )
+        await cb({"type": "stage_end", "stage": "storyboard", "duration_ms": int((time.time() - t0) * 1000), "shot_count": len(storyboard)})
 
         # decompose visual descriptions of shots
+        await cb({"type": "stage_start", "stage": "visual_descriptions", "message": f"Decomposing visual descriptions for {len(storyboard)} shots..."})
+        t0 = time.time()
         shot_descriptions = await self.decompose_visual_descriptions(
             shot_brief_descriptions=storyboard,
             characters=characters,
         )
+        await cb({"type": "stage_end", "stage": "visual_descriptions", "duration_ms": int((time.time() - t0) * 1000)})
 
         # construct camera tree
+        await cb({"type": "stage_start", "stage": "camera_tree", "message": "Constructing camera tree..."})
+        t0 = time.time()
         camera_tree = await self.construct_camera_tree(
             shot_descriptions=shot_descriptions,
         )
+        await cb({"type": "stage_end", "stage": "camera_tree", "duration_ms": int((time.time() - t0) * 1000)})
 
         priority_shot_idxs = [camera.parent_cam_idx for camera in camera_tree if camera.parent_cam_idx is not None]
         total_shots = len(shot_descriptions)
         print(f"📋 Processing {total_shots} shots across {len(camera_tree)} camera(s)...")
+        await cb({"type": "stage_start", "stage": "frames", "message": f"Generating frames for {total_shots} shots across {len(camera_tree)} camera(s)..."})
+        t0 = time.time()
         tasks = [
             self.generate_frames_for_single_camera(
                 camera=camera,
@@ -144,20 +160,30 @@ class Script2VideoPipeline:
         ]
         tasks.extend(video_tasks)
         await asyncio.gather(*tasks)
+        await cb({"type": "stage_end", "stage": "frames", "duration_ms": int((time.time() - t0) * 1000)})
 
         final_video_path = os.path.join(self.working_dir, "final_video.mp4")
         if os.path.exists(final_video_path):
             print(f"🚀 Skipped concatenating videos, already exists.")
         else:
+            await cb({"type": "stage_start", "stage": "concatenate", "message": "Concatenating shot videos..."})
+            t0 = time.time()
             print(f"🎬 Starting concatenating videos...")
-            video_clips = [
-                VideoFileClip(os.path.join(self.working_dir, "shots", f"{shot_description.idx}", "video.mp4"))
+            from utils.video import concat_videos
+            shot_video_paths = [
+                os.path.join(self.working_dir, "shots", f"{shot_description.idx}", "video.mp4")
                 for shot_description in shot_descriptions
             ]
-            final_video = concatenate_videoclips(video_clips)
-            final_video.write_videofile(final_video_path, codec="libx264", preset="medium")
+            concat_videos(shot_video_paths, final_video_path)
             print(f"☑️ Concatenated videos, saved to {final_video_path}.")
+            await cb({"type": "stage_end", "stage": "concatenate", "duration_ms": int((time.time() - t0) * 1000)})
 
+        await cb({
+            "type": "artifact", "stage": "concatenate", "file_type": "video",
+            "file_path": "final_video.mp4",
+        })
+
+        self._progress_callback = None
         return final_video_path
 
 
@@ -260,6 +286,14 @@ class Script2VideoPipeline:
                 shutil.copy(new_camera_image_path, first_shot_ff_path)
                 self.frame_events[first_shot_idx]["first_frame"].set()
                 print(f"☑️ Generated first_frame for shot {first_shot_idx}, saved to {first_shot_ff_path}.")
+            # Emit artifact for first frame
+            cb = getattr(self, "_progress_callback", None)
+            if cb:
+                await cb({
+                    "type": "artifact", "stage": "frames", "file_type": "image",
+                    "file_path": os.path.join("shots", f"{first_shot_idx}", "first_frame.png"),
+                    "shot_idx": first_shot_idx, "frame_type": "first_frame",
+                })
 
 
         # 2. generate the following frames of the camera
@@ -333,6 +367,13 @@ class Script2VideoPipeline:
             )
             video_output.save(video_path)
             print(f"☑️ Generated video for shot {shot_description.idx}, saved to {video_path}.")
+            cb = getattr(self, "_progress_callback", None)
+            if cb:
+                await cb({
+                    "type": "artifact", "stage": "videos", "file_type": "video",
+                    "file_path": os.path.join("shots", f"{shot_description.idx}", "video.mp4"),
+                    "shot_idx": shot_description.idx,
+                })
 
     async def generate_frame_for_single_shot(
         self,
@@ -389,6 +430,13 @@ class Script2VideoPipeline:
             )
             frame_image.save(frame_image_path)
             print(f"☑️ Generated {frame_type} frame for shot {shot_idx}, saved to {frame_image_path}.")
+            cb = getattr(self, "_progress_callback", None)
+            if cb:
+                await cb({
+                    "type": "artifact", "stage": "frames", "file_type": "image",
+                    "file_path": os.path.join("shots", f"{shot_idx}", f"{frame_type}.png"),
+                    "shot_idx": shot_idx, "frame_type": frame_type,
+                })
 
 
         self.frame_events[shot_idx][frame_type].set()
@@ -512,6 +560,16 @@ class Script2VideoPipeline:
         self.character_portrait_events[character.idx].set()
 
         print(f"☑️ Completed character portrait generation for {character.identifier_in_scene}.")
+
+        # Emit portrait artifact events
+        cb = getattr(self, "_progress_callback", None)
+        if cb:
+            for view_name, path in [("front", front_portrait_path), ("side", side_portrait_path), ("back", back_portrait_path)]:
+                await cb({
+                    "type": "artifact", "stage": "character_portraits", "file_type": "image",
+                    "file_path": os.path.relpath(path, self.working_dir),
+                    "character_name": character.identifier_in_scene, "view": view_name,
+                })
 
         return {
             character.identifier_in_scene: {
