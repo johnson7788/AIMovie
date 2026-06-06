@@ -4,7 +4,7 @@ import { debounce, fileSizeToStr } from '@/common/functions'
 import { $http } from '@/common/http'
 import { useLogin } from '@/composables/useLogin'
 import router from '@/routers'
-import { useRefs, useUserStore, useStateStore } from '@/stores'
+import { useRefs, useUserStore, useStateStore, useModelStore } from '@/stores'
 import { ElMessage, type MentionOption } from 'element-plus'
 import UploadSvg from '@/svg/icon/upload.vue'
 import IconStyleSvg from '@/svg/icon/icon-style.vue'
@@ -17,6 +17,7 @@ import DramaSvg from '@/svg/icon/drama.vue'
 import { useLoading } from '@/composables/useLoading'
 
 const userStore = useUserStore()
+const modelStore = useModelStore()
 const { USERINFO } = useRefs(userStore);
 watch(USERINFO, () => {
 	addListener();
@@ -57,7 +58,7 @@ const examplePresets: ExamplePreset[] = [
 		aspect_ratio: '9:16',
 		episode_sum: 3,
 		episode_duration: 60,
-		model_id: '',
+		model_id: '5',
 	},
 	{
 		label: '蝴蝶的第一次飞翔',
@@ -67,7 +68,7 @@ const examplePresets: ExamplePreset[] = [
 		aspect_ratio: '9:16',
 		episode_sum: 4,
 		episode_duration: 60,
-		model_id: '',
+		model_id: '5',
 	},
 	{
 		label: '赛博朋克侦探',
@@ -77,7 +78,7 @@ const examplePresets: ExamplePreset[] = [
 		aspect_ratio: '9:16',
 		episode_sum: 5,
 		episode_duration: 60,
-		model_id: '',
+		model_id: '5',
 	},
 	{
 		label: '都市爱情故事',
@@ -87,7 +88,7 @@ const examplePresets: ExamplePreset[] = [
 		aspect_ratio: '9:16',
 		episode_sum: 20,
 		episode_duration: 60,
-		model_id: '',
+		model_id: '5',
 	},
 	{
 		label: '古装武侠传奇',
@@ -97,7 +98,7 @@ const examplePresets: ExamplePreset[] = [
 		aspect_ratio: '9:16',
 		episode_sum: 40,
 		episode_duration: 60,
-		model_id: '',
+		model_id: '5',
 	},
 ]
 
@@ -382,7 +383,7 @@ const applyExample = (example: ExamplePreset) => {
 	form.episode_duration = example.episode_duration;
 	form.model = example.model_id;
 	styleFind.value = { id: example.style };
-	selectedModel.value = { id: '' };
+	selectedModel.value = modelStore.get('creative_script', example.model_id) || {};
 	nextTick(() => {
 		mentionRef.value?.input?.ref?.focus();
 	});
