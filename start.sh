@@ -24,6 +24,7 @@ trap cleanup SIGINT SIGTERM
 # --- Start Backend ---
 echo -e "${GREEN}[start.sh]${NC} 启动后端 (backend/main.py) ..."
 cd "$BACKEND_DIR"
+uv sync --index-url https://pypi.tuna.tsinghua.edu.cn/simple
 uv run python main.py 2>&1 | while IFS= read -r line; do
     echo -e "${BLUE}[backend]${NC} $line"
 done &
