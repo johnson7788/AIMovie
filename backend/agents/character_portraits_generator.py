@@ -43,6 +43,22 @@ Character features (for identity anchoring):
 Style: {style}
 """
 
+prompt_template_turnaround = \
+"""
+Generate a character turnaround sheet for character {identifier} with 3 views arranged side-by-side horizontally in a single wide image. Pure white background throughout all panels.
+
+The 3 views must be equally spaced from left to right:
+- LEFT panel: FULL-BODY FRONT VIEW — character facing directly forward, arms relaxed at sides, natural expression, centered in frame
+- CENTER panel: FULL-BODY SIDE VIEW — character facing left (profile), arms relaxed at sides, centered in frame
+- RIGHT panel: FULL-BODY BACK VIEW — character facing away from viewer, no facial features visible, centered in frame
+
+CRITICAL: All 3 panels MUST depict the EXACT SAME character with perfect consistency. Same facial features, same body type, same skin tone, same hairstyle and hair color, same clothing with identical colors and details, same proportions. The ONLY difference between panels is the viewing angle. This is essential — the character must be visually identical across all 3 views.
+
+Character description:
+{features}
+Style: {style}
+"""
+
 
 class CharacterPortraitsGenerator:
     def __init__(
@@ -108,5 +124,28 @@ class CharacterPortraitsGenerator:
             prompt=prompt,
             reference_image_paths=[front_image_path],
             # size="512x512",
+        )
+        return image_output
+
+    @retry(stop=stop_after_attempt(3), after=after_func, reraise=True)
+    async def generate_turnaround_sheet(
+        self,
+        character: CharacterInScene,
+        style: str,
+    ) -> ImageOutput:
+        """Generate a single 3-view turnaround sheet image.
+
+        Produces one image with front, side, and back views arranged horizontally.
+        This ensures character consistency across all views since they originate
+        from a single model inference.
+        """
+        features = "(static) " + character.static_features + "; (dynamic) " + character.dynamic_features
+        prompt = prompt_template_turnaround.format(
+            identifier=character.identifier_in_scene,
+            features=features,
+            style=style,
+        )
+        image_output = await self.image_generator.generate_single_image(
+            prompt=prompt,
         )
         return image_output

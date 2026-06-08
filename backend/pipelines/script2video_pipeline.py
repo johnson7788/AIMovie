@@ -13,8 +13,13 @@ from interfaces import *
 from langchain.chat_models import init_chat_model
 from tools.render_backend import RenderBackend
 from utils.provider_presets import resolve_chat_model_config
+from utils.image import image_output_to_pil, crop_turnaround_views
 
 class Script2VideoPipeline:
+
+    # Use turnaround sheet (single image with 3 views) for better character consistency.
+    # Set to False to fall back to the old 3-separate-call method.
+    USE_TURNAROUND_SHEET = True
 
     # events
     character_portrait_events = {}
@@ -536,26 +541,34 @@ class Script2VideoPipeline:
         os.makedirs(character_dir, exist_ok=True)
 
         front_portrait_path = os.path.join(character_dir, "front.png")
-        if os.path.exists(front_portrait_path):
-            pass
-        else:
-            front_portrait_output = await self.character_portraits_generator.generate_front_portrait(character, style)
-            front_portrait_output.save(front_portrait_path)
-
-
         side_portrait_path = os.path.join(character_dir, "side.png")
-        if os.path.exists(side_portrait_path):
-            pass
-        else:
-            side_portrait_output = await self.character_portraits_generator.generate_side_portrait(character, front_portrait_path, style)
-            side_portrait_output.save(side_portrait_path)
-
         back_portrait_path = os.path.join(character_dir, "back.png")
-        if os.path.exists(back_portrait_path):
+
+        all_exist = all(os.path.exists(p) for p in [front_portrait_path, side_portrait_path, back_portrait_path])
+        if all_exist:
             pass
+        elif self.USE_TURNAROUND_SHEET:
+            try:
+                turnaround_output = await self.character_portraits_generator.generate_turnaround_sheet(character, style)
+                sheet_pil = image_output_to_pil(turnaround_output)
+                paths = crop_turnaround_views(sheet_pil, character_dir)
+                front_portrait_path = paths.get("front", front_portrait_path)
+                side_portrait_path = paths.get("side", side_portrait_path)
+                back_portrait_path = paths.get("back", back_portrait_path)
+            except Exception as e:
+                logging.warning(
+                    f"Turnaround sheet generation failed for {character.identifier_in_scene}: {e}. "
+                    f"Falling back to 3 separate calls."
+                )
+                await self._generate_portraits_individual(
+                    character, style, character_dir,
+                    front_portrait_path, side_portrait_path, back_portrait_path
+                )
         else:
-            back_portrait_output = await self.character_portraits_generator.generate_back_portrait(character, front_portrait_path, style)
-            back_portrait_output.save(back_portrait_path)
+            await self._generate_portraits_individual(
+                character, style, character_dir,
+                front_portrait_path, side_portrait_path, back_portrait_path
+            )
 
         self.character_portrait_events[character.idx].set()
 
@@ -588,6 +601,26 @@ class Script2VideoPipeline:
                 },
             }
         }
+
+    async def _generate_portraits_individual(
+        self,
+        character: CharacterInScene,
+        style: str,
+        character_dir: str,
+        front_path: str,
+        side_path: str,
+        back_path: str,
+    ):
+        """Fallback: generate 3 separate portrait images (front, side, back)."""
+        if not os.path.exists(front_path):
+            front_output = await self.character_portraits_generator.generate_front_portrait(character, style)
+            front_output.save(front_path)
+        if not os.path.exists(side_path):
+            side_output = await self.character_portraits_generator.generate_side_portrait(character, front_path, style)
+            side_output.save(side_path)
+        if not os.path.exists(back_path):
+            back_output = await self.character_portraits_generator.generate_back_portrait(character, front_path, style)
+            back_output.save(back_path)
 
 
 
