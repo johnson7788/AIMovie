@@ -113,3 +113,6 @@ cd frontend && npm run dev
 | GET  | `/api/tasks/{task_id}` | 查询任务状态 |
 | GET  | `/api/models` | 获取模型列表 |
 | GET  | `/api/styles` | 获取风格列表 |
+
+## 更新
+1. 一致性 [人物一致性](doc/同1个人物的背景由1个模型生成.png)
