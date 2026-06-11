@@ -28,7 +28,7 @@
                         </g>
                     </g>
                 </g>
-                <text x="28" y="17" fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="bold">AIMovie</text>
+                <text x="28" y="17" fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="bold">VixP3D</text>
             </g>
         </g>
     </svg>

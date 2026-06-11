@@ -80,7 +80,7 @@ async def _download_image(url: str) -> str:
     return path
 
 app = FastAPI(
-    title="ViMax API",
+    title="VixP3D API",
     description="Agentic Video Generation API - supports script2video and idea2video modes",
     version="0.1.0",
 )
@@ -486,9 +486,9 @@ STYLES_DATA = [
 ]
 
 CONFIG_DATA = {
-    "web_name": "ViMax",
-    "web_title": "ViMax - AI Video Generation",
-    "copyright": "ViMax",
+    "web_name": "VixP3D",
+    "web_title": "一键式长篇创作平台",
+    "copyright": "VixP3D",
     "version_name": "0.1.0",
     "version": 1,
 }
@@ -1188,13 +1188,13 @@ async def upload_file():
 # ===================================================================
 
 CONTROL_CONFIG_DATA = {
-    "web_name": "AIMovie",
-    "web_title": "AIMovie - AI Video Generation",
+    "web_name": "VixP3D",
+    "web_title": "一键式长篇创作平台",
     "web_logo": "",
     "web_icp": "",
     "web_mps": "",
     "web_mps_text": "",
-    "copyright": "AIMovie",
+    "copyright": "VixP3D",
     "version_name": "0.1.0",
     "version": 1,
     "wechat_group_qrcode_url": "",
