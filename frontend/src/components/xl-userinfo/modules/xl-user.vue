@@ -481,7 +481,7 @@ defineExpose({
     transition: all 0.2s;
     
     &:hover {
-        background-color: #f5f5f5;
+        background-color: var(--el-fill-color-light);
         transform: scale(1.1);
     }
     

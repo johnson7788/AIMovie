@@ -78,16 +78,16 @@ onMounted(() => {
     cursor: pointer;
     position: relative;
     overflow: hidden;
-    background: rgba(0, 0, 0, 0.2);
+    background: rgba(255, 255, 255, 0.06);
     padding: 10px;
     line-height: normal;
 
     &:hover {
-        background: rgba(0, 0, 0, 0.1);
+        background: rgba(255, 255, 255, 0.1);
     }
 
     &-active {
-        background: rgba(0, 0, 0, 0.06);
+        background: rgba(255, 255, 255, 0.06);
     }
 
     &.model-item-selected {

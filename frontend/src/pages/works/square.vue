@@ -212,7 +212,7 @@ onMounted(getList)
         top: 10px;
         left: 10px;
         color: #FFFFFF;
-        background-color: rgba(0, 0, 0, 0.15);
+        background-color: rgba(255, 255, 255, 0.15);
         padding: 4px 8px;
         border-radius: 4px;
         backdrop-filter: blur(10px);

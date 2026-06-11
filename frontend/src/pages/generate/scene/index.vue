@@ -832,7 +832,7 @@ onUnmounted(() => {
 
         .icon-button {
             cursor: pointer;
-            background-color: rgba(0, 0, 0, 0.08);
+            background-color: rgba(255, 255, 255, 0.08);
             padding: 3px;
             border-radius: 4px;
 
@@ -857,7 +857,7 @@ onUnmounted(() => {
         }
 
         .button {
-            background: rgba(0, 0, 0, 0.15);
+            background: rgba(255, 255, 255, 0.15);
             backdrop-filter: blur(2px);
             padding: 6px 10px;
             border-radius: 40px;

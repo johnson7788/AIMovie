@@ -56,7 +56,7 @@ const handleClick = (item: any) => {
         flex-shrink: 0;
         cursor: pointer;
         padding-left: 0;
-        background: #e4e7ed;
+        background: var(--el-fill-color);
         border-radius: 6px;
         border-radius: 6px;
         font-weight: 600;

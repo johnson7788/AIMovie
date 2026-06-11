@@ -75,14 +75,14 @@ a {
 }
 
 ::-webkit-scrollbar-thumb {
-    background-color: #c0c4cc;
+    background-color: #4a4a4d;
     border-radius: 10px;
     transition: all .2s ease-in-out
 }
 
 ::-webkit-scrollbar-thumb:hover {
     cursor: pointer;
-    background-color: #909399
+    background-color: #6a6a6d
 }
 
 .circular {
@@ -463,10 +463,10 @@ a {
 
 .tabs-segmented.el-segmented {
     --el-border-radius-base: 8px;
-    --el-segmented-bg-color: rgba(0, 0, 0, 0.04) !important;
-    --el-border-color: rgba(0, 0, 0, 0.1);
-    --el-segmented-item-hover-bg-color: rgba(0, 0, 0, 0.06);
-    --el-segmented-item-active-bg-color: rgba(0, 0, 0, 0.06);
+    --el-segmented-bg-color: rgba(255, 255, 255, 0.06) !important;
+    --el-border-color: rgba(255, 255, 255, 0.1);
+    --el-segmented-item-hover-bg-color: rgba(255, 255, 255, 0.08);
+    --el-segmented-item-active-bg-color: rgba(255, 255, 255, 0.08);
     --el-segmented-padding: 4px;
     --el-segmented-item-selected-color: #FFFFFF;
     --el-segmented-item-selected-bg-color: var(--el-color-primary);
@@ -518,15 +518,15 @@ a {
 }
 
 .el-popper.model-popover {
-    --el-popover-bg-color: rgba(255, 255, 255, 0.8);
+    --el-popover-bg-color: rgba(23, 23, 23, 0.85);
     backdrop-filter: blur(20px);
     border-radius: 20px;
-    --el-popover-border-color: rgba(0, 0, 0, 0.08);
+    --el-popover-border-color: rgba(255, 255, 255, 0.08);
     --el-box-shadow-light: none;
 
     /* border: 0px solid rgba(0,0,0,0.1); */
     .el-popper__arrow::before {
-        background-color: rgba(255, 255, 255, 0.8);
+        background-color: rgba(23, 23, 23, 0.85);
     }
 }
 
@@ -603,9 +603,9 @@ a {
     padding-top: 2px;
     padding-bottom: 2px;
     &-selected {
-        background: rgba(0, 0, 0, 0.06);
+        background: rgba(255, 255, 255, 0.06);
     }
     &:hover {
-        background: rgba(0, 0, 0, 0.1);
+        background: rgba(255, 255, 255, 0.1);
     }
 }

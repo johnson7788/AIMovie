@@ -366,7 +366,7 @@ onMounted(() => {
     padding: 20px;
     background-color: var(--el-bg-color-overlay);
     border-radius: 8px;
-    box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.1);
+    box-shadow: 0 0 10px 0 rgba(255, 255, 255, 0.1);
     display: flex;
     gap: 20px;
     position: relative;
@@ -414,7 +414,7 @@ onMounted(() => {
         background-color: var(--el-bg-color-overlay);
         padding: 10px;
         border-radius: 8px;
-        box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.1);
+        box-shadow: 0 0 10px 0 rgba(255, 255, 255, 0.1);
         cursor: pointer;
         transition: all 0.3s ease-in-out;
         opacity: 0;

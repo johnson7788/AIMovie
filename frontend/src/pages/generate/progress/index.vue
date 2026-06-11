@@ -403,14 +403,14 @@ onUnmounted(() => {
             .elapsed-time {
                 font-family: monospace;
                 font-size: 14px;
-                color: #909399;
+                color: var(--el-text-color-secondary);
             }
         }
     }
     .header-right {
         .task-id {
             font-size: 12px;
-            color: #c0c4cc;
+            color: var(--el-text-color-disabled);
             font-family: monospace;
         }
     }
@@ -461,11 +461,11 @@ onUnmounted(() => {
             font-size: 14px;
             &.done { color: #67c23a; }
             &.running { color: #e6a23c; animation: spin 1.5s linear infinite; }
-            &.pending { color: #c0c4cc; }
+            &.pending { color: var(--el-text-color-disabled); }
         }
-        .stage-name { color: #303133; }
-        .stage-duration { color: #909399; font-size: 11px; }
-        &.pending .stage-name { color: #c0c4cc; }
+        .stage-name { color: var(--el-text-color-primary); }
+        .stage-duration { color: var(--el-text-color-secondary); font-size: 11px; }
+        &.pending .stage-name { color: var(--el-text-color-disabled); }
     }
 }
 
@@ -545,7 +545,7 @@ onUnmounted(() => {
 }
 
 .artifacts-empty {
-    color: #909399;
+    color: var(--el-text-color-secondary);
     text-align: center;
     padding: 20px;
 }
@@ -562,13 +562,13 @@ onUnmounted(() => {
         margin-bottom: 6px;
         .artifact-name {
             font-size: 12px;
-            color: #606266;
+            color: var(--el-text-color-regular);
             word-break: break-all;
         }
     }
 
     .artifact-text-preview {
-        background: #f5f7fa;
+        background: var(--el-fill-color-light);
         border-radius: 4px;
         padding: 8px;
         max-height: 200px;
@@ -602,8 +602,8 @@ onUnmounted(() => {
         align-items: center;
         justify-content: center;
         height: 120px;
-        color: #909399;
-        background: #f5f7fa;
+        color: var(--el-text-color-secondary);
+        background: var(--el-fill-color-light);
         border-radius: 4px;
     }
 }

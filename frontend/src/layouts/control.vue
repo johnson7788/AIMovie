@@ -285,9 +285,9 @@ onMounted(() => {
             flex-direction: column;
             gap: 28px;
 
-            background: rgba(0, 0, 0, 0.04);
+            background: rgba(255, 255, 255, 0.04);
             border-radius: 200px 200px 200px 200px;
-            border: 0.1px solid rgba(0, 0, 0, 0.12);
+            border: 0.1px solid rgba(255, 255, 255, 0.12);
 
             &-item {
                 width: 100%;
@@ -318,7 +318,7 @@ onMounted(() => {
                     justify-content: center;
                     gap: 4px;
                     text-decoration: none;
-                    color: #8C8C8C;
+                    color: var(--el-text-color-secondary);
                     padding: 6px 0;
                     cursor: pointer;
                     user-select: none;
@@ -361,7 +361,7 @@ onMounted(() => {
 </style>
 <style>
 .el-popover {
-    --el-popover-bg-color: rgba(0, 0, 0, 0.04);
+    --el-popover-bg-color: rgba(255, 255, 255, 0.04);
     --el-popover-border-color: rgba(3255, 255, 255, 0.3);
     --el-box-shadow-light: none;
     --el-popover-border-radius: 20px;

@@ -158,7 +158,7 @@ defineExpose({
 
     .h8 {
         font-size: 14px;
-        color: rgba(0, 0, 0, 0.8);
+        color: rgba(255, 255, 255, 0.85);
         line-height: 1.5;
     }
 
@@ -174,8 +174,8 @@ defineExpose({
     .code-item {
         display: flex;
         gap: 8px;
-        background: #f5f7fa;
-        border: 1px solid #e4e7ed;
+        background: var(--el-fill-color-light);
+        border: 1px solid var(--el-border-color-light);
         padding: 16px 20px;
         border-radius: 12px;
         cursor: pointer;
@@ -203,7 +203,7 @@ defineExpose({
 
     .status-used {
         background: rgba(140, 140, 140, 0.1);
-        color: #8C8C8C;
+        color: var(--el-text-color-secondary);
         border: 1px solid #8C8C8C;
     }
 
@@ -230,7 +230,7 @@ defineExpose({
         width: 100%;
         background-color: #fff;
         color: #000;
-        border: 1px solid rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.1);
         font-weight: 600;
         font-size: 13px;
         padding: 6px 0;
@@ -238,8 +238,8 @@ defineExpose({
         transition: all 0.3s;
 
         &:hover {
-            background-color: #f5f5f5;
-            border-color: rgba(0, 0, 0, 0.15);
+            background-color: var(--el-fill-color-light);
+            border-color: rgba(255, 255, 255, 0.15);
         }
     }
 }

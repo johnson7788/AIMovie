@@ -320,18 +320,18 @@ const handleSubmit = () => {
 }
 
 :deep(.el-input__wrapper) {
-    --el-input-bg-color: #f5f7fa;
-    --el-input-border-color: #f5f7fa;
-    --el-input-focus-border-color: #f5f7fa;
+    --el-input-bg-color: var(--el-fill-color-light);
+    --el-input-border-color: var(--el-fill-color-light);
+    --el-input-focus-border-color: var(--el-fill-color-light);
     --el-input-border-radius: 8px;
     --el-border-radius-base: 8px;
     padding: 6px 8px;
 }
 
 :deep(.el-select__wrapper) {
-    --el-fill-color-blank: #f5f7fa;
-    --el-select-border-color: #f5f7fa;
-    --el-color-primary: #f5f7fa;
+    --el-fill-color-blank: var(--el-fill-color-light);
+    --el-select-border-color: var(--el-fill-color-light);
+    --el-color-primary: var(--el-fill-color-light);
     --el-select-border-radius: 8px;
     --el-border-radius-base: 8px;
     padding: 14px 16px;
