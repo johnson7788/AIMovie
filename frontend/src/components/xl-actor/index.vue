@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ResponseCode } from '@/common/const';
-import { truncate } from '@/common/functions';
+import { truncate, normalizeApiList } from '@/common/functions';
 import { $http } from '@/common/http';
 import { useRefs, useWebConfigStore } from '@/stores';
 const props = withDefaults(defineProps<{
@@ -32,7 +32,7 @@ const getActorList = () => {
         }
     }).then((res: any) => {
         if (res.code === ResponseCode.SUCCESS) {
-            actorList.value = res.data;
+            actorList.value = normalizeApiList(res.data);
         }
     }).finally(() => {
         loading.value = false;

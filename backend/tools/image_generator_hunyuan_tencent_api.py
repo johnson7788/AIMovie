@@ -59,6 +59,9 @@ class ImageGeneratorHunyuanTencentAPI:
             async with session.post(
                 self.submit_url, json=submit_payload, headers=headers
             ) as resp:
+                if resp.status != 200:
+                    body = await resp.text()
+                    raise ValueError(f"Hunyuan image submit failed: HTTP {resp.status}: {body[:200]}")
                 submit_json = await resp.json()
                 logging.debug(f"Hunyuan submit response: {submit_json}")
 
@@ -85,6 +88,9 @@ class ImageGeneratorHunyuanTencentAPI:
                 async with session.post(
                     self.query_url, json=query_payload, headers=headers
                 ) as resp:
+                    if resp.status != 200:
+                        body = await resp.text()
+                        raise ValueError(f"Hunyuan image query failed: HTTP {resp.status}: {body[:200]}")
                     query_json = await resp.json()
                     logging.debug(f"Hunyuan query response (elapsed={elapsed}s): {query_json}")
 

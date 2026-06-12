@@ -1,3 +1,6 @@
+import { buildApiUrl } from '@/common/apiBaseUrl';
+import { $http } from '@/common/http';
+
 export interface SSEEvent {
     type: string;
     stage?: string;
@@ -35,14 +38,13 @@ export function useSSE() {
     let abortController: AbortController | null = null;
 
     const connect = (taskId: string, options: UseSSEOptions) => {
-        const baseURL = import.meta.env.DEV
-            ? `${window.location.origin}/local`
-            : '';
-        const url = `${baseURL}/api/tasks/${taskId}/stream`;
-
+        const url = buildApiUrl(`api/tasks/${taskId}/stream`);
         abortController = new AbortController();
 
-        fetch(url, { signal: abortController.signal })
+        fetch(url, {
+            signal: abortController.signal,
+            headers: $http.getHeaders(),
+        })
             .then(async (response) => {
                 if (!response.ok) {
                     options.onError?.(new Error(`HTTP ${response.status}: ${response.statusText}`));
@@ -72,7 +74,6 @@ export function useSSE() {
                                 try {
                                     const event: SSEEvent = JSON.parse(line.substring(6));
                                     options.onEvent?.(event);
-                                    // Stop reading on terminal events
                                     if (event.type === 'complete' || event.type === 'error') {
                                         options.onComplete?.();
                                         return;
@@ -81,7 +82,6 @@ export function useSSE() {
                                     // skip malformed JSON events
                                 }
                             }
-                            // Skip SSE comments (lines starting with ":")
                         }
                     }
                 }

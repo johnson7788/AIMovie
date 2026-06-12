@@ -1,20 +1,48 @@
 <script setup lang="ts">
 
-const props = defineProps<{
+interface EpisodeOption {
+    value: number;
+    label: string;
+}
+
+const props = withDefaults(defineProps<{
     modelValue: number;
     allowInput?: boolean;
-}>();
+    variant?: 'default' | 'drama';
+}>(), {
+    variant: 'default',
+});
+
 const emit = defineEmits(['update:modelValue']);
+
+const defaultEpisodeValues = [20, 40, 60, 80, 100, 150, 200, 300, 400, 500];
+const dramaEpisodeValues = [1, 5, ...defaultEpisodeValues];
+
+const episodeOptions = computed<EpisodeOption[]>(() => {
+    const values = props.variant === 'drama'
+        ? dramaEpisodeValues
+        : defaultEpisodeValues;
+    return values.map(value => ({
+        value,
+        label: String(value),
+    }));
+});
+
+const displayLabel = computed(() => {
+    if (props.modelValue <= 0) return '自动';
+    return String(props.modelValue);
+});
+
 const handleSelect = (value: number) => {
     emit('update:modelValue', value);
-}
-const episodeSumList = ref<number[]>([20, 40, 60, 80, 100, 150, 200, 300, 400, 500]);
+};
+
 const customValue = ref<number>();
 const handleCustomInput = () => {
     if (customValue.value && customValue.value > 0) {
         emit('update:modelValue', customValue.value);
     }
-}
+};
 </script>
 <template>
     <el-popover trigger="click" :show-arrow="false" placement="bottom-start" width="fit-content" popper-class="model-popover">
@@ -22,16 +50,16 @@ const handleCustomInput = () => {
             <slot>
                 <div class="flex flex-center grid-gap-2 input-button input-button-selected px-6">
                     <span v-if="props.modelValue > 0">全</span>
-                    <span class="h10 font-weight-600 text-episode-sum">{{ props.modelValue > 0 ? props.modelValue : '自动' }}</span>
+                    <span class="h10 font-weight-600 text-episode-sum">{{ displayLabel }}</span>
                     <span v-if="props.modelValue > 0">集</span>
                 </div>
             </slot>
         </template>
         <span class="h10">选择集数</span>
         <div class="grid-columns-4 grid-gap-4 text-center mt-4">
-            <div class="grid-column-2 btn rounded-4 p-4" v-for="item in episodeSumList" :key="item"
-                :class="{ 'active': props.modelValue === item }" @click.stop="handleSelect(item)">
-                <span class="font-weight-600">{{ item }}</span>
+            <div class="grid-column-2 btn rounded-4 p-4" v-for="item in episodeOptions" :key="item.value"
+                :class="{ 'active': props.modelValue === item.value }" @click.stop="handleSelect(item.value)">
+                <span class="font-weight-600">{{ item.label }}</span>
             </div>
         </div>
         <div v-if="allowInput" class="custom-input-area mt-4 pt-3" style="border-top: 1px solid rgba(255, 255, 255, 0.06);">

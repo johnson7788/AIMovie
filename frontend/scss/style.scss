@@ -304,8 +304,8 @@ a {
 }
 
 .el-message-box.x-login-message-box {
-    --el-messagebox-width: min(980px, 100%);
-    --el-messagebox-height: 550px;
+    --el-messagebox-width: min(420px, calc(100vw - 32px));
+    --el-messagebox-height: 520px;
     --el-messagebox-padding-primary: 0px;
     --el-messagebox-border-radius: 16px;
     height: var(--el-messagebox-height);

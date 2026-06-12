@@ -61,7 +61,7 @@ const xlInvitationCodeRef = ref<any>(null);
     </el-popover>
     <div class="xl-header-userinfo" v-else>
         <div class="xl-header-userinfo-button" @click="login.open()">
-            <span>一键登录</span>
+            <span>登录</span>
         </div>
     </div>
     <xl-userinfo ref="xlUserinfoRef" />

@@ -25,6 +25,7 @@ trap cleanup SIGINT SIGTERM
 echo -e "${GREEN}[start.sh]${NC} 启动后端 (backend/main.py) ..."
 cd "$BACKEND_DIR"
 uv sync --index-url https://pypi.tuna.tsinghua.edu.cn/simple
+export PYTHONUTF8=1
 uv run python main.py 2>&1 | while IFS= read -r line; do
     echo -e "${BLUE}[backend]${NC} $line"
 done &
@@ -33,6 +34,7 @@ BACKEND_PID=$!
 # --- Start Frontend ---
 echo -e "${GREEN}[start.sh]${NC} 启动前端 (vite dev) ..."
 cd "$FRONTEND_DIR"
+export VITE_REQUEST_BASE_URL="${VITE_REQUEST_BASE_URL:-http://127.0.0.1:8666}"
 npm run dev 2>&1 | while IFS= read -r line; do
     echo -e "${GREEN}[frontend]${NC} $line"
 done &

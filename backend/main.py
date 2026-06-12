@@ -1,13 +1,24 @@
 import os
 import logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s", datefmt="%H:%M:%S")
-# Enable HTTP-level debug logging for LLM API calls
-logging.getLogger("openai").setLevel(logging.DEBUG)
-logging.getLogger("httpx").setLevel(logging.DEBUG)
 
 from dotenv import load_dotenv
+_BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 # Load .env from the backend directory (next to this file)
-load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
+load_dotenv(os.path.join(_BACKEND_DIR, ".env"))
+SERVER_PORT = int(os.getenv("SERVER_PORT", "8666"))
+
+# Ensure UTF-8 text handling on Windows (avoid GBK decode errors).
+if os.name == "nt":
+    os.environ.setdefault("PYTHONUTF8", "1")
+    try:
+        import sys
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8")
+        if hasattr(sys.stderr, "reconfigure"):
+            sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
 
 import asyncio
 import hashlib
@@ -22,11 +33,12 @@ from typing import Optional
 
 import aiohttp
 import yaml
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Header
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
 from pydantic import BaseModel, Field
 from progress_manager import ProgressManager
+import auth as auth_service
 
 def _import_pipelines():
     """Lazy import pipelines to avoid import errors when deps are missing."""
@@ -47,7 +59,7 @@ def _get_image_generator(model_id: Optional[str] = None, config_path: str = "con
     """
     from tools.render_backend import RenderBackend
 
-    with open(config_path) as f:
+    with open(_backend_path(config_path), encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
     # Override image generator class based on model_id
@@ -66,6 +78,8 @@ def _get_image_generator(model_id: Optional[str] = None, config_path: str = "con
 
 async def _download_image(url: str) -> str:
     """Download image from URL to a temp file. Returns file path."""
+    if not url.startswith(("http://", "https://")):
+        raise HTTPException(status_code=400, detail="Only http(s) image URLs are supported")
     ext = ".png"
     if "." in url.split("/")[-1]:
         ext = "." + url.split("/")[-1].split(".")[-1].split("?")[0]
@@ -74,10 +88,33 @@ async def _download_image(url: str) -> str:
     fd, path = tempfile.mkstemp(suffix=ext)
     async with aiohttp.ClientSession() as session:
         async with session.get(url, timeout=aiohttp.ClientTimeout(total=60)) as resp:
+            if resp.status != 200:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Failed to download image: HTTP {resp.status}",
+                )
             data = await resp.read()
     with os.fdopen(fd, "wb") as f:
         f.write(data)
     return path
+
+
+def _backend_path(*parts: str) -> str:
+    return os.path.join(_BACKEND_DIR, *parts)
+
+
+def _track_background_task(coro):
+    """Run a background coroutine and log unhandled exceptions."""
+    task = asyncio.create_task(coro)
+
+    def _done(t: asyncio.Task):
+        try:
+            t.result()
+        except Exception:
+            logging.exception("Background task failed")
+
+    task.add_done_callback(_done)
+    return task
 
 app = FastAPI(
     title="VixP3D API",
@@ -89,13 +126,13 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # --- SQLite database ---
-DB_PATH = "tasks.db"
+DB_PATH = _backend_path("tasks.db")
 
 
 def init_db():
@@ -116,6 +153,7 @@ def init_db():
         conn.execute("ALTER TABLE tasks ADD COLUMN working_dir TEXT")
     except sqlite3.OperationalError:
         pass  # column already exists
+    auth_service.init_auth_tables(conn)
     conn.commit()
     return conn
 
@@ -193,6 +231,7 @@ class Idea2VideoRequest(BaseModel):
     config_path: str = "configs/idea2video.yaml"
     model_id: str = ""
     episode_count: int = 0  # 0 = let LLM decide; >0 = force this many episodes
+    episode_duration: int = 0  # seconds per episode; 0 = no hard limit
 
 
 class TaskResponse(BaseModel):
@@ -259,10 +298,14 @@ async def run_script2video(task_id: str, req: Script2VideoRequest):
         _remove_log_handler(log_handler)
 
 
-def _find_model_by_id(model_id: str) -> dict | None:
-    """Find a model entry in MODELS_DATA by its id."""
+def _find_model_by_id(model_id: str, scene: Optional[str] = None) -> dict | None:
+    """Find a model entry in MODELS_DATA by id, optionally scoped to a scene group."""
     if not model_id:
         return None
+    if scene and scene in MODELS_DATA:
+        for m in MODELS_DATA[scene]:
+            if m.get("id") == model_id:
+                return m
     for scene_models in MODELS_DATA.values():
         for m in scene_models:
             if m.get("id") == model_id:
@@ -308,10 +351,30 @@ def _build_provider_image_generator(provider: str):
         return ImageGeneratorDoubaoSeedreamVolcengineAPI()
     elif provider == "gpugeek":
         return ImageGeneratorDoubaoSeedreamGPUGEEKAPI()
-    elif provider == "openai":
-        return ImageGeneratorDoubaoSeedreamVolcengineAPI()
     else:
         return ImageGeneratorDoubaoSeedreamVolcengineAPI()
+
+
+def _get_video_generator(model_id: Optional[str] = None, config_path: str = "configs/script2video.yaml"):
+    """Create a video generator from config, with optional model_id override."""
+    from tools.render_backend import RenderBackend
+
+    config_file = _backend_path(config_path)
+    with open(config_file, encoding="utf-8") as f:
+        config = yaml.safe_load(f)
+
+    model_info = _find_model_by_id(model_id, "storyboard_video") if model_id else None
+    if model_info:
+        provider = model_info.get("provider", "")
+        if provider == "google":
+            config["video_generator"]["class_path"] = "tools.VideoGeneratorVeoGoogleAPI"
+        elif provider == "gpugeek":
+            config["video_generator"]["class_path"] = "tools.VideoGeneratorViraGPUGEEKAPI"
+        else:
+            config["video_generator"]["class_path"] = "tools.VideoGeneratorDoubaoSeedanceVolcengineAPI"
+
+    backend = RenderBackend.from_config(config)
+    return backend.video_generator
 
 
 def _build_provider_video_generator(provider: str):
@@ -341,6 +404,7 @@ async def run_idea2video(task_id: str, req: Idea2VideoRequest):
             req.user_requirement or "",
             req.style,
             str(req.episode_count),
+            str(req.episode_duration),
             req.model_id,
             req.config_path,
         ])
@@ -358,7 +422,7 @@ async def run_idea2video(task_id: str, req: Idea2VideoRequest):
 
         # Override generators based on selected model's provider
         if req.model_id:
-            model_info = _find_model_by_id(req.model_id)
+            model_info = _find_model_by_id(req.model_id, "creative_script")
             if model_info:
                 provider = model_info["provider"]
                 model_name = model_info["model"]
@@ -382,6 +446,7 @@ async def run_idea2video(task_id: str, req: Idea2VideoRequest):
             user_requirement=req.user_requirement,
             style=req.style,
             episode_count=req.episode_count,
+            episode_duration=req.episode_duration,
             progress_callback=progress_callback,
         )
         pm.emit(task_id, {"type": "complete", "result": result_path})
@@ -419,17 +484,17 @@ MODELS_DATA = {
     "creative_script": [
         {"id": "4", "name": "Doubao Pro", "provider": "volcengine", "model": "doubao-seed-2-0-lite-260428", "icon": "", "description": "ByteDance's large language model optimized for Chinese-language creative content."},
         {"id": "1", "name": "Hunyuan (Tencent)", "provider": "tencent", "model": "hunyuan-turbos-latest", "icon": "", "description": "Tencent's powerful large language model with excellent Chinese creative writing and reasoning."},
-        {"id": "2", "name": "Gemini 2.5 Pro", "provider": "openai", "model": "gemini-2.5-pro", "icon": "", "description": "Google's most capable model for complex reasoning, coding, and creative writing tasks."},
+        {"id": "2", "name": "Gemini 2.5 Pro", "provider": "google", "model": "gemini-2.5-pro", "icon": "", "description": "Google's most capable model for complex reasoning, coding, and creative writing tasks."},
         {"id": "3", "name": "GPT-4o", "provider": "openai", "model": "gpt-4o", "icon": "", "description": "OpenAI's fast multimodal flagship model with strong creative writing capabilities."},
         {"id": "5", "name": "DeepSeek V4 (GPUGeek)", "provider": "gpugeek", "model": "Vendor3/DeepSeek-V4-Flash", "icon": "", "description": "DeepSeek's latest model via GPUGeek proxy with excellent reasoning and creative writing."},
     ],
     "creative_episode": [],
     "creative_scenes": [
-        {"id": "cs_1", "name": "Gemini 2.5 Flash", "provider": "openai", "model": "gemini-2.5-flash", "icon": "", "description": "Fast and efficient model for scene breakdown and structuring tasks."},
+        {"id": "cs_1", "name": "Gemini 2.5 Flash", "provider": "google", "model": "gemini-2.5-flash", "icon": "", "description": "Fast and efficient model for scene breakdown and structuring tasks."},
         {"id": "cs_2", "name": "Hunyuan (Tencent)", "provider": "tencent", "model": "hunyuan-turbos-latest", "icon": "", "description": "Tencent's efficient model for scene structuring and plot development."},
     ],
     "creative_storyboards": [
-        {"id": "sb_1", "name": "Gemini 2.5 Pro", "provider": "openai", "model": "gemini-2.5-pro", "icon": "", "description": "High-quality storyboard generation with detailed visual descriptions."},
+        {"id": "sb_1", "name": "Gemini 2.5 Pro", "provider": "google", "model": "gemini-2.5-pro", "icon": "", "description": "High-quality storyboard generation with detailed visual descriptions."},
         {"id": "sb_2", "name": "Hunyuan (Tencent)", "provider": "tencent", "model": "hunyuan-turbos-latest", "icon": "", "description": "Tencent's model for storyboard layout and visual planning."},
     ],
     "drama_cover": [],
@@ -509,7 +574,7 @@ async def script2video(req: Script2VideoRequest):
             "INSERT INTO tasks (task_id, mode, status) VALUES (?, ?, ?)",
             (task_id, "script2video", "pending"),
         )
-    asyncio.create_task(run_script2video(task_id, req))
+    _track_background_task(run_script2video(task_id, req))
     return success_response(
         TaskResponse(task_id=task_id, mode="script2video", status="pending").model_dump()
     )
@@ -524,7 +589,7 @@ async def idea2video(req: Idea2VideoRequest):
             "INSERT INTO tasks (task_id, mode, status) VALUES (?, ?, ?)",
             (task_id, "idea2video", "pending"),
         )
-    asyncio.create_task(run_idea2video(task_id, req))
+    _track_background_task(run_idea2video(task_id, req))
     return success_response(
         TaskResponse(task_id=task_id, mode="idea2video", status="pending").model_dump()
     )
@@ -573,6 +638,20 @@ async def stream_task_progress(task_id: str):
     """SSE endpoint for real-time task progress streaming."""
     pm = ProgressManager.get_instance()
 
+    def _terminal_event_from_db() -> Optional[dict]:
+        with get_db() as conn:
+            row = conn.execute(
+                "SELECT status, result, error FROM tasks WHERE task_id = ?",
+                (task_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        if row["status"] == "completed":
+            return {"type": "complete", "result": row["result"]}
+        if row["status"] == "failed":
+            return {"type": "error", "error": row["error"] or "Task failed"}
+        return None
+
     async def event_generator():
         index = 0
         heartbeat_interval = 15  # seconds between heartbeats when idle
@@ -580,6 +659,22 @@ async def stream_task_progress(task_id: str):
         try:
             # Send initial connect event so frontend knows the stream is live
             yield f"data: {json_module.dumps({'type': 'connected', 'task_id': task_id}, ensure_ascii=False)}\n\n"
+
+            # Replay buffered in-memory events first (supports reconnect within same process)
+            buffered = pm.get_events(task_id)
+            for event in buffered:
+                yield f"data: {json_module.dumps(event, ensure_ascii=False)}\n\n"
+                await asyncio.sleep(0)
+                if event.get("type") in ("complete", "error"):
+                    return
+            index = len(buffered)
+
+            terminal = _terminal_event_from_db()
+            if terminal and not pm.is_completed(task_id):
+                yield f"data: {json_module.dumps(terminal, ensure_ascii=False)}\n\n"
+                return
+            if pm.is_completed(task_id):
+                return
 
             while True:
                 # Wait for new events, or timeout for heartbeat
@@ -604,6 +699,11 @@ async def stream_task_progress(task_id: str):
                     last_data_time = time.time()
 
                 if pm.is_completed(task_id):
+                    return
+
+                terminal = _terminal_event_from_db()
+                if terminal:
+                    yield f"data: {json_module.dumps(terminal, ensure_ascii=False)}\n\n"
                     return
 
                 # Send heartbeat only when no data has been sent recently
@@ -645,9 +745,11 @@ async def serve_task_file(task_id: str, file_path: str):
         raise HTTPException(status_code=404, detail="Task not found")
 
     full_path = os.path.normpath(os.path.join(working_dir, file_path))
+    norm_working = os.path.normpath(os.path.abspath(working_dir))
+    norm_full = os.path.normpath(os.path.abspath(full_path))
 
-    # Security: ensure the resolved path is within the working_dir
-    if not full_path.startswith(os.path.normpath(working_dir)):
+    # Security: ensure the resolved path stays within working_dir
+    if os.path.commonpath([norm_working, norm_full]) != norm_working:
         raise HTTPException(status_code=403, detail="Access denied")
 
     if not os.path.exists(full_path):
@@ -681,7 +783,7 @@ class LegacySubmitRequest(BaseModel):
     prompt: str = ""
     style: str = ""
     aspect_ratio: str = "9:16"
-    episode_sum: int = 20
+    episode_sum: int = 0
     episode_duration: int = 60
 
 
@@ -703,41 +805,41 @@ async def legacy_submit(req: LegacySubmitRequest):
     if req.episode_duration:
         user_requirement_parts.append(f"Episode duration: {req.episode_duration}s")
     user_requirement = "; ".join(user_requirement_parts) if user_requirement_parts else ""
+    episode_count = req.episode_sum if req.episode_sum > 0 else 0
 
-    if req.script in ("script", "drama"):
-        # idea2video mode (creative from idea/prompt)
-        idea_req = Idea2VideoRequest(
-            idea=req.prompt,
+    if req.script == "script":
+        script_req = Script2VideoRequest(
+            script=req.prompt,
             user_requirement=user_requirement,
             style=req.style or "Cinematic",
-            config_path="configs/idea2video.yaml",
-            model_id=req.model,
-            episode_count=req.episode_sum,
+            config_path="configs/script2video.yaml",
         )
+        mode = "script2video"
         with get_db() as conn:
             conn.execute(
                 "INSERT INTO tasks (task_id, mode, status) VALUES (?, ?, ?)",
-                (task_id, "idea2video", "pending"),
+                (task_id, mode, "pending"),
             )
-        asyncio.create_task(run_idea2video(task_id, idea_req))
+        _track_background_task(run_script2video(task_id, script_req))
     else:
-        # Fallback: treat as idea2video
         idea_req = Idea2VideoRequest(
             idea=req.prompt,
             user_requirement=user_requirement,
             style=req.style or "Cinematic",
             config_path="configs/idea2video.yaml",
             model_id=req.model,
-            episode_count=req.episode_sum,
+            episode_count=episode_count,
+            episode_duration=req.episode_duration,
         )
+        mode = "idea2video"
         with get_db() as conn:
             conn.execute(
                 "INSERT INTO tasks (task_id, mode, status) VALUES (?, ?, ?)",
-                (task_id, "idea2video", "pending"),
+                (task_id, mode, "pending"),
             )
-        asyncio.create_task(run_idea2video(task_id, idea_req))
+        _track_background_task(run_idea2video(task_id, idea_req))
 
-    return success_response({"uuid": task_id, "task_id": task_id})
+    return success_response({"uuid": task_id, "task_id": task_id, "mode": mode})
 
 
 @app.get("/app/model/api/Model/models")
@@ -845,13 +947,6 @@ class VoiceModelResponse(BaseModel):
 
 # --- Frontend-facing endpoints under /app/ paths ---
 
-# --- Models ---
-@app.get("/app/model/api/Model/models")
-async def frontend_get_models():
-    """Get available AI models grouped by scene type (frontend endpoint)."""
-    return success_response(MODELS_DATA)
-
-
 # --- Tasks (frontend-facing) ---
 @app.get("/app/model/api/Task/index")
 async def frontend_task_list(
@@ -912,7 +1007,7 @@ async def run_scene_image_generation(
     log_handler = _install_log_handler(task_id)
     ref_path = None
     try:
-        output_dir = os.path.join(".working_dir", "scenes")
+        output_dir = _backend_path(".working_dir", "scenes")
         os.makedirs(output_dir, exist_ok=True)
         pm.set_working_dir(task_id, output_dir)
         with get_db() as conn:
@@ -994,7 +1089,7 @@ async def run_storyboard_image_generation(
     log_handler = _install_log_handler(task_id)
     ref_paths = []
     try:
-        output_dir = os.path.join(".working_dir", "storyboards")
+        output_dir = _backend_path(".working_dir", "storyboards")
         os.makedirs(output_dir, exist_ok=True)
         pm.set_working_dir(task_id, output_dir)
         with get_db() as conn:
@@ -1062,6 +1157,141 @@ async def run_storyboard_image_generation(
                     pass
 
 
+async def run_video_generation(
+    task_id: str,
+    mode: str,
+    stage: str,
+    prompt: str,
+    model_id: Optional[str],
+    reference_urls: Optional[list[str]] = None,
+    duration: int = 5,
+    resolution: str = "1080p",
+    output_prefix: str = "video",
+):
+    """Run image-to-video or text-to-video generation in background."""
+    pm = ProgressManager.get_instance()
+    log_handler = _install_log_handler(task_id)
+    ref_paths: list[str] = []
+    try:
+        output_dir = _backend_path(".working_dir", mode)
+        os.makedirs(output_dir, exist_ok=True)
+        pm.set_working_dir(task_id, output_dir)
+        with get_db() as conn:
+            conn.execute(
+                "UPDATE tasks SET working_dir = ? WHERE task_id = ?",
+                (output_dir, task_id),
+            )
+
+        pm.emit(task_id, {"type": "stage_start", "stage": stage, "message": f"Starting {stage}..."})
+
+        gen = _get_video_generator(model_id)
+        for url in reference_urls or []:
+            if url:
+                ref_paths.append(await _download_image(url))
+
+        duration_val = 5 if duration <= 5 else 10
+        result = await gen.generate_single_video(
+            prompt=prompt or "Generate a cinematic video clip.",
+            reference_image_paths=ref_paths,
+            resolution=resolution if resolution in ("480p", "720p", "1080p") else "1080p",
+            duration=duration_val,
+        )
+
+        output_path = os.path.join(output_dir, f"{output_prefix}_{task_id}.mp4")
+        result.save(output_path)
+
+        rel_name = f"{output_prefix}_{task_id}.mp4"
+        pm.emit(task_id, {
+            "type": "artifact",
+            "stage": stage,
+            "file_type": "video",
+            "file_path": rel_name,
+            "url": f"/api/tasks/{task_id}/files/{rel_name}",
+        })
+        pm.emit(task_id, {"type": "stage_end", "stage": stage, "message": f"{stage} completed"})
+        pm.emit(task_id, {"type": "complete", "result": output_path})
+
+        with get_db() as conn:
+            conn.execute(
+                "UPDATE tasks SET status = ?, result = ? WHERE task_id = ?",
+                ("completed", output_path, task_id),
+            )
+    except Exception as e:
+        logging.exception(f"{stage} failed for task {task_id}")
+        pm.emit(task_id, {"type": "error", "error": str(e)})
+        with get_db() as conn:
+            conn.execute(
+                "UPDATE tasks SET status = ?, error = ? WHERE task_id = ?",
+                ("failed", str(e), task_id),
+            )
+    finally:
+        _remove_log_handler(log_handler)
+        for p in ref_paths:
+            if p and os.path.exists(p):
+                try:
+                    os.remove(p)
+                except OSError:
+                    pass
+
+
+async def run_image_generation_task(
+    task_id: str,
+    mode: str,
+    stage: str,
+    prompt: str,
+    model_id: Optional[str],
+    output_prefix: str,
+):
+    """Generic single-image generation used by character look and drama cover."""
+    pm = ProgressManager.get_instance()
+    log_handler = _install_log_handler(task_id)
+    try:
+        output_dir = _backend_path(".working_dir", mode)
+        os.makedirs(output_dir, exist_ok=True)
+        pm.set_working_dir(task_id, output_dir)
+        with get_db() as conn:
+            conn.execute(
+                "UPDATE tasks SET working_dir = ? WHERE task_id = ?",
+                (output_dir, task_id),
+            )
+
+        pm.emit(task_id, {"type": "stage_start", "stage": stage, "message": f"Starting {stage}..."})
+        gen = _get_image_generator(model_id)
+        gen_class_name = type(gen).__name__
+        if "Nanobanana" in gen_class_name or "nanobanana" in gen_class_name.lower():
+            result = await gen.generate_single_image(prompt=prompt, reference_image_paths=[], aspect_ratio="16:9")
+        else:
+            result = await gen.generate_single_image(prompt=prompt, reference_image_paths=[], size="1600x900")
+
+        output_path = os.path.join(output_dir, f"{output_prefix}_{task_id}.png")
+        result.save(output_path)
+        rel_name = f"{output_prefix}_{task_id}.png"
+        pm.emit(task_id, {
+            "type": "artifact",
+            "stage": stage,
+            "file_type": "image",
+            "file_path": rel_name,
+            "url": f"/api/tasks/{task_id}/files/{rel_name}",
+        })
+        pm.emit(task_id, {"type": "stage_end", "stage": stage, "message": f"{stage} completed"})
+        pm.emit(task_id, {"type": "complete", "result": output_path})
+        with get_db() as conn:
+            conn.execute(
+                "UPDATE tasks SET status = ?, result = ? WHERE task_id = ?",
+                ("completed", output_path, task_id),
+            )
+    except Exception as e:
+        logging.exception(f"{stage} failed for task {task_id}")
+        pm.emit(task_id, {"type": "error", "error": str(e)})
+        with get_db() as conn:
+            conn.execute(
+                "UPDATE tasks SET status = ?, error = ? WHERE task_id = ?",
+                ("failed", str(e), task_id),
+            )
+    finally:
+        _remove_log_handler(log_handler)
+
+
 # --- Generation endpoints ---
 
 @app.post("/app/shortplay/api/Generate/sceneImage")
@@ -1077,7 +1307,7 @@ async def generate_scene_image(req: GenerateSceneImageRequest):
             "INSERT INTO tasks (task_id, mode, status) VALUES (?, ?, ?)",
             (task_id, "scene_image", "pending"),
         )
-    asyncio.create_task(run_scene_image_generation(
+    _track_background_task(run_scene_image_generation(
         task_id, prompt, req.image_url, req.model_id
     ))
     return success_response({"task_id": task_id, "status": "pending"})
@@ -1096,7 +1326,7 @@ async def generate_storyboard_image(req: GenerateStoryboardImageRequest):
             "INSERT INTO tasks (task_id, mode, status) VALUES (?, ?, ?)",
             (task_id, "storyboard_image", "pending"),
         )
-    asyncio.create_task(run_storyboard_image_generation(
+    _track_background_task(run_storyboard_image_generation(
         task_id, prompt, req.model_id, req.first_image, req.last_image
     ))
     return success_response({"task_id": task_id, "status": "pending"})
@@ -1105,52 +1335,84 @@ async def generate_storyboard_image(req: GenerateStoryboardImageRequest):
 @app.post("/app/shortplay/api/Generate/storyboardVideo")
 async def generate_storyboard_video(req: GenerateStoryboardVideoRequest):
     """Generate a storyboard video. Returns a task_id for async processing."""
+    prompt = req.prompt or ""
+    if not prompt and not req.first_image:
+        return error_response(400, "prompt or first_image is required")
+
     task_id = str(uuid.uuid4())
     with get_db() as conn:
         conn.execute(
             "INSERT INTO tasks (task_id, mode, status) VALUES (?, ?, ?)",
             (task_id, "storyboard_video", "pending"),
         )
-    # TODO: implement actual storyboard video generation pipeline
+    refs = [u for u in [req.first_image, req.last_image] if u]
+    _track_background_task(run_video_generation(
+        task_id,
+        mode="storyboard_video",
+        stage="storyboard_video",
+        prompt=prompt,
+        model_id=req.model_id,
+        reference_urls=refs,
+        duration=req.duration,
+        output_prefix="storyboard",
+    ))
     return success_response({"task_id": task_id, "status": "pending"})
 
 
 @app.post("/app/shortplay/api/Generate/characterLook")
 async def generate_character_look(req: GenerateCharacterLookRequest):
     """Generate character look images. Returns a task_id for async processing."""
+    prompt = req.prompt or "Generate a character portrait with consistent features."
     task_id = str(uuid.uuid4())
     with get_db() as conn:
         conn.execute(
             "INSERT INTO tasks (task_id, mode, status) VALUES (?, ?, ?)",
             (task_id, "character_look", "pending"),
         )
-    # TODO: implement actual character look generation pipeline
+    _track_background_task(run_image_generation_task(
+        task_id, "character_look", "character_look", prompt, req.model_id, "character_look"
+    ))
     return success_response({"task_id": task_id, "status": "pending"})
 
 
 @app.post("/app/shortplay/api/Generate/dramaCover")
 async def generate_drama_cover(req: GenerateDramaCoverRequest):
     """Generate a drama cover image. Returns a task_id for async processing."""
+    prompt = req.prompt or "Generate a cinematic drama cover poster."
     task_id = str(uuid.uuid4())
     with get_db() as conn:
         conn.execute(
             "INSERT INTO tasks (task_id, mode, status) VALUES (?, ?, ?)",
             (task_id, "drama_cover", "pending"),
         )
-    # TODO: implement actual drama cover generation pipeline
+    _track_background_task(run_image_generation_task(
+        task_id, "drama_cover", "drama_cover", prompt, req.model_id, "drama_cover"
+    ))
     return success_response({"task_id": task_id, "status": "pending"})
 
 
 @app.post("/app/shortplay/api/Creative/video")
 async def creative_video(req: CreativeVideoRequest):
     """Generate a video from image + prompt (creative mode). Returns a task_id."""
+    if not req.image_url:
+        return error_response(400, "image_url is required")
     task_id = str(uuid.uuid4())
     with get_db() as conn:
         conn.execute(
             "INSERT INTO tasks (task_id, mode, status) VALUES (?, ?, ?)",
             (task_id, "creative_video", "pending"),
         )
-    # TODO: implement actual creative video generation (img2video)
+    _track_background_task(run_video_generation(
+        task_id,
+        mode="creative_video",
+        stage="creative_video",
+        prompt=req.prompt,
+        model_id=req.model_id,
+        reference_urls=[req.image_url],
+        duration=req.duration,
+        resolution=req.resolution,
+        output_prefix="creative",
+    ))
     return success_response({"task_id": task_id, "status": "pending"})
 
 
@@ -1178,9 +1440,8 @@ async def get_voice_list():
 # --- Upload (stub) ---
 @app.post("/app/shortplay/api/Uploads/upload")
 async def upload_file():
-    """Upload a file (image/video/document). Stub - returns a placeholder URL."""
-    # TODO: implement actual file upload handling
-    return success_response({"url": "/uploads/placeholder.jpg", "dir_name": "uploads"})
+    """Upload a file (image/video/document). Not implemented."""
+    raise HTTPException(status_code=501, detail="File upload is not implemented yet")
 
 
 # ===================================================================
@@ -1251,32 +1512,74 @@ async def control_config():
 
 @app.post("/app/control/api/Public/getSmsVcode")
 async def get_sms_vcode():
-    """获取短信验证码（桩）. 写死返回成功."""
-    return success_response({"token": "stub-vcode-token-000000"})
+    """短信验证码已停用."""
+    return error_response(400, "当前仅支持账号密码登录")
 
 
 # --- User ---
-GUEST_USER_DATA = {
-    "id": "guest-001",
-    "nickname": "游客",
-    "username": "guest",
-    "mobile": "",
-    "avatar": "",
-    "token": "stub-guest-token-000000",
-    "is_guest": True,
-}
+def _extract_token(authorization: Optional[str] = Header(default=None)) -> Optional[str]:
+    if not authorization:
+        return None
+    token = authorization.strip()
+    if token.lower().startswith("bearer "):
+        token = token[7:].strip()
+    return token or None
+
+
+class LoginRequest(BaseModel):
+    username: str = ""
+    password: str = ""
+
+
+class RegisterRequest(BaseModel):
+    username: str = ""
+    password: str = ""
+    vpassword: str = ""
+
+
+class UserUpdateRequest(BaseModel):
+    nickname: Optional[str] = None
 
 
 @app.get("/app/user/api/User/info")
-async def user_info():
-    """获取当前用户信息（桩）. 写死返回游客."""
-    return success_response(GUEST_USER_DATA)
+async def user_info(authorization: Optional[str] = Header(default=None)):
+    """Return the authenticated user profile."""
+    token = _extract_token(authorization)
+    with get_db() as conn:
+        user = auth_service.get_user_by_token(conn, token)
+    if user is None:
+        return success_response({"token": "", "is_guest": False})
+    return success_response(user)
 
 
 @app.post("/app/user/api/User/update")
-async def user_update():
-    """更新用户信息（桩）."""
-    return success_response(GUEST_USER_DATA)
+async def user_update(
+    req: UserUpdateRequest,
+    authorization: Optional[str] = Header(default=None),
+):
+    token = _extract_token(authorization)
+    with get_db() as conn:
+        user = auth_service.get_user_by_token(conn, token)
+        if user is None:
+            return error_response(12000, "请先登录")
+        if req.nickname and req.nickname.strip():
+            conn.execute(
+                "UPDATE users SET nickname = ? WHERE id = ?",
+                (req.nickname.strip(), user["id"]),
+            )
+            user = auth_service.get_user_by_token(conn, token)
+    return success_response(user)
+
+
+@app.post("/app/user/api/User/bindMobile")
+async def bind_mobile(authorization: Optional[str] = Header(default=None)):
+    """Mobile binding is disabled; username/password auth only."""
+    token = _extract_token(authorization)
+    with get_db() as conn:
+        user = auth_service.get_user_by_token(conn, token)
+    if user is None:
+        return error_response(12000, "请先登录")
+    return error_response(400, "当前仅支持账号密码登录，无需绑定手机号")
 
 
 @app.post("/app/user/api/User/bindInvitationCode")
@@ -1298,55 +1601,56 @@ async def get_unused_invitation_code():
 
 
 @app.post("/app/user/api/Login/login")
+async def login(req: LoginRequest):
+    try:
+        with get_db() as conn:
+            user, _token = auth_service.login_user(conn, req.username, req.password)
+        return success_response(user)
+    except ValueError as e:
+        return error_response(400, str(e))
+
+
+@app.post("/app/user/api/Login/register")
+async def register(req: RegisterRequest):
+    if req.password != req.vpassword:
+        return error_response(400, "两次输入的密码不一致")
+    try:
+        with get_db() as conn:
+            user, _token = auth_service.register_user(conn, req.username, req.password)
+        return success_response(user)
+    except ValueError as e:
+        return error_response(400, str(e))
+
+
 @app.post("/app/user/api/Login/loginPass")
 @app.post("/app/user/api/Login/loginSms")
 @app.post("/app/user/api/Login/wechatLogin")
 @app.post("/app/user/api/Login/vcode")
-async def login_stub():
-    """登录接口（桩）. 写死返回游客用户."""
-    return success_response(GUEST_USER_DATA)
-
-
-@app.post("/app/user/api/Login/register")
-async def register_stub():
-    """注册接口（桩）."""
-    return success_response(GUEST_USER_DATA)
+async def login_legacy_disabled():
+    return error_response(400, "当前仅支持账号密码登录")
 
 
 @app.get("/app/user/api/Captcha/captcha_json")
 async def captcha():
-    """图形验证码（桩）."""
-    return success_response({"captcha_id": "stub-captcha-001", "captcha_img": ""})
+    """图形验证码（已停用）."""
+    return error_response(400, "当前仅支持账号密码登录")
 
 
 # --- Actor (桩) ---
 @app.get("/app/shortplay/api/Actor/index")
 async def actor_list():
-    """演员列表（桩）."""
-    return success_response({"data": [], "total": 0})
-
-
-# --- Style (桩) ---
-MOCK_STYLES = [
-    {"id": "cinematic", "name": "Cinematic", "image": ""},
-    {"id": "anime", "name": "Anime Style", "image": ""},
-    {"id": "storybook", "name": "Storybook Illustration", "image": ""},
-    {"id": "realistic", "name": "Photorealistic", "image": ""},
-    {"id": "watercolor", "name": "Watercolor", "image": ""},
-    {"id": "3d_render", "name": "3D Render", "image": ""},
-    {"id": "pixel_art", "name": "Pixel Art", "image": ""},
-    {"id": "comic", "name": "Comic Book", "image": ""},
-]
-
-
-@app.get("/app/shortplay/api/Style/index")
-async def style_list():
-    """风格列表（桩）."""
-    return success_response({"data": MOCK_STYLES, "total": len(MOCK_STYLES)})
+    """演员列表（桩）— returns empty array for frontend list components."""
+    return success_response([])
 
 
 # --- Works / Drama / Episode (桩) ---
 _EMPTY_LIST = {"data": [], "total": 0}
+
+
+@app.get("/app/shortplay/api/Prop/index")
+async def prop_list():
+    """道具列表（桩）— returns empty array for mention search."""
+    return success_response([])
 
 
 @app.get("/app/shortplay/api/Works/index")
@@ -1367,30 +1671,24 @@ async def works_episode():
 # --- Scene (桩) ---
 @app.get("/app/shortplay/api/Scene/index")
 async def scene_list():
-    return success_response(_EMPTY_LIST)
+    return success_response([])
 
 
 # --- Storyboard (桩) ---
 @app.get("/app/shortplay/api/Storyboard/index")
 async def storyboard_list():
-    return success_response(_EMPTY_LIST)
+    return success_response([])
 
 
 @app.get("/app/shortplay/api/StoryboardDialogue/index")
 async def storyboard_dialogue_list():
-    return success_response(_EMPTY_LIST)
-
-
-# --- Prop (桩) ---
-@app.get("/app/shortplay/api/Prop/index")
-async def prop_list():
-    return success_response(_EMPTY_LIST)
+    return success_response([])
 
 
 # --- CharacterLook (桩) ---
 @app.get("/app/shortplay/api/CharacterLook/index")
 async def character_look_list():
-    return success_response(_EMPTY_LIST)
+    return success_response([])
 
 
 # --- Square (桩) ---
@@ -1463,8 +1761,11 @@ async def merge_chunks():
 # ===================================================================
 @app.api_route("/app/{full_path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def app_catch_all(full_path: str):
-    """所有未显式定义的 /app/ 接口的通用桩."""
-    return success_response(None)
+    """Unimplemented /app/ endpoints return 501 instead of silent success."""
+    return JSONResponse(
+        status_code=501,
+        content=error_response(501, f"Endpoint not implemented: /app/{full_path}"),
+    )
 
 
 # --- Startup ---
@@ -1477,4 +1778,4 @@ if __name__ == "__main__":
     import uvicorn
 
     init_db()
-    uvicorn.run(app, host="0.0.0.0", port=8666)
+    uvicorn.run(app, host="0.0.0.0", port=SERVER_PORT)

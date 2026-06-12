@@ -16,8 +16,8 @@
         </div>
 
         <!-- Overall Progress -->
-        <div class="progress-bar-wrap" v-if="overallProgress > 0">
-            <el-progress :percentage="Math.min(overallProgress, 99)" :status="isComplete ? 'success' : undefined" :stroke-width="8" />
+        <div class="progress-bar-wrap" v-if="overallProgress > 0 || isComplete">
+            <el-progress :percentage="isComplete ? 100 : Math.min(overallProgress, 99)" :status="isComplete ? 'success' : undefined" :stroke-width="8" />
         </div>
 
         <!-- Main Content -->
@@ -69,7 +69,8 @@
                     <template #header>
                         <span>生成产物 ({{ artifacts.length }})</span>
                     </template>
-                    <div class="artifacts-list" v-if="artifacts.length > 0">
+                    <div class="artifacts-scroll" v-if="artifacts.length > 0">
+                        <div class="artifacts-list">
                         <div v-for="(item, idx) in artifacts" :key="idx" class="artifact-item">
                             <!-- Text artifacts -->
                             <template v-if="item.file_type === 'text' || item.file_type === 'json'">
@@ -115,6 +116,7 @@
                                 />
                             </template>
                         </div>
+                        </div>
                     </div>
                     <div v-else-if="!isConnecting" class="artifacts-empty">
                         等待产物生成...
@@ -135,6 +137,8 @@ import { ref, reactive, computed, onMounted, onUnmounted, nextTick, watch } from
 import { useRoute, useRouter } from 'vue-router';
 import { CircleCheckFilled, Loading, Clock } from '@element-plus/icons-vue';
 import { useSSE, type SSEEvent } from '@/composables/useSSE';
+import { buildApiUrl } from '@/common/apiBaseUrl';
+import { $http } from '@/common/http';
 
 const route = useRoute();
 const router = useRouter();
@@ -185,6 +189,10 @@ const stageDefinitions: Record<string, Array<{ name: string; label: string }>> =
         { name: 'character_portraits', label: '角色画像' },
         { name: 'script', label: '剧本编写' },
         { name: 'scene_0', label: '场景处理' },
+        { name: 'storyboard', label: '分镜设计' },
+        { name: 'visual_descriptions', label: '视觉描述' },
+        { name: 'camera_tree', label: '机位构建' },
+        { name: 'frames', label: '画面生成' },
         { name: 'concatenate', label: '视频合成' },
     ],
     script2video: [
@@ -218,13 +226,13 @@ const initStages = () => {
 // Build file URL from relative path or event URL
 const buildFileUrl = (filePath: string) => {
     if (!filePath) return '';
-    if (filePath.startsWith('/api/')) {
-        const baseURL = import.meta.env.DEV ? '/local' : '';
-        return baseURL + filePath;
+    if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+        return filePath;
     }
-    // Assume it's a relative path from the task files endpoint
-    const baseURL = import.meta.env.DEV ? '/local' : '';
-    return `${baseURL}/api/tasks/${taskId.value}/files/${filePath}`;
+    if (filePath.startsWith('/api/')) {
+        return buildApiUrl(filePath.slice(1));
+    }
+    return buildApiUrl(`api/tasks/${taskId.value}/files/${filePath}`);
 };
 
 const goBack = () => {
@@ -264,7 +272,17 @@ const updateStageStatus = (event: SSEEvent) => {
         }
     }
 
-    // Update overall progress based on completed stages
+    recalculateOverallProgress();
+};
+
+const markAllStagesDone = () => {
+    for (const stage of stages) {
+        stage.status = 'done';
+    }
+    overallProgress.value = 100;
+};
+
+const recalculateOverallProgress = () => {
     const totalStages = stages.length || 1;
     const completedStages = stages.filter(s => s.status === 'done').length;
     const runningStageIdx = stages.findIndex(s => s.status === 'running');
@@ -272,6 +290,52 @@ const updateStageStatus = (event: SSEEvent) => {
         overallProgress.value = Math.round(((completedStages + 0.5) / totalStages) * 100);
     } else {
         overallProgress.value = Math.round((completedStages / totalStages) * 100);
+    }
+};
+
+interface TaskStatusResponse {
+    task_id: string;
+    mode: string;
+    status: string;
+    result?: string | null;
+    error?: string | null;
+}
+
+const applyTerminalTaskStatus = (task: TaskStatusResponse) => {
+    if (task.status === 'completed') {
+        isComplete.value = true;
+        markAllStagesDone();
+        if (task.result) {
+            logs.value.push({
+                time: new Date().toLocaleTimeString(),
+                level: 'INFO',
+                message: `生成完成! 结果: ${task.result}`,
+            });
+            artifacts.value.push({
+                type: 'artifact',
+                stage: 'concatenate',
+                file_type: 'video',
+                file_path: 'final_video.mp4',
+                url: `/api/tasks/${taskId.value}/files/final_video.mp4`,
+            });
+        }
+    } else if (task.status === 'failed') {
+        errorMessage.value = task.error || '任务失败';
+    }
+};
+
+const fetchTaskStatus = async () => {
+    try {
+        const res = await fetch(buildApiUrl(`api/tasks/${taskId.value}`), {
+            headers: $http.getHeaders(),
+        });
+        if (!res.ok) return;
+        const payload = await res.json();
+        if (payload?.data) {
+            applyTerminalTaskStatus(payload.data);
+        }
+    } catch {
+        // ignore polling errors
     }
 };
 
@@ -330,12 +394,21 @@ const handleEvent = (event: SSEEvent) => {
 
         case 'complete':
             isComplete.value = true;
-            overallProgress.value = 100;
+            markAllStagesDone();
             logs.value.push({
                 time: new Date().toLocaleTimeString(),
                 level: 'INFO',
                 message: `生成完成! 结果: ${event.result || '见产物列表'}`,
             });
+            if (event.result && !artifacts.value.some(a => a.file_path === 'final_video.mp4')) {
+                artifacts.value.push({
+                    type: 'artifact',
+                    stage: 'concatenate',
+                    file_type: 'video',
+                    file_path: 'final_video.mp4',
+                    url: `/api/tasks/${taskId.value}/files/final_video.mp4`,
+                });
+            }
             break;
     }
 };
@@ -347,9 +420,12 @@ const handleError = (err: Error) => {
 
 const handleComplete = () => {
     isConnecting.value = false;
+    if (!isComplete.value && !errorMessage.value) {
+        fetchTaskStatus();
+    }
 };
 
-onMounted(() => {
+onMounted(async () => {
     initStages();
 
     // Start elapsed timer
@@ -358,6 +434,8 @@ onMounted(() => {
             elapsedSeconds.value++;
         }
     }, 1000);
+
+    await fetchTaskStatus();
 
     // Connect to SSE
     connect(taskId.value, {
@@ -441,6 +519,9 @@ onUnmounted(() => {
     flex: 2;
     min-width: 280px;
     max-width: 450px;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
 }
 
@@ -531,11 +612,23 @@ onUnmounted(() => {
     flex-direction: column;
     min-height: 0;
     overflow: hidden;
+
     :deep(.el-card__body) {
         flex: 1;
-        overflow-y: auto;
-        padding: 8px;
+        min-height: 0;
+        overflow: hidden;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
     }
+}
+
+.artifacts-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 8px;
 }
 
 .artifacts-list {

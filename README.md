@@ -16,12 +16,15 @@ AI 驱动的智能视频生成平台，支持创意到视频、剧本到视频�
 AIMovie/
 ├── backend/          # Python FastAPI 后端
 │   ├── main.py       # API 入口
+│   ├── auth.py       # 账号密码登录
 │   ├── tools/        # 图片/视频生成器 (Seedream, Nanobanana, Hunyuan 等)
 │   ├── pipelines/    # 视频生成流水线
 │   └── configs/      # YAML 配置文件
 ├── frontend/         # Vue 3 + Vite 前端
 │   └── src/
-├── start.sh          # 一键启动脚本
+├── start.sh          # Linux / macOS 一键启动
+├── start.bat         # Windows 一键启动（双击运行）
+├── start.ps1         # Windows 启动脚本（由 start.bat 调用）
 └── README.md
 ```
 
@@ -51,7 +54,7 @@ npm install
 cp backend/env_example backend/.env
 ```
 
-编辑 `backend/.env`，填入你的 API Key：
+编辑 `backend/.env`，填入你的 API Key（**此文件不会提交到 Git**）：
 
 ```env
 # 豆包/火山引擎
@@ -59,17 +62,27 @@ ARK_API_KEY=your_ark_api_key
 
 # 腾讯混元
 HUNYUAN_API_KEY=your_hunyuan_api_key
+
+# GPUGEEK（可选）
+GPUGEEK_API_KEY=your_gpugeek_api_key
 ```
 
 ### 3. 启动
 
 **方式一：一键启动（推荐）**
 
-```bash
-./start.sh
-```
+| 系统 | 命令 |
+|------|------|
+| **Windows** | 双击 `start.bat`，或在项目根目录执行 `.\start.bat` |
+| **Linux / macOS** | `./start.sh` |
 
-自动启动前端 (port 36310) 和后端 (port 8000)，按 `Ctrl+C` 停止。
+Windows 脚本会依次完成：
+
+1. `uv sync` 同步后端依赖
+2. 启动后端并等待 `/health` 就绪
+3. 首次运行自动 `npm install`，再启动前端
+
+日志输出到项目根目录的 `backend.log`、`backend.err.log`。按 `Ctrl+C` 停止前后端。
 
 **方式二：分别启动**
 
@@ -77,15 +90,41 @@ HUNYUAN_API_KEY=your_hunyuan_api_key
 # 终端1 - 后端
 cd backend && uv run python main.py
 
-# 终端2 - 前端
-cd frontend && npm run dev
+# 终端2 - 前端（Windows PowerShell 示例）
+cd frontend
+$env:VITE_REQUEST_BASE_URL="http://127.0.0.1:8666"
+npm run dev
 ```
 
 ### 4. 访问
 
-- 前端界面: http://localhost:36310
-- 后端 API 文档: http://localhost:8000/docs
-- 健康检查: http://localhost:8000/health
+- 前端界面: http://localhost:36310/aimovie/
+- 后端 API 文档: http://localhost:8666/docs
+- 健康检查: http://localhost:8666/health
+
+## 上传到 Git 会包含什么？
+
+**不会上传**（已在 `.gitignore` 中排除）：
+
+| 类型 | 路径示例 |
+|------|----------|
+| API Key / 密钥 | `backend/.env`、`frontend/.env.development` 等 `.env*` |
+| Python 虚拟环境 | `backend/.venv/`、`.venv/` |
+| Node 依赖 | `frontend/node_modules/` |
+| 本地生成数据 | `backend/.working_dir/`、`backend/tasks.db` |
+| 运行日志 | `*.log`（如 `backend.log`） |
+
+**会上传**：
+
+- 源代码、`backend/env_example`（仅模板，无真实 Key）
+- `start.bat` / `start.ps1` / `start.sh` 启动脚本
+- 配置文件模板（`configs/*.yaml` 等）
+
+上传前建议执行 `git status`，确认列表里没有 `.env`、`.venv`、`node_modules`、`.working_dir`。若误加入，可用 `git rm --cached <文件>` 移除跟踪。
+
+## 登录说明
+
+当前仅支持**账号密码**注册与登录。首次使用请点击右上角「登录」→「注册」创建账号。
 
 ## 支持的 AI 模型
 
@@ -108,11 +147,14 @@ cd frontend && npm run dev
 |--------|------|------|
 | POST | `/api/script2video` | 剧本→视频 |
 | POST | `/api/idea2video` | 创意→视频 |
-| POST | `/app/shortplay/api/Generate/sceneImage` | 场景图生成 |
-| POST | `/app/shortplay/api/Generate/storyboardImage` | 分镜图生成 |
+| POST | `/app/shortplay/api/Index/submit` | 前端提交生成任务 |
+| POST | `/app/user/api/Login/register` | 账号注册 |
+| POST | `/app/user/api/Login/login` | 账号登录 |
 | GET  | `/api/tasks/{task_id}` | 查询任务状态 |
+| GET  | `/api/tasks/{task_id}/stream` | 任务进度 SSE |
 | GET  | `/api/models` | 获取模型列表 |
 | GET  | `/api/styles` | 获取风格列表 |
 
 ## 更新
+
 1. 一致性 [人物一致性](doc/同1个人物的背景由1个模型生成.png)

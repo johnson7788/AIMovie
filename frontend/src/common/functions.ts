@@ -2,6 +2,16 @@ import { ElMessage } from "element-plus";
 import { useWebConfigStore } from "@/stores";
 import { i18n } from '@/locale';
 const { t } = i18n.global;
+
+/** Normalize API list payloads that may be a plain array or `{ data: [] }`. */
+export function normalizeApiList(data: unknown): any[] {
+    if (Array.isArray(data)) return data;
+    if (data && typeof data === 'object' && Array.isArray((data as { data?: unknown }).data)) {
+        return (data as { data: any[] }).data;
+    }
+    return [];
+}
+
 /**
  * 节流函数会确保在指定的时间间隔内，函数被调用的次数不超过设定的阈值。
  * @param func 节流函数

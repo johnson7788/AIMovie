@@ -10,8 +10,9 @@ import compression from 'vite-plugin-compression';
 import Inspect from 'vite-plugin-inspect'
 
 const pathSrc = path.resolve(__dirname, './src')
-export default defineConfig((ConfigEnv: ConfigEnv) => {
-  const env = loadEnv(ConfigEnv.mode, process.cwd())
+export default defineConfig((env: ConfigEnv) => {
+  const loadedEnv = loadEnv(env.mode, process.cwd())
+  const apiProxyTarget = loadedEnv.VITE_REQUEST_BASE_URL || 'http://127.0.0.1:8666'
   return {
     base: '/aimovie/',
     resolve: {
@@ -80,7 +81,7 @@ export default defineConfig((ConfigEnv: ConfigEnv) => {
       // 接口代理（解决跨域）
       proxy: {
         "/local": {
-          target: env.VITE_REQUEST_BASE_URL,
+          target: apiProxyTarget,
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/local/, ""),
         }

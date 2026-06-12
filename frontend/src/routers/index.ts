@@ -84,7 +84,7 @@ const router = createRouter({
                         if (to.params.drama_id && userStore.hasLogin()) {
                             next()
                         } else {
-                            next({ name: 'works' })
+                            next({ name: 'index' })
                         }
                     },
                 },
@@ -323,8 +323,17 @@ router.beforeEach(async (to, from, next) => {
 
     const userStore = useUserStore();
     userStore.initUserInfo();
-    const { USERINFO } = useRefs(userStore);
-    const whiteList = ['index', 'article']
+    if (!userStore.hasLogin()) {
+        try {
+            const res: any = await $http.get('/app/user/api/User/info');
+            if (res.code === ResponseCode.SUCCESS && res.data?.token) {
+                await userStore.setUserInfo(res.data);
+            }
+        } catch {
+            // ignore guest bootstrap failure
+        }
+    }
+    const whiteList = ['index', 'article', 'progress', 'square']
     if (!userStore.hasLogin() && !whiteList.includes(to.name as string)) {
         return next({ name: 'index' })
     }

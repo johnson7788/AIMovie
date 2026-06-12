@@ -2,15 +2,52 @@ import logging
 import requests
 import subprocess
 import os
+import shutil
 import tempfile
-from typing import List
+from typing import List, Optional
 from tenacity import retry
+
+
+def _resolve_ffmpeg_exe() -> str:
+    """Return ffmpeg executable path (system PATH or imageio_ffmpeg bundle)."""
+    exe = shutil.which("ffmpeg")
+    if exe:
+        return exe
+    try:
+        import imageio_ffmpeg
+        exe = imageio_ffmpeg.get_ffmpeg_exe()
+        if exe and os.path.isfile(exe):
+            return exe
+    except Exception:
+        pass
+    raise RuntimeError(
+        "ffmpeg not found. Install ffmpeg and add it to PATH, "
+        "or ensure imageio-ffmpeg is installed."
+    )
+
+
+def _resolve_ffprobe_exe() -> Optional[str]:
+    """Return ffprobe path if available (often not bundled with imageio_ffmpeg)."""
+    exe = shutil.which("ffprobe")
+    if exe:
+        return exe
+    ffmpeg = _resolve_ffmpeg_exe()
+    ffmpeg_dir = os.path.dirname(ffmpeg)
+    for name in ("ffprobe.exe", "ffprobe"):
+        candidate = os.path.join(ffmpeg_dir, name)
+        if os.path.isfile(candidate):
+            return candidate
+    if "ffmpeg" in os.path.basename(ffmpeg):
+        candidate = ffmpeg.replace("ffmpeg", "ffprobe")
+        if os.path.isfile(candidate):
+            return candidate
+    return None
 
 
 def _read_stderr_file(stderr_path: str) -> str:
     """Safely read stderr output from a temp file."""
     try:
-        with open(stderr_path, 'r', errors='replace') as f:
+        with open(stderr_path, 'r', encoding='utf-8', errors='replace') as f:
             return f.read()
     except Exception:
         return ""
@@ -36,25 +73,48 @@ def download_video(url, save_path):
 
 
 def _probe_video(path: str) -> dict:
-    """Quick sanity check: file exists, not empty, and ffprobe can parse it."""
+    """Quick sanity check: file exists, not empty, and probe tool can parse it."""
     import json
     if not os.path.exists(path):
         raise FileNotFoundError(f"Video file not found: {path}")
     size_mb = os.path.getsize(path) / (1024 * 1024)
     if size_mb < 0.01:
         raise ValueError(f"Video file is too small ({size_mb:.2f} MB): {path}")
+
+    ffprobe = _resolve_ffprobe_exe()
+    if ffprobe:
+        result = subprocess.run(
+            [ffprobe, '-v', 'quiet', '-print_format', 'json',
+             '-show_format', '-show_streams', path],
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='replace',
+            timeout=60,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"ffprobe failed for {path}: {result.stderr}")
+        info = json.loads(result.stdout)
+        logging.info(f"Probed {path}: {size_mb:.1f} MB, "
+                     f"format={info.get('format', {}).get('format_name')}, "
+                     f"duration={info.get('format', {}).get('duration')}s")
+        return info
+
+    # imageio_ffmpeg bundles ffmpeg only — use it to verify the container is readable
+    ffmpeg = _resolve_ffmpeg_exe()
     result = subprocess.run(
-        ['ffprobe', '-v', 'quiet', '-print_format', 'json',
-         '-show_format', '-show_streams', path],
-        capture_output=True, text=True, timeout=60,
+        [ffmpeg, '-hide_banner', '-i', path],
+        capture_output=True,
+        text=True,
+        encoding='utf-8',
+        errors='replace',
+        timeout=60,
     )
-    if result.returncode != 0:
-        raise RuntimeError(f"ffprobe failed for {path}: {result.stderr}")
-    info = json.loads(result.stdout)
-    logging.info(f"Probed {path}: {size_mb:.1f} MB, "
-                 f"format={info.get('format', {}).get('format_name')}, "
-                 f"duration={info.get('format', {}).get('duration')}s")
-    return info
+    stderr = result.stderr or ""
+    if "Invalid data" in stderr or "No such file" in stderr or "does not contain" in stderr:
+        raise RuntimeError(f"ffmpeg probe failed for {path}: {stderr[-500:]}")
+    logging.info(f"Probed {path}: {size_mb:.1f} MB (ffmpeg probe, ffprobe unavailable)")
+    return {}
 
 
 def concat_videos(video_paths: List[str], output_path: str,
@@ -83,7 +143,7 @@ def concat_videos(video_paths: List[str], output_path: str,
     # demuxer resolves relative paths relative to the concat file's directory,
     # not the process CWD)
     concat_file = output_path + ".concat.txt"
-    with open(concat_file, 'w') as f:
+    with open(concat_file, 'w', encoding='utf-8') as f:
         for path in video_paths:
             f.write(f"file '{os.path.abspath(path)}'\n")
 
@@ -92,8 +152,9 @@ def concat_videos(video_paths: List[str], output_path: str,
           f":force_original_aspect_ratio=decrease,"
           f"pad={target_width}:{target_height}:(ow-iw)/2:(oh-ih)/2")
 
+    ffmpeg = _resolve_ffmpeg_exe()
     cmd = [
-        'ffmpeg', '-y',
+        ffmpeg, '-y',
         '-f', 'concat', '-safe', '0', '-i', concat_file,
         '-vf', vf,
         '-c:v', 'libx264', '-preset', 'medium', '-crf', '23',
@@ -109,7 +170,7 @@ def concat_videos(video_paths: List[str], output_path: str,
     #  the default 64KB pipe buffer and deadlock if using PIPE)
     stderr_path = output_path + ".ffmpeg.stderr.txt"
     try:
-        with open(stderr_path, 'w') as stderr_f:
+        with open(stderr_path, 'w', encoding='utf-8') as stderr_f:
             result = subprocess.run(
                 cmd,
                 stdout=subprocess.DEVNULL,

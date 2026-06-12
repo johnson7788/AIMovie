@@ -49,6 +49,8 @@ DerivedData
 *.ipa
 .idea
 node_modules/
+.venv/
+**/.venv/
 npm-debug.log
 yarn-error.log
 **/Pods/

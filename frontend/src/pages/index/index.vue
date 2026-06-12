@@ -120,7 +120,7 @@ const sendSearch = debounce((pattern: string, prefix: string) => {
 	$http.get(url, { params: { name: pattern, limit: 100 }, signal: controller.signal }).then((res: any) => {
 		if (res.code === ResponseCode.SUCCESS) {
 			nextTick(() => {
-				options.value = res.data.map((item: any) => ({
+				options.value = (Array.isArray(res.data) ? res.data : res.data?.data ?? []).map((item: any) => ({
 					...item,
 					view: prefix === '@' ? 'actor' : 'prop',
 					label: `${item.name}{${prefix === '@' ? item.actor_id : item.prop_id}}`,
@@ -278,7 +278,7 @@ const submit = () => {
 			if (res.data.drama_id) {
 				router.push('/works/' + res.data.drama_id)
 			} else if (res.data.task_id) {
-				const mode = form.script === 'script' ? 'idea2video' : 'idea2video';
+				const mode = res.data.mode || (form.script === 'script' ? 'script2video' : 'idea2video');
 				router.push(`/progress/${res.data.task_id}?mode=${mode}`)
 			} else {
 				xlLoading.open();
@@ -489,8 +489,16 @@ onUnmounted(() => {
 					</div>
 
 					<xl-aspect-ratio v-model="form.aspect_ratio" />
-					<xl-episode-sum v-model="form.episode_sum" :allow-input="form.script === 'script'" />
-					<xl-episode-duration v-if="form.script !== 'script'" v-model="form.episode_duration" />
+					<xl-episode-sum
+						v-model="form.episode_sum"
+						:allow-input="form.script === 'script'"
+						:variant="form.script === 'drama' ? 'drama' : 'default'"
+					/>
+					<xl-episode-duration
+						v-if="form.script !== 'script'"
+						v-model="form.episode_duration"
+						variant="drama"
+					/>
 					<div class="flex-1"></div>
 					<div class="flex flex-center grid-gap-2 input-button " style="width: 40px; height: 40px;"
 						@click="submit">

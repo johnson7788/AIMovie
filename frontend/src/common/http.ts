@@ -1,3 +1,4 @@
+import { buildApiUrl, getApiBaseUrl } from "./apiBaseUrl";
 import { ElMessageBox } from "element-plus";
 import { useStorage } from "@/composables/useStorage";
 import axios, { AxiosResponse, AxiosError } from "axios";
@@ -7,17 +8,9 @@ import { i18n } from '@/locale';
 import { ResponseCode } from "./const";
 import { useLogin } from "@/composables/useLogin";
 const { t } = i18n.global;
-let baseURL = globalThis.location.origin
-if (import.meta.env.DEV) {
-    baseURL = baseURL + '/local'
-} else if (import.meta.env.VITE_REQUEST_BASE_URL) {
-    baseURL = import.meta.env.VITE_REQUEST_BASE_URL
-} else {
-    // 从meta中获取version
-    baseURL = document.querySelector('meta[name="base-url"]')?.getAttribute('content') || baseURL;
-}
+const baseURL = getApiBaseUrl();
 const getCompleteUrl = (path: string) => {
-    return `${baseURL}/${path}`;
+    return buildApiUrl(path);
 }
 const getHeaders = () => {
     const headers: any = {};
@@ -93,19 +86,33 @@ axios.interceptors.response.use((response: AxiosResponse) => {
 export const $http = {
     getCompleteUrl,
     getHeaders,
+    getApiBaseUrl,
+    buildApiUrl,
     get: axios.get,
     post: axios.post,
     axios
 }
+type EventListenerEntry = { callback: Function; wrapper: (e: Event) => void };
+const eventListeners = new Map<string, Set<EventListenerEntry>>();
 const eventOn = (event: string, callback: Function) => {
-    globalThis.addEventListener(event, (e: any) => {
-        callback(e.detail)
-    })
+    if (!eventListeners.has(event)) {
+        eventListeners.set(event, new Set());
+    }
+    const wrapper = (e: Event) => {
+        callback((e as CustomEvent).detail);
+    };
+    eventListeners.get(event)!.add({ callback, wrapper });
+    globalThis.addEventListener(event, wrapper);
 }
 const eventRemove = (event: string, callback: Function) => {
-    globalThis.removeEventListener(event, (e: any) => {
-        callback(e.detail)
-    })
+    const entries = eventListeners.get(event);
+    if (!entries) return;
+    for (const entry of entries) {
+        if (entry.callback === callback) {
+            globalThis.removeEventListener(event, entry.wrapper);
+            entries.delete(entry);
+        }
+    }
 }
 const eventEmit = (event: string, data?: any) => {
     globalThis.dispatchEvent(new CustomEvent(event, { detail: data }))

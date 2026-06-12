@@ -15,6 +15,48 @@ from utils.provider_presets import resolve_chat_model_config
 from utils.image import image_output_to_pil, crop_turnaround_views
 
 
+async def _noop_progress(_event):
+    pass
+
+
+def build_effective_user_requirement(
+    user_requirement: str,
+    episode_count: int = 0,
+    episode_duration: int = 0,
+) -> str:
+    """Merge UI episode settings into prompts the LLM and storyboard must follow."""
+    parts = []
+    if user_requirement and user_requirement.strip():
+        parts.append(user_requirement.strip())
+    if episode_count == 1:
+        parts.append(
+            "Generate exactly ONE episode as a single short video. "
+            "The script must contain exactly ONE scene (single time and location). "
+            "Do not split into multiple acts or scenes."
+        )
+    elif episode_count > 1:
+        parts.append(
+            f"Generate exactly {episode_count} episodes; "
+            f"each episode should map to one scene in the script."
+        )
+    if episode_duration > 0:
+        max_shots = max(1, min(10, episode_duration // 5))
+        parts.append(
+            f"Target episode duration: approximately {episode_duration} seconds. "
+            f"Use at most {max_shots} shots in the storyboard."
+        )
+    return " ".join(parts)
+
+
+def limit_scene_scripts(scene_scripts: List[str], episode_count: int) -> List[str]:
+    """Enforce episode count even when cached script.json has more scenes."""
+    if episode_count == 1:
+        return scene_scripts[:1]
+    if episode_count > 1:
+        return scene_scripts[:episode_count]
+    return scene_scripts
+
+
 class Idea2VideoPipeline:
 
     # Use turnaround sheet (single image with 3 views) for better character consistency.
@@ -41,7 +83,13 @@ class Idea2VideoPipeline:
 
     @classmethod
     def init_from_config(cls, config_path: str):
-        with open(config_path, "r") as f:
+        config_file = config_path
+        if not os.path.isabs(config_path):
+            config_file = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                config_path,
+            )
+        with open(config_file, encoding="utf-8") as f:
             config = yaml.safe_load(f)
 
         chat_model_args = resolve_chat_model_config(config["chat_model"]["init_args"])
@@ -116,7 +164,6 @@ class Idea2VideoPipeline:
         self,
         idea: str,
         user_requirement: str,
-        episode_count: int = 0,
     ):
         save_path = os.path.join(self.working_dir, "story.txt")
         if os.path.exists(save_path):
@@ -125,10 +172,7 @@ class Idea2VideoPipeline:
             print(f"🚀 Loaded story from existing file.")
         else:
             print("🧠 Developing story...")
-            effective_requirement = user_requirement
-            if episode_count > 0:
-                effective_requirement = f"{user_requirement}\nEpisodes: {episode_count}"
-            story = await self.screenwriter.develop_story(idea=idea, user_requirement=effective_requirement)
+            story = await self.screenwriter.develop_story(idea=idea, user_requirement=user_requirement)
             with open(save_path, "w", encoding="utf-8") as f:
                 f.write(story)
             print(f"✅ Developed story and saved to {save_path}.")
@@ -249,15 +293,19 @@ class Idea2VideoPipeline:
         user_requirement: str,
         style: str,
         episode_count: int = 0,
+        episode_duration: int = 0,
         progress_callback: Optional[Callable[[dict], Awaitable[None]]] = None,
     ):
-        cb = progress_callback or (lambda e: None)
+        cb = progress_callback or _noop_progress
         self._progress_callback = cb
+        effective_requirement = build_effective_user_requirement(
+            user_requirement, episode_count, episode_duration
+        )
 
         # Stage: Story
         await cb({"type": "stage_start", "stage": "story", "message": "Developing story from idea..."})
         t0 = time.time()
-        story = await self.develop_story(idea=idea, user_requirement=user_requirement, episode_count=episode_count)
+        story = await self.develop_story(idea=idea, user_requirement=effective_requirement)
         story_path = os.path.join(self.working_dir, "story.txt")
         await cb({
             "type": "artifact", "stage": "story", "file_type": "text",
@@ -290,7 +338,16 @@ class Idea2VideoPipeline:
         # Stage: Script
         await cb({"type": "stage_start", "stage": "script", "message": "Writing script based on story..."})
         t0 = time.time()
-        scene_scripts = await self.write_script_based_on_story(story=story, user_requirement=user_requirement)
+        scene_scripts = await self.write_script_based_on_story(
+            story=story, user_requirement=effective_requirement
+        )
+        raw_scene_count = len(scene_scripts)
+        scene_scripts = limit_scene_scripts(scene_scripts, episode_count)
+        if episode_count > 0 and raw_scene_count > len(scene_scripts):
+            print(
+                f"✂️ Using {len(scene_scripts)} of {raw_scene_count} script scene(s) "
+                f"for {episode_count} requested episode(s)."
+            )
         await cb({
             "type": "artifact", "stage": "script", "file_type": "json",
             "file_path": "script.json",
@@ -324,7 +381,7 @@ class Idea2VideoPipeline:
 
             final_video_path = await script2video_pipeline(
                 script=scene_script,
-                user_requirement=user_requirement,
+                user_requirement=effective_requirement,
                 style=style,
                 characters=characters,
                 character_portraits_registry=character_portraits_registry,

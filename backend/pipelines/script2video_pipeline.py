@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 import json
 import logging
@@ -15,17 +16,20 @@ from tools.render_backend import RenderBackend
 from utils.provider_presets import resolve_chat_model_config
 from utils.image import image_output_to_pil, crop_turnaround_views
 
+async def _noop_progress(_event):
+    pass
+
+
+def _max_shots_from_user_requirement(user_requirement: str) -> Optional[int]:
+    match = re.search(r"Use at most (\d+) shots", user_requirement or "")
+    return int(match.group(1)) if match else None
+
+
 class Script2VideoPipeline:
 
     # Use turnaround sheet (single image with 3 views) for better character consistency.
     # Set to False to fall back to the old 3-separate-call method.
     USE_TURNAROUND_SHEET = True
-
-    # events
-    character_portrait_events = {}
-    shot_desc_events = {}
-    frame_events = {}
-
 
     def __init__(
         self,
@@ -46,6 +50,10 @@ class Script2VideoPipeline:
         self.camera_image_generator = CameraImageGenerator(chat_model=self.chat_model, image_generator=self.image_generator, video_generator=self.video_generator)
         self.reference_image_selector = ReferenceImageSelector(chat_model=self.chat_model, multimodal_model=multimodal_chat_model)
 
+        self.character_portrait_events = {}
+        self.shot_desc_events = {}
+        self.frame_events = {}
+
         self.working_dir = working_dir
         os.makedirs(self.working_dir, exist_ok=True)
 
@@ -53,7 +61,13 @@ class Script2VideoPipeline:
 
     @classmethod
     def init_from_config(cls, config_path: str):
-        with open(config_path, "r") as f:
+        config_file = config_path
+        if not os.path.isabs(config_path):
+            config_file = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                config_path,
+            )
+        with open(config_file, encoding="utf-8") as f:
             config = yaml.safe_load(f)
 
         chat_model_args = resolve_chat_model_config(config["chat_model"]["init_args"])
@@ -83,7 +97,7 @@ class Script2VideoPipeline:
         character_portraits_registry: Optional[Dict[str, Dict[str, Dict[str, str]]]] = None,
         progress_callback: Optional[Callable[[dict], Awaitable[None]]] = None,
     ):
-        cb = progress_callback or (lambda e: None)
+        cb = progress_callback or _noop_progress
         self._progress_callback = cb
 
         if characters is None:
@@ -461,12 +475,14 @@ class Script2VideoPipeline:
             print(f"🚀 Loaded {len(camera_tree)} cameras from existing file.")
             return camera_tree
 
-        cameras: List[Camera] = []
+        cameras_by_idx: Dict[int, Camera] = {}
         for shot_description in shot_descriptions:
-            if shot_description.cam_idx not in [camera.idx for camera in cameras]:
-                cameras.append(Camera(idx=shot_description.cam_idx, active_shot_idxs=[shot_description.idx]))
+            cam_idx = shot_description.cam_idx
+            if cam_idx not in cameras_by_idx:
+                cameras_by_idx[cam_idx] = Camera(idx=cam_idx, active_shot_idxs=[shot_description.idx])
             else:
-                cameras[shot_description.cam_idx].active_shot_idxs.append(shot_description.idx)
+                cameras_by_idx[cam_idx].active_shot_idxs.append(shot_description.idx)
+        cameras = list(cameras_by_idx.values())
 
         camera_tree = await self.camera_image_generator.construct_camera_tree(cameras=cameras, shot_descs=shot_descriptions)
         with open(camera_tree_path, "w", encoding="utf-8") as f:
@@ -647,6 +663,11 @@ class Script2VideoPipeline:
             with open(storyboard_path, 'w', encoding='utf-8') as f:
                 json.dump([shot.model_dump() for shot in storyboard], f, ensure_ascii=False, indent=4)
             print(f"✅ Designed storyboard and saved to {storyboard_path}.")
+
+        max_shots = _max_shots_from_user_requirement(user_requirement)
+        if max_shots is not None and len(storyboard) > max_shots:
+            storyboard = storyboard[:max_shots]
+            print(f"✂️ Limited storyboard to {max_shots} shot(s) for target duration.")
 
         for shot_brief_description in storyboard:
             self.shot_desc_events[shot_brief_description.idx] = asyncio.Event()

@@ -58,7 +58,7 @@ class VideoGeneratorDoubaoSeedanceVolcengineAPI:
         content = [
             {
                 "type": "text",
-                "text": prompt + f"  --resolution {resolution}  --duration {duration} --camerafixed false --watermark true"
+                "text": prompt + f"  --resolution {resolution}  --duration {duration} --camerafixed false --watermark false"
             }
         ]
         if len(reference_image_paths) >= 1:
