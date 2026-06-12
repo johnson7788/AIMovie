@@ -69,9 +69,9 @@
                     <template #header>
                         <span>生成产物 ({{ artifacts.length }})</span>
                     </template>
-                    <div class="artifacts-scroll" v-if="artifacts.length > 0">
+                    <div class="artifacts-scroll" v-if="artifacts.length > 0" ref="artifactsScrollRef">
                         <div class="artifacts-list">
-                        <div v-for="(item, idx) in artifacts" :key="idx" class="artifact-item">
+                        <div v-for="(item, idx) in artifacts" :key="getArtifactKey(item, idx)" class="artifact-item">
                             <!-- Text artifacts -->
                             <template v-if="item.file_type === 'text' || item.file_type === 'json'">
                                 <div class="artifact-header">
@@ -109,7 +109,7 @@
                                     <span class="artifact-name">{{ item.file_path }}</span>
                                 </div>
                                 <video
-                                    :src="buildFileUrl(item.url || item.file_path)"
+                                    :src="item.url || buildFileUrl(item.file_path || '', isFinalVideoArtifact(item))"
                                     controls
                                     class="artifact-video"
                                     preload="metadata"
@@ -158,8 +158,11 @@ const overallProgress = ref(0);
 const elapsedSeconds = ref(0);
 const autoScroll = ref(true);
 const logViewerRef = ref<HTMLElement | null>(null);
+const artifactsScrollRef = ref<HTMLElement | null>(null);
+const videoReloadToken = ref(0);
 
 let elapsedTimer: ReturnType<typeof setInterval> | null = null;
+let statusPollTimer: ReturnType<typeof setInterval> | null = null;
 
 // Computed
 const statusText = computed(() => {
@@ -224,15 +227,73 @@ const initStages = () => {
 };
 
 // Build file URL from relative path or event URL
-const buildFileUrl = (filePath: string) => {
+const buildFileUrl = (filePath: string, cacheBust = false) => {
     if (!filePath) return '';
+    let url = '';
     if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
-        return filePath;
+        url = filePath;
+    } else if (filePath.startsWith('/api/')) {
+        url = buildApiUrl(filePath.slice(1));
+    } else {
+        url = buildApiUrl(`api/tasks/${taskId.value}/files/${filePath}`);
     }
-    if (filePath.startsWith('/api/')) {
-        return buildApiUrl(filePath.slice(1));
+    if (cacheBust) {
+        const sep = url.includes('?') ? '&' : '?';
+        url = `${url}${sep}t=${Date.now()}`;
     }
-    return buildApiUrl(`api/tasks/${taskId.value}/files/${filePath}`);
+    return url;
+};
+
+const isFinalVideoArtifact = (item: SSEEvent) => {
+    const path = item.file_path || '';
+    return path === 'final_video.mp4' || path.endsWith('/final_video.mp4');
+};
+
+const scrollArtifactsToBottom = async () => {
+    await nextTick();
+    if (artifactsScrollRef.value) {
+        artifactsScrollRef.value.scrollTop = artifactsScrollRef.value.scrollHeight;
+    }
+};
+
+const upsertFinalVideoArtifact = async (filePath = 'final_video.mp4') => {
+    const artifact: SSEEvent = {
+        type: 'artifact',
+        stage: 'concatenate',
+        file_type: 'video',
+        file_path: filePath,
+        url: buildFileUrl(filePath, true),
+    };
+    const existingIdx = artifacts.value.findIndex(isFinalVideoArtifact);
+    if (existingIdx >= 0) {
+        artifacts.value[existingIdx] = artifact;
+    } else {
+        artifacts.value.push(artifact);
+    }
+    videoReloadToken.value = Date.now();
+    await scrollArtifactsToBottom();
+};
+
+const getArtifactKey = (item: SSEEvent, idx: number) => {
+    if (isFinalVideoArtifact(item)) {
+        return `final-video-${videoReloadToken.value}`;
+    }
+    return `${item.file_path || item.stage || 'artifact'}-${idx}`;
+};
+
+const finalizeComplete = async (result?: string | null) => {
+    const wasComplete = isComplete.value;
+    isComplete.value = true;
+    markAllStagesDone();
+    stopStatusPolling();
+    await upsertFinalVideoArtifact('final_video.mp4');
+    if (!wasComplete) {
+        logs.value.push({
+            time: new Date().toLocaleTimeString(),
+            level: 'INFO',
+            message: `生成完成! 结果: ${result || 'final_video.mp4'}`,
+        });
+    }
 };
 
 const goBack = () => {
@@ -301,26 +362,12 @@ interface TaskStatusResponse {
     error?: string | null;
 }
 
-const applyTerminalTaskStatus = (task: TaskStatusResponse) => {
+const applyTerminalTaskStatus = async (task: TaskStatusResponse) => {
     if (task.status === 'completed') {
-        isComplete.value = true;
-        markAllStagesDone();
-        if (task.result) {
-            logs.value.push({
-                time: new Date().toLocaleTimeString(),
-                level: 'INFO',
-                message: `生成完成! 结果: ${task.result}`,
-            });
-            artifacts.value.push({
-                type: 'artifact',
-                stage: 'concatenate',
-                file_type: 'video',
-                file_path: 'final_video.mp4',
-                url: `/api/tasks/${taskId.value}/files/final_video.mp4`,
-            });
-        }
+        await finalizeComplete(task.result);
     } else if (task.status === 'failed') {
         errorMessage.value = task.error || '任务失败';
+        stopStatusPolling();
     }
 };
 
@@ -332,10 +379,26 @@ const fetchTaskStatus = async () => {
         if (!res.ok) return;
         const payload = await res.json();
         if (payload?.data) {
-            applyTerminalTaskStatus(payload.data);
+            await applyTerminalTaskStatus(payload.data);
         }
     } catch {
         // ignore polling errors
+    }
+};
+
+const startStatusPolling = () => {
+    stopStatusPolling();
+    statusPollTimer = setInterval(() => {
+        if (!isComplete.value && !errorMessage.value) {
+            fetchTaskStatus();
+        }
+    }, 3000);
+};
+
+const stopStatusPolling = () => {
+    if (statusPollTimer) {
+        clearInterval(statusPollTimer);
+        statusPollTimer = null;
     }
 };
 
@@ -367,7 +430,14 @@ const handleEvent = (event: SSEEvent) => {
             break;
 
         case 'artifact':
-            artifacts.value.push(event);
+            if (event.file_type === 'video' && isFinalVideoArtifact(event)) {
+                upsertFinalVideoArtifact(event.file_path || 'final_video.mp4');
+            } else {
+                artifacts.value.push(event);
+                if (event.file_type === 'video') {
+                    scrollArtifactsToBottom();
+                }
+            }
             logs.value.push({
                 time: new Date().toLocaleTimeString(),
                 level: 'INFO',
@@ -393,22 +463,7 @@ const handleEvent = (event: SSEEvent) => {
             break;
 
         case 'complete':
-            isComplete.value = true;
-            markAllStagesDone();
-            logs.value.push({
-                time: new Date().toLocaleTimeString(),
-                level: 'INFO',
-                message: `生成完成! 结果: ${event.result || '见产物列表'}`,
-            });
-            if (event.result && !artifacts.value.some(a => a.file_path === 'final_video.mp4')) {
-                artifacts.value.push({
-                    type: 'artifact',
-                    stage: 'concatenate',
-                    file_type: 'video',
-                    file_path: 'final_video.mp4',
-                    url: `/api/tasks/${taskId.value}/files/final_video.mp4`,
-                });
-            }
+            finalizeComplete(event.result);
             break;
     }
 };
@@ -420,9 +475,7 @@ const handleError = (err: Error) => {
 
 const handleComplete = () => {
     isConnecting.value = false;
-    if (!isComplete.value && !errorMessage.value) {
-        fetchTaskStatus();
-    }
+    fetchTaskStatus();
 };
 
 onMounted(async () => {
@@ -436,6 +489,7 @@ onMounted(async () => {
     }, 1000);
 
     await fetchTaskStatus();
+    startStatusPolling();
 
     // Connect to SSE
     connect(taskId.value, {
@@ -447,6 +501,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
     disconnect();
+    stopStatusPolling();
     if (elapsedTimer) {
         clearInterval(elapsedTimer);
     }

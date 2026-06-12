@@ -398,6 +398,7 @@ class Idea2VideoPipeline:
         final_video_path = os.path.join(self.working_dir, "final_video.mp4")
         if os.path.exists(final_video_path):
             print(f"🚀 Skipped concatenating videos, already exists.")
+            await cb({"type": "stage_end", "stage": "concatenate", "message": "Final video already exists"})
         else:
             await cb({"type": "stage_start", "stage": "concatenate", "message": "Concatenating all scene videos..."})
             t0 = time.time()
