@@ -1,0 +1,7 @@
+version: "2"
+
+tunnels:
+  aimovie:
+    proto: http
+    addr: 36310
+    # 访问地址需加路径: https://<你的域名>.ngrok-free.app/aimovie/
