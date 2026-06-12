@@ -54,7 +54,7 @@ npm install
 cp backend/env_example backend/.env
 ```
 
-编辑 `backend/.env`，填入你的 API Key（**此文件不会提交到 Git**）：
+编辑 `backend/.env`，填入你的 API Key：
 
 ```env
 # 豆包/火山引擎
@@ -101,26 +101,6 @@ npm run dev
 - 前端界面: http://localhost:36310/aimovie/
 - 后端 API 文档: http://localhost:8666/docs
 - 健康检查: http://localhost:8666/health
-
-## 上传到 Git 会包含什么？
-
-**不会上传**（已在 `.gitignore` 中排除）：
-
-| 类型 | 路径示例 |
-|------|----------|
-| API Key / 密钥 | `backend/.env`、`frontend/.env.development` 等 `.env*` |
-| Python 虚拟环境 | `backend/.venv/`、`.venv/` |
-| Node 依赖 | `frontend/node_modules/` |
-| 本地生成数据 | `backend/.working_dir/`、`backend/tasks.db` |
-| 运行日志 | `*.log`（如 `backend.log`） |
-
-**会上传**：
-
-- 源代码、`backend/env_example`（仅模板，无真实 Key）
-- `start.bat` / `start.ps1` / `start.sh` 启动脚本
-- 配置文件模板（`configs/*.yaml` 等）
-
-上传前建议执行 `git status`，确认列表里没有 `.env`、`.venv`、`node_modules`、`.working_dir`。若误加入，可用 `git rm --cached <文件>` 移除跟踪。
 
 ## 登录说明
 
