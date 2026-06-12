@@ -65,6 +65,8 @@ cache
 .next
 .backend.pid
 .frontend.pid
+.ngrok.pid
+ngrok.log
 .working_dir
 .working_dir
 .working_dir/idea2video
