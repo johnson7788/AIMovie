@@ -31,10 +31,24 @@ uv run python main.py 2>&1 | while IFS= read -r line; do
 done &
 BACKEND_PID=$!
 
+# --- Wait for backend to be ready ---
+BACKEND_URL="${VITE_REQUEST_BASE_URL:-http://127.0.0.1:8666}"
+echo -e "${GREEN}[start.sh]${NC} 等待后端就绪 ($BACKEND_URL) ..."
+for i in $(seq 1 60); do
+    if curl -s -o /dev/null -w "%{http_code}" "$BACKEND_URL" 2>/dev/null | grep -q "200\|404\|405"; then
+        echo -e "${GREEN}[start.sh]${NC} 后端已就绪。"
+        break
+    fi
+    if [ $i -eq 60 ]; then
+        echo -e "${GREEN}[start.sh]${NC} 后端启动超时，请检查。"
+    fi
+    sleep 1
+done
+
 # --- Start Frontend ---
 echo -e "${GREEN}[start.sh]${NC} 启动前端 (vite dev) ..."
 cd "$FRONTEND_DIR"
-export VITE_REQUEST_BASE_URL="${VITE_REQUEST_BASE_URL:-http://127.0.0.1:8666}"
+export VITE_REQUEST_BASE_URL="$BACKEND_URL"
 npm run dev 2>&1 | while IFS= read -r line; do
     echo -e "${GREEN}[frontend]${NC} $line"
 done &
