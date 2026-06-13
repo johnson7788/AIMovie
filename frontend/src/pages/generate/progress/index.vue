@@ -109,7 +109,7 @@
                                     <span class="artifact-name">{{ item.file_path }}</span>
                                 </div>
                                 <video
-                                    :src="item.url || buildFileUrl(item.file_path || '', isFinalVideoArtifact(item))"
+                                    :src="buildFileUrl(item.url || item.file_path || '', isFinalVideoArtifact(item))"
                                     controls
                                     class="artifact-video"
                                     preload="metadata"
@@ -562,7 +562,7 @@ onUnmounted(() => {
 }
 
 .left-panel {
-    flex: 3;
+    flex: 1;
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -571,9 +571,7 @@ onUnmounted(() => {
 }
 
 .right-panel {
-    flex: 2;
-    min-width: 280px;
-    max-width: 450px;
+    flex: 1;
     min-height: 0;
     display: flex;
     flex-direction: column;
