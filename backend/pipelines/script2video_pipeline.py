@@ -60,7 +60,7 @@ class Script2VideoPipeline:
 
 
     @classmethod
-    def init_from_config(cls, config_path: str):
+    def init_from_config(cls, config_path: str, chat_model_override=None, image_generator_override=None, video_generator_override=None):
         config_file = config_path
         if not os.path.isabs(config_path):
             config_file = os.path.join(
@@ -70,20 +70,29 @@ class Script2VideoPipeline:
         with open(config_file, encoding="utf-8") as f:
             config = yaml.safe_load(f)
 
-        chat_model_args = resolve_chat_model_config(config["chat_model"]["init_args"])
-        chat_model = init_chat_model(**chat_model_args)
+        if chat_model_override is not None:
+            chat_model = chat_model_override
+        else:
+            chat_model_args = resolve_chat_model_config(config["chat_model"]["init_args"])
+            chat_model = init_chat_model(**chat_model_args)
 
         multimodal_chat_model = None
         if "multimodal_chat_model" in config:
             multimodal_args = resolve_chat_model_config(config["multimodal_chat_model"]["init_args"])
             multimodal_chat_model = init_chat_model(**multimodal_args)
 
-        backend = RenderBackend.from_config(config)
+        if image_generator_override is not None and video_generator_override is not None:
+            image_generator = image_generator_override
+            video_generator = video_generator_override
+        else:
+            backend = RenderBackend.from_config(config)
+            image_generator = image_generator_override or backend.image_generator
+            video_generator = video_generator_override or backend.video_generator
 
         return cls(
             chat_model=chat_model,
-            image_generator=backend.image_generator,
-            video_generator=backend.video_generator,
+            image_generator=image_generator,
+            video_generator=video_generator,
             working_dir=config["working_dir"],
             multimodal_chat_model=multimodal_chat_model,
         )

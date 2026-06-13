@@ -82,7 +82,7 @@ class Idea2VideoPipeline:
             image_generator=self.image_generator)
 
     @classmethod
-    def init_from_config(cls, config_path: str):
+    def init_from_config(cls, config_path: str, chat_model_override=None, image_generator_override=None, video_generator_override=None):
         config_file = config_path
         if not os.path.isabs(config_path):
             config_file = os.path.join(
@@ -92,14 +92,24 @@ class Idea2VideoPipeline:
         with open(config_file, encoding="utf-8") as f:
             config = yaml.safe_load(f)
 
-        chat_model_args = resolve_chat_model_config(config["chat_model"]["init_args"])
-        chat_model = init_chat_model(**chat_model_args)
-        backend = RenderBackend.from_config(config)
+        if chat_model_override is not None:
+            chat_model = chat_model_override
+        else:
+            chat_model_args = resolve_chat_model_config(config["chat_model"]["init_args"])
+            chat_model = init_chat_model(**chat_model_args)
+
+        if image_generator_override is not None and video_generator_override is not None:
+            image_generator = image_generator_override
+            video_generator = video_generator_override
+        else:
+            backend = RenderBackend.from_config(config)
+            image_generator = image_generator_override or backend.image_generator
+            video_generator = video_generator_override or backend.video_generator
 
         return cls(
             chat_model=chat_model,
-            image_generator=backend.image_generator,
-            video_generator=backend.video_generator,
+            image_generator=image_generator,
+            video_generator=video_generator,
             working_dir=config["working_dir"],
         )
 

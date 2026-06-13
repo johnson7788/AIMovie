@@ -352,6 +352,7 @@ class Script2VideoRequest(BaseModel):
     user_requirement: str = ""
     style: str = "Cinematic"
     config_path: str = "configs/script2video.yaml"
+    model_id: str = ""
 
 
 class Idea2VideoRequest(BaseModel):
@@ -378,13 +379,32 @@ async def run_script2video(task_id: str, req: Script2VideoRequest):
     pm = ProgressManager.get_instance()
     log_handler = _install_log_handler(task_id)
     try:
-        pipeline = Script2VideoPipeline.init_from_config(config_path=req.config_path)
+        # Resolve provider overrides from model_id BEFORE pipeline init
+        chat_override = None
+        image_override = None
+        video_override = None
+        if req.model_id:
+            model_info = _find_model_by_id(req.model_id, "creative_script")
+            if model_info:
+                provider = model_info["provider"]
+                model_name = model_info["model"]
+                chat_override = _build_provider_chat_model(provider, model_name)
+                image_override = _build_provider_image_generator(provider)
+                video_override = _build_provider_video_generator(provider)
+
+        pipeline = Script2VideoPipeline.init_from_config(
+            config_path=req.config_path,
+            chat_model_override=chat_override,
+            image_generator_override=image_override,
+            video_generator_override=video_override,
+        )
         # Use a deterministic cache key so identical inputs reuse the same cache directory.
         cache_key_raw = "|".join([
             req.script,
             req.user_requirement or "",
             req.style,
             req.config_path,
+            req.model_id,
         ])
         cache_key = hashlib.sha256(cache_key_raw.encode("utf-8")).hexdigest()[:16]
         pipeline.working_dir = os.path.join(pipeline.working_dir, cache_key)
@@ -522,7 +542,25 @@ async def run_idea2video(task_id: str, req: Idea2VideoRequest):
     pm = ProgressManager.get_instance()
     log_handler = _install_log_handler(task_id)
     try:
-        pipeline = Idea2VideoPipeline.init_from_config(config_path=req.config_path)
+        # Resolve provider overrides from model_id BEFORE pipeline init
+        chat_override = None
+        image_override = None
+        video_override = None
+        if req.model_id:
+            model_info = _find_model_by_id(req.model_id, "creative_script")
+            if model_info:
+                provider = model_info["provider"]
+                model_name = model_info["model"]
+                chat_override = _build_provider_chat_model(provider, model_name)
+                image_override = _build_provider_image_generator(provider)
+                video_override = _build_provider_video_generator(provider)
+
+        pipeline = Idea2VideoPipeline.init_from_config(
+            config_path=req.config_path,
+            chat_model_override=chat_override,
+            image_generator_override=image_override,
+            video_generator_override=video_override,
+        )
         # Use a deterministic cache key from input parameters so identical
         # inputs reuse the same cache directory and skip recomputation.
         cache_key_raw = "|".join([
@@ -545,21 +583,6 @@ async def run_idea2video(task_id: str, req: Idea2VideoRequest):
                 "UPDATE tasks SET working_dir = ? WHERE task_id = ?",
                 (pipeline.working_dir, task_id),
             )
-
-        # Override generators based on selected model's provider
-        if req.model_id:
-            model_info = _find_model_by_id(req.model_id, "creative_script")
-            if model_info:
-                provider = model_info["provider"]
-                model_name = model_info["model"]
-                from agents import Screenwriter, CharacterExtractor, CharacterPortraitsGenerator
-                pipeline.chat_model = _build_provider_chat_model(provider, model_name)
-                pipeline.image_generator = _build_provider_image_generator(provider)
-                pipeline.video_generator = _build_provider_video_generator(provider)
-                pipeline.screenwriter = Screenwriter(chat_model=pipeline.chat_model)
-                pipeline.character_extractor = CharacterExtractor(chat_model=pipeline.chat_model)
-                pipeline.character_portraits_generator = CharacterPortraitsGenerator(
-                    image_generator=pipeline.image_generator)
 
         async def progress_callback(event):
             event["task_id"] = task_id
@@ -939,6 +962,7 @@ async def legacy_submit(req: LegacySubmitRequest):
             user_requirement=user_requirement,
             style=req.style or "Cinematic",
             config_path="configs/script2video.yaml",
+            model_id=req.model,
         )
         mode = "script2video"
         with get_db() as conn:
