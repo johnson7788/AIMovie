@@ -398,7 +398,7 @@ onUnmounted(() => {
 
 <template>
 	<div class="flex flex-column  flex-center px-10 page-layouts grid-gap-6">
-		<span class="head-title">一句话生成一部短剧</span>
+		<span class="head-title">一站式长片创作平台</span>
 		<span class="head-subtitle">剧本、分镜、画面、配音、剪辑，一站式智能生成</span>
 		<el-segmented v-model="form.script" :disabled="loading"
 			:options="[{ label: '剧本模式', value: 'drama', icon: DramaSvg }, { label: '创意模式', value: 'script', icon: ScriptSvg }]"
