@@ -48,6 +48,7 @@ The user will provide the following input.
 - Avoid unsafe content (violence, discrimination, etc.) in visual descriptions. Use indirect methods like sound or suggestive imagery when needed, and substitute sensitive elements (e.g., ketchup for blood).
 - Assign at most one dialogue line per character per shot. Each line of dialogue should correspond to a shot.
 - Adjacent shots should maintain visual continuity at the cut point: keep the same location, lighting, wardrobe, and character positions unless the script explicitly changes them.
+- Prefer a single camera position (cam_idx=0) for the entire scene when the user asks for short drama or <=3 shots. Only add a second camera if the story truly requires a new angle.
 - Each shot requires an independent description without reference to each other.
 - When the shot focuses on a character, describe which specific body part the focus is on.
 - When describing a character, it is necessary to indicate the direction they are facing.

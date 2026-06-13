@@ -4,7 +4,7 @@ import subprocess
 import os
 import shutil
 import tempfile
-from typing import List, Optional
+from typing import List, Optional, Union
 from tenacity import retry
 
 
@@ -190,15 +190,38 @@ def _normalize_video_to_size(
     return output_path
 
 
+def extract_last_frame_from_video(video_path: str, output_path: str) -> str:
+    """Save the final visible frame from a video clip as a PNG reference."""
+    if not os.path.exists(video_path):
+        raise FileNotFoundError(f"Video file not found: {video_path}")
+    parent = os.path.dirname(output_path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    ffmpeg = _resolve_ffmpeg_exe()
+    cmd = [
+        ffmpeg, "-y",
+        "-sseof", "-0.08",
+        "-i", os.path.abspath(video_path),
+        "-frames:v", "1",
+        "-q:v", "2",
+        output_path,
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
+    if result.returncode != 0 or not os.path.exists(output_path):
+        tail = (result.stderr or "")[-1000:]
+        raise RuntimeError(f"Failed to extract last frame from {video_path}: {tail}")
+    logging.info("Extracted last frame from %s -> %s", video_path, output_path)
+    return output_path
+
+
 def concat_videos(video_paths: List[str], output_path: str,
                   target_width: int = 720, target_height: int = 1280,
                   preserve_audio: bool = True,
-                  crossfade_seconds: float = 0.35) -> str:
+                  crossfade_seconds: Union[float, List[float]] = 0.35) -> str:
     """Concatenate videos with per-input normalize + optional crossfade.
 
-    Normalizes resolution/fps and resets PTS on each clip. When
-    crossfade_seconds > 0, uses xfade/acrossfade between adjacent clips to
-    reduce visible hard cuts between shots.
+    ``crossfade_seconds`` may be a float (uniform) or a list of length N-1
+    with per-join fade durations. Use 0 for a hard cut between adjacent clips.
     """
     if not video_paths:
         raise ValueError("video_paths must not be empty")
@@ -236,6 +259,15 @@ def concat_videos(video_paths: List[str], output_path: str,
 
     ffmpeg = _resolve_ffmpeg_exe()
     n = len(abs_paths)
+    if isinstance(crossfade_seconds, list):
+        fade_list = [float(value) for value in crossfade_seconds]
+        if len(fade_list) != max(0, n - 1):
+            raise ValueError(
+                f"crossfade_seconds list must have length {n - 1}, got {len(fade_list)}"
+            )
+    else:
+        fade_list = [float(crossfade_seconds)] * (n - 1) if n > 1 else []
+
     cmd = [ffmpeg, '-y']
     for path in abs_paths:
         cmd.extend(['-i', path])
@@ -249,13 +281,19 @@ def concat_videos(video_paths: List[str], output_path: str,
         )
 
     use_crossfade = (
-        crossfade_seconds > 0
-        and n >= 2
-        and all(d is not None and d > crossfade_seconds for d in input_durations)
+        n >= 2
+        and any(fade > 0 for fade in fade_list)
+        and all(d is not None for d in input_durations)
+    )
+    uniform_fade = (
+        use_crossfade
+        and len(set(round(f, 4) for f in fade_list)) == 1
+        and fade_list[0] > 0
+        and all(d > fade_list[0] for d in input_durations)
     )
 
-    if use_crossfade:
-        fade = crossfade_seconds
+    if uniform_fade:
+        fade = fade_list[0]
         v_chain = vf_parts[:]
         current_v = "v0"
         accumulated = input_durations[0]
@@ -305,6 +343,67 @@ def concat_videos(video_paths: List[str], output_path: str,
         logging.info(
             "Using %.2fs crossfade between %d clips (expected duration ~%.2fs)",
             fade, n, accumulated,
+        )
+    elif use_crossfade:
+        fade = max(f for f in fade_list if f > 0)
+        v_chain = vf_parts[:]
+        a_chain = []
+        if preserve_audio_effective:
+            for i in range(n):
+                a_chain.append(
+                    f"[{i}:a]aresample=44100:async=1:first_pts=0,"
+                    f"aformat=sample_fmts=fltp:channel_layouts=stereo,asetpts=PTS-STARTPTS[a{i}]"
+                )
+        current_v = "v0"
+        current_a = "a0" if preserve_audio_effective else None
+        accumulated = input_durations[0]
+        for i in range(1, n):
+            join_fade = fade_list[i - 1]
+            if join_fade > 0 and accumulated > join_fade and input_durations[i] > join_fade:
+                out_v = f"vx{i}"
+                offset = max(0.0, accumulated - join_fade)
+                v_chain.append(
+                    f"[{current_v}][v{i}]xfade=transition=fade:duration={join_fade:.3f}:offset={offset:.3f}[{out_v}]"
+                )
+                current_v = out_v
+                accumulated = accumulated + input_durations[i] - join_fade
+                if preserve_audio_effective and current_a is not None:
+                    out_a = f"ax{i}"
+                    a_chain.append(
+                        f"[{current_a}][a{i}]acrossfade=d={join_fade:.3f}:c1=tri:c2=tri[{out_a}]"
+                    )
+                    current_a = out_a
+            else:
+                out_v = f"vc{i}"
+                v_chain.append(f"[{current_v}][v{i}]concat=n=2:v=1:a=0[{out_v}]")
+                current_v = out_v
+                accumulated = accumulated + input_durations[i]
+                if preserve_audio_effective and current_a is not None:
+                    out_a = f"ac{i}"
+                    a_chain.append(f"[{current_a}][a{i}]concat=n=2:v=0:a=1[{out_a}]")
+                    current_a = out_a
+        filter_complex = ";".join(v_chain + a_chain)
+        if preserve_audio_effective and current_a is not None:
+            cmd.extend([
+                '-filter_complex', filter_complex,
+                '-map', f'[{current_v}]', '-map', f'[{current_a}]',
+                '-c:v', 'libx264', '-preset', 'medium', '-crf', '23', '-pix_fmt', 'yuv420p',
+                '-c:a', 'aac', '-b:a', '192k',
+                '-movflags', '+faststart',
+                output_path,
+            ])
+        else:
+            cmd.extend([
+                '-filter_complex', filter_complex,
+                '-map', f'[{current_v}]',
+                '-c:v', 'libx264', '-preset', 'medium', '-crf', '23', '-pix_fmt', 'yuv420p',
+                '-an',
+                '-movflags', '+faststart',
+                output_path,
+            ])
+        logging.info(
+            "Using variable crossfade schedule %s between %d clips (expected duration ~%.2fs)",
+            [round(f, 3) for f in fade_list], n, accumulated,
         )
     elif preserve_audio_effective:
         af_parts = []
@@ -367,7 +466,10 @@ def concat_videos(video_paths: List[str], output_path: str,
         raise RuntimeError(f"ffmpeg concat failed: {tail}")
 
     out_duration = _format_duration_seconds(output_path)
-    expected = _concat_expected_duration(input_durations, crossfade_seconds if use_crossfade else 0.0)
+    expected = _concat_expected_duration(
+        input_durations,
+        fade_list if use_crossfade else [0.0] * max(0, len(fade_list)),
+    )
     if out_duration is not None and expected is not None:
         logging.info(
             "Concatenation complete: %s (duration=%.2fs, expected~%.2fs)",
@@ -385,11 +487,13 @@ def concat_videos(video_paths: List[str], output_path: str,
 
 
 def _concat_expected_duration(
-    input_durations: List[Optional[float]], crossfade_seconds: float
+    input_durations: List[Optional[float]], fade_list: List[float]
 ) -> Optional[float]:
     if not input_durations or any(d is None for d in input_durations):
         return None
     total = float(sum(input_durations))
-    if crossfade_seconds > 0 and len(input_durations) >= 2:
-        total -= crossfade_seconds * (len(input_durations) - 1)
+    if fade_list and len(input_durations) >= 2:
+        for index, fade in enumerate(fade_list):
+            if fade > 0 and index < len(input_durations) - 1:
+                total -= fade
     return total

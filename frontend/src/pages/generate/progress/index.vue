@@ -200,8 +200,10 @@ const stageDefinitions: Record<string, Array<{ name: string; label: string }>> =
         { name: 'scene_0', label: '场景处理' },
         { name: 'storyboard', label: '分镜设计' },
         { name: 'visual_descriptions', label: '视觉描述' },
+        { name: 'scene_anchor', label: '场景锚点' },
         { name: 'camera_tree', label: '机位构建' },
         { name: 'frames', label: '画面生成' },
+        { name: 'videos', label: '镜头视频' },
         { name: 'concatenate', label: '视频合成' },
     ],
     script2video: [
@@ -209,8 +211,10 @@ const stageDefinitions: Record<string, Array<{ name: string; label: string }>> =
         { name: 'character_portraits', label: '角色画像' },
         { name: 'storyboard', label: '分镜设计' },
         { name: 'visual_descriptions', label: '视觉描述' },
+        { name: 'scene_anchor', label: '场景锚点' },
         { name: 'camera_tree', label: '机位构建' },
         { name: 'frames', label: '画面生成' },
+        { name: 'videos', label: '镜头视频' },
         { name: 'concatenate', label: '视频合成' },
     ],
     scene_image: [
@@ -279,6 +283,7 @@ const appendLog = (level: string, message: string) => {
 const shouldDisplayArtifact = (event: SSEEvent) => {
     if (event.file_type === 'text' || event.file_type === 'json') return true;
     if (event.file_type === 'image' && event.stage === 'character_portraits') return true;
+    if (event.file_type === 'image' && event.stage === 'scene_anchor') return true;
     if (event.file_type === 'video') {
         return isFinalVideoArtifact(event) || Boolean(event.stage?.startsWith('scene_'));
     }
@@ -339,6 +344,9 @@ const formatPortraitLabel = (item: SSEEvent) => {
         };
         const view = item.view ? viewLabels[item.view] || item.view : '';
         return view ? `${name} · ${view}` : name;
+    }
+    if (item.stage === 'scene_anchor') {
+        return '场景锚点 · 空镜';
     }
     return item.character_name || item.frame_type || item.file_path || '产物';
 };
@@ -490,6 +498,9 @@ const handleEvent = (event: SSEEvent) => {
                     const name = event.character_name || '角色';
                     const view = event.view ? ` (${event.view})` : '';
                     appendLog('INFO', `角色画像已生成: ${name}${view}`);
+                    scrollArtifactsToBottom();
+                } else if (event.file_type === 'image' && event.stage === 'scene_anchor') {
+                    appendLog('INFO', '场景锚点空镜已生成');
                     scrollArtifactsToBottom();
                 } else if (event.file_type === 'video') {
                     scrollArtifactsToBottom();

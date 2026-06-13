@@ -43,10 +43,15 @@ def build_effective_user_requirement(
             f"each episode should map to one scene in the script."
         )
     if episode_duration > 0:
-        max_shots = max(1, min(10, episode_duration // 5))
+        max_shots = max(1, min(3, episode_duration // 5))
         parts.append(
             f"Target episode duration: approximately {episode_duration} seconds. "
             f"Use at most {max_shots} shots in the storyboard."
+        )
+        parts.append(
+            "Use exactly ONE camera position for the entire scene when possible. "
+            "Keep the same background, props, lighting, and room layout across all shots. "
+            "Prefer 2-3 shots total with minimal camera movement."
         )
         parts.append(
             "Short drama pacing: hook the audience in the first 3 seconds, "
@@ -445,7 +450,7 @@ class Idea2VideoPipeline:
                 final_video_path,
                 target_width=width,
                 target_height=height,
-                crossfade_seconds=0.35,
+                crossfade_seconds=0.12,
             )
             print(f"☑️ Concatenated videos, saved to {final_video_path}.")
             await cb({"type": "stage_end", "stage": "concatenate", "duration_ms": int((time.time() - t0) * 1000)})

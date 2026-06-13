@@ -21,7 +21,15 @@ from utils.pipeline_media import (
     image_size_for_aspect,
     resolve_aspect_ratio,
 )
+from utils.pipeline_consistency import (
+    build_crossfade_schedule,
+    scene_anchor_prompt,
+    scene_anchor_reference_text,
+    video_last_frame_path,
+)
 from utils.style_prompts import expand_style_prompt, expand_video_style_prompt
+from utils.video import extract_last_frame_from_video
+from agents.best_image_selector import BestImageSelector
 
 async def _noop_progress(_event):
     pass
@@ -60,6 +68,7 @@ class Script2VideoPipeline:
     # Use turnaround sheet (single image with 3 views) for better character consistency.
     # Set to False to fall back to the old 3-separate-call method.
     USE_TURNAROUND_SHEET = True
+    FRAME_CANDIDATE_COUNT = 2
 
     def __init__(
         self,
@@ -68,6 +77,7 @@ class Script2VideoPipeline:
         video_generator,
         working_dir: str,
         multimodal_chat_model=None,
+        best_image_selector: Optional[BestImageSelector] = None,
     ):
 
         self.chat_model = chat_model
@@ -79,10 +89,12 @@ class Script2VideoPipeline:
         self.storyboard_artist = StoryboardArtist(chat_model=self.chat_model)
         self.camera_image_generator = CameraImageGenerator(chat_model=self.chat_model, image_generator=self.image_generator, video_generator=self.video_generator)
         self.reference_image_selector = ReferenceImageSelector(chat_model=self.chat_model, multimodal_model=multimodal_chat_model)
+        self.best_image_selector = best_image_selector
 
         self.character_portrait_events = {}
         self.shot_desc_events = {}
         self.frame_events = {}
+        self._scene_anchor_path = ""
 
         self.working_dir = working_dir
         os.makedirs(self.working_dir, exist_ok=True)
@@ -119,12 +131,23 @@ class Script2VideoPipeline:
             image_generator = image_generator_override or backend.image_generator
             video_generator = video_generator_override or backend.video_generator
 
+        best_image_selector = None
+        if "multimodal_chat_model" in config:
+            multimodal_args = resolve_chat_model_config(config["multimodal_chat_model"]["init_args"])
+            if multimodal_args.get("api_key") and multimodal_args.get("base_url") and multimodal_args.get("model"):
+                best_image_selector = BestImageSelector(
+                    base_url=multimodal_args["base_url"],
+                    api_key=multimodal_args["api_key"],
+                    chat_model=multimodal_args["model"],
+                )
+
         return cls(
             chat_model=chat_model,
             image_generator=image_generator,
             video_generator=video_generator,
             working_dir=config["working_dir"],
             multimodal_chat_model=multimodal_chat_model,
+            best_image_selector=best_image_selector,
         )
 
     async def __call__(
@@ -199,6 +222,11 @@ class Script2VideoPipeline:
         )
         await cb({"type": "stage_end", "stage": "visual_descriptions", "duration_ms": int((time.time() - t0) * 1000)})
 
+        await cb({"type": "stage_start", "stage": "scene_anchor", "message": "Generating scene establishing anchor..."})
+        t0 = time.time()
+        self._scene_anchor_path = await self.generate_scene_anchor(script=script)
+        await cb({"type": "stage_end", "stage": "scene_anchor", "duration_ms": int((time.time() - t0) * 1000)})
+
         self._shot_duration = _shot_duration_from_user_requirement(
             user_requirement, len(shot_descriptions)
         )
@@ -232,15 +260,11 @@ class Script2VideoPipeline:
             )
             for camera in camera_tree
         ]
-
-        video_tasks = [
-            self.generate_video_for_single_shot(
-                shot_description=shot_description,
-            )
-            for shot_description in shot_descriptions
-        ]
-        tasks.extend(video_tasks)
         await asyncio.gather(*tasks)
+        await cb({"type": "stage_start", "stage": "videos", "message": f"Generating videos for {total_shots} shots sequentially..."})
+        t_video = time.time()
+        await self.generate_videos_in_order(shot_descriptions=shot_descriptions)
+        await cb({"type": "stage_end", "stage": "videos", "duration_ms": int((time.time() - t_video) * 1000)})
         await cb({"type": "stage_end", "stage": "frames", "duration_ms": int((time.time() - t0) * 1000)})
 
         final_video_path = os.path.join(self.working_dir, "final_video.mp4")
@@ -256,12 +280,13 @@ class Script2VideoPipeline:
                 for shot_description in shot_descriptions
             ]
             width, height = self._concat_size
+            crossfade_schedule = build_crossfade_schedule(shot_descriptions)
             concat_videos(
                 shot_video_paths,
                 final_video_path,
                 target_width=width,
                 target_height=height,
-                crossfade_seconds=0.35,
+                crossfade_seconds=crossfade_schedule if crossfade_schedule else 0.0,
             )
             print(f"☑️ Concatenated videos, saved to {final_video_path}.")
             await cb({"type": "stage_end", "stage": "concatenate", "duration_ms": int((time.time() - t0) * 1000)})
@@ -273,6 +298,122 @@ class Script2VideoPipeline:
 
         self._progress_callback = None
         return final_video_path
+
+    def _scene_anchor_pair(self) -> Tuple[str, str]:
+        return (self._scene_anchor_path, scene_anchor_reference_text())
+
+    async def generate_scene_anchor(self, script: str) -> str:
+        anchor_path = os.path.join(self.working_dir, "scene_anchor.png")
+        if os.path.exists(anchor_path):
+            print("🚀 Loaded existing scene anchor image.")
+            return anchor_path
+
+        print("🏞️ Generating scene establishing anchor (empty environment)...")
+        prompt = scene_anchor_prompt(script, self._style_prompt)
+        anchor_image = await self.image_generator.generate_single_image(
+            prompt=prompt,
+            reference_image_paths=[],
+            size=self._frame_size,
+        )
+        anchor_image.save(anchor_path)
+        print(f"☑️ Scene anchor saved to {anchor_path}.")
+        cb = getattr(self, "_progress_callback", None)
+        if cb:
+            await cb({
+                "type": "artifact",
+                "stage": "scene_anchor",
+                "file_type": "image",
+                "file_path": "scene_anchor.png",
+            })
+        return anchor_path
+
+    async def _save_generated_frame(
+        self,
+        frame_image_path: str,
+        prompt: str,
+        reference_image_paths: List[str],
+        reference_image_path_and_text_pairs: List[Tuple[str, str]],
+        target_description: str,
+    ) -> None:
+        candidate_count = self.FRAME_CANDIDATE_COUNT if self.best_image_selector else 1
+        candidates_dir = os.path.join(os.path.dirname(frame_image_path), "candidates")
+        os.makedirs(candidates_dir, exist_ok=True)
+        candidate_paths: List[str] = []
+
+        for index in range(candidate_count):
+            candidate_path = os.path.join(candidates_dir, f"{index}.png")
+            if not (candidate_count == 1 and os.path.exists(frame_image_path) and index == 0):
+                frame_image = await self.image_generator.generate_single_image(
+                    prompt=prompt,
+                    reference_image_paths=reference_image_paths,
+                    size=self._frame_size,
+                )
+                frame_image.save(candidate_path)
+            elif os.path.exists(frame_image_path):
+                shutil.copy(frame_image_path, candidate_path)
+            candidate_paths.append(candidate_path)
+
+        if self.best_image_selector and len(candidate_paths) > 1:
+            try:
+                best_path = await self.best_image_selector(
+                    reference_image_path_and_text_pairs=reference_image_path_and_text_pairs,
+                    target_description=target_description,
+                    candidate_image_paths=candidate_paths,
+                )
+                shutil.copy(best_path, frame_image_path)
+                return
+            except Exception as exc:
+                logging.warning(
+                    "BestImageSelector failed for %s, using first candidate: %s",
+                    frame_image_path,
+                    exc,
+                )
+
+        shutil.copy(candidate_paths[0], frame_image_path)
+
+    def _build_video_reference_paths(
+        self,
+        shot_description: ShotDescription,
+        prev_shot_last_frame_path: Optional[str],
+    ) -> List[str]:
+        first_frame_path = os.path.join(
+            self.working_dir, "shots", f"{shot_description.idx}", "first_frame.png"
+        )
+        paths: List[str] = []
+
+        if shot_description.variation_type in ["medium", "large"]:
+            last_frame_path = os.path.join(
+                self.working_dir, "shots", f"{shot_description.idx}", "last_frame.png"
+            )
+            return [first_frame_path, last_frame_path][:2]
+
+        if (
+            shot_description.idx > 0
+            and prev_shot_last_frame_path
+            and os.path.exists(prev_shot_last_frame_path)
+        ):
+            return [first_frame_path, prev_shot_last_frame_path][:2]
+
+        if (
+            shot_description.idx == 0
+            and self._scene_anchor_path
+            and os.path.exists(self._scene_anchor_path)
+        ):
+            return [self._scene_anchor_path, first_frame_path][:2]
+
+        return [first_frame_path]
+
+    async def generate_videos_in_order(
+        self,
+        shot_descriptions: List[ShotDescription],
+    ) -> None:
+        prev_last_frame_path: Optional[str] = None
+        ordered_shots = sorted(shot_descriptions, key=lambda item: item.idx)
+        for shot_description in ordered_shots:
+            prev_last_frame_path = await self.generate_video_for_single_shot(
+                shot_description=shot_description,
+                prev_shot_last_frame_path=prev_last_frame_path,
+            )
 
 
     async def generate_frames_for_single_camera(
@@ -294,6 +435,8 @@ class Script2VideoPipeline:
         else:
             print(f"🖼️ Starting first_frame generation for shot {first_shot_idx}...")
             available_image_path_and_text_pairs = []
+            if self._scene_anchor_path and os.path.exists(self._scene_anchor_path):
+                available_image_path_and_text_pairs.append(self._scene_anchor_pair())
 
             for character_idx in shot_descriptions[first_shot_idx].ff_vis_char_idxs:
                 identifier_in_scene = characters[character_idx].identifier_in_scene
@@ -362,12 +505,13 @@ class Script2VideoPipeline:
                     prefix_prompt += f"Image {i}: {text}\n"
                 prompt = f"{prefix_prompt}\n{prompt}\nStyle: {self._style_prompt}"
                 reference_image_paths = [item[0] for item in reference_image_path_and_text_pairs]
-                ff_image: ImageOutput = await self.image_generator.generate_single_image(
+                await self._save_generated_frame(
+                    frame_image_path=first_shot_ff_path,
                     prompt=prompt,
                     reference_image_paths=reference_image_paths,
-                    size=self._frame_size,
+                    reference_image_path_and_text_pairs=reference_image_path_and_text_pairs,
+                    target_description=shot_descriptions[first_shot_idx].ff_desc,
                 )
-                ff_image.save(first_shot_ff_path)
                 self.frame_events[first_shot_idx]["first_frame"].set()
                 print(f"☑️ Generated first_frame for shot {first_shot_idx}, saved to {first_shot_ff_path}.")
             else:
@@ -434,47 +578,75 @@ class Script2VideoPipeline:
     async def generate_video_for_single_shot(
         self,
         shot_description: ShotDescription,
-    ):
+        prev_shot_last_frame_path: Optional[str] = None,
+    ) -> Optional[str]:
         video_path = os.path.join(self.working_dir, "shots", f"{shot_description.idx}", "video.mp4")
+        last_frame_path = video_last_frame_path(shot_description.idx, self.working_dir)
         if os.path.exists(video_path):
             print(f"🚀 Skipped generating video for shot {shot_description.idx}, already exists.")
-        else:
-            await self.frame_events[shot_description.idx]["first_frame"].wait()
-            if shot_description.variation_type in ["medium", "large"]:
-                await self.frame_events[shot_description.idx]["last_frame"].wait()
+            if not os.path.exists(last_frame_path):
+                try:
+                    extract_last_frame_from_video(video_path, last_frame_path)
+                except Exception as exc:
+                    logging.warning(
+                        "Could not extract last frame for cached shot %s: %s",
+                        shot_description.idx,
+                        exc,
+                    )
+                    return prev_shot_last_frame_path
+            return last_frame_path if os.path.exists(last_frame_path) else prev_shot_last_frame_path
 
-            frame_paths = []
-            frame_paths.append(os.path.join(self.working_dir, "shots", f"{shot_description.idx}", "first_frame.png"))
-            if shot_description.variation_type in ["medium", "large"]:
-                frame_paths.append(os.path.join(self.working_dir, "shots", f"{shot_description.idx}", "last_frame.png"))
+        await self.frame_events[shot_description.idx]["first_frame"].wait()
+        if shot_description.variation_type in ["medium", "large"]:
+            await self.frame_events[shot_description.idx]["last_frame"].wait()
 
-            shot_duration = getattr(self, "_shot_duration", 5)
-            print(
-                f"🎬 Starting video generation for shot {shot_description.idx} "
-                f"({shot_duration}s)..."
+        frame_paths = self._build_video_reference_paths(
+            shot_description,
+            prev_shot_last_frame_path,
+        )
+
+        shot_duration = getattr(self, "_shot_duration", 5)
+        print(
+            f"🎬 Starting video generation for shot {shot_description.idx} "
+            f"({shot_duration}s, refs={len(frame_paths)})..."
+        )
+        video_prompt = build_seedance_video_prompt(
+            shot_description.motion_desc,
+            shot_description.audio_desc,
+            duration_seconds=shot_duration,
+        )
+        video_prompt = f"{video_prompt}\n\nVisual style: {self._video_style_prompt}"
+        if self._scene_anchor_path and os.path.exists(self._scene_anchor_path):
+            video_prompt += (
+                "\nKeep the same fixed scene background, room layout, props, and lighting "
+                "throughout the clip."
             )
-            video_prompt = build_seedance_video_prompt(
-                shot_description.motion_desc,
-                shot_description.audio_desc,
-                duration_seconds=shot_duration,
+        video_output = await self.video_generator.generate_single_video(
+            prompt=video_prompt,
+            reference_image_paths=frame_paths,
+            duration=shot_duration,
+            aspect_ratio=self._aspect_ratio,
+            style=self._style,
+        )
+        video_output.save(video_path)
+        try:
+            extract_last_frame_from_video(video_path, last_frame_path)
+        except Exception as exc:
+            logging.warning(
+                "Video saved for shot %s but last-frame extraction failed: %s",
+                shot_description.idx,
+                exc,
             )
-            video_prompt = f"{video_prompt}\n\nVisual style: {self._video_style_prompt}"
-            video_output = await self.video_generator.generate_single_video(
-                prompt=video_prompt,
-                reference_image_paths=frame_paths,
-                duration=shot_duration,
-                aspect_ratio=self._aspect_ratio,
-                style=self._style,
-            )
-            video_output.save(video_path)
-            print(f"☑️ Generated video for shot {shot_description.idx}, saved to {video_path}.")
-            cb = getattr(self, "_progress_callback", None)
-            if cb:
-                await cb({
-                    "type": "artifact", "stage": "videos", "file_type": "video",
-                    "file_path": os.path.join("shots", f"{shot_description.idx}", "video.mp4"),
-                    "shot_idx": shot_description.idx,
-                })
+            last_frame_path = prev_shot_last_frame_path or ""
+        print(f"☑️ Generated video for shot {shot_description.idx}, saved to {video_path}.")
+        cb = getattr(self, "_progress_callback", None)
+        if cb:
+            await cb({
+                "type": "artifact", "stage": "videos", "file_type": "video",
+                "file_path": os.path.join("shots", f"{shot_description.idx}", "video.mp4"),
+                "shot_idx": shot_description.idx,
+            })
+        return last_frame_path if os.path.exists(last_frame_path) else prev_shot_last_frame_path
 
     async def generate_frame_for_single_shot(
         self,
@@ -494,6 +666,8 @@ class Script2VideoPipeline:
         else:
             print(f"🖼️ Starting {frame_type} generation for shot {shot_idx}...")
             available_image_path_and_text_pairs = []
+            if self._scene_anchor_path and os.path.exists(self._scene_anchor_path):
+                available_image_path_and_text_pairs.append(self._scene_anchor_pair())
             for visible_character in visible_characters:
                 identifier_in_scene = visible_character.identifier_in_scene
                 registry_item = character_portraits_registry[identifier_in_scene]
@@ -524,12 +698,13 @@ class Script2VideoPipeline:
             prompt = f"{prefix_prompt}\n{prompt}\nStyle: {self._style_prompt}"
             reference_image_paths = [item[0] for item in reference_image_path_and_text_pairs]
 
-            frame_image: ImageOutput = await self.image_generator.generate_single_image(
+            await self._save_generated_frame(
+                frame_image_path=frame_image_path,
                 prompt=prompt,
                 reference_image_paths=reference_image_paths,
-                size=self._frame_size,
+                reference_image_path_and_text_pairs=reference_image_path_and_text_pairs,
+                target_description=frame_desc,
             )
-            frame_image.save(frame_image_path)
             print(f"☑️ Generated {frame_type} frame for shot {shot_idx}, saved to {frame_image_path}.")
             cb = getattr(self, "_progress_callback", None)
             if cb:
