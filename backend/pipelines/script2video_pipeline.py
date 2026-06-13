@@ -21,6 +21,7 @@ from utils.pipeline_media import (
     image_size_for_aspect,
     resolve_aspect_ratio,
 )
+from utils.style_prompts import expand_style_prompt
 
 async def _noop_progress(_event):
     pass
@@ -141,6 +142,7 @@ class Script2VideoPipeline:
         self._aspect_ratio = resolve_aspect_ratio(user_requirement, explicit=aspect_ratio or None)
         self._frame_size = image_size_for_aspect(self._aspect_ratio)
         self._concat_size = concat_dimensions_for_aspect(self._aspect_ratio)
+        self._style_prompt = expand_style_prompt(style)
         self.camera_image_generator.frame_size = self._frame_size
         self.camera_image_generator.aspect_ratio = self._aspect_ratio
         print(
@@ -356,7 +358,7 @@ class Script2VideoPipeline:
                 prefix_prompt = ""
                 for i, (image_path, text) in enumerate(reference_image_path_and_text_pairs):
                     prefix_prompt += f"Image {i}: {text}\n"
-                prompt = f"{prefix_prompt}\n{prompt}"
+                prompt = f"{prefix_prompt}\n{prompt}\nStyle: {self._style_prompt}"
                 reference_image_paths = [item[0] for item in reference_image_path_and_text_pairs]
                 ff_image: ImageOutput = await self.image_generator.generate_single_image(
                     prompt=prompt,
@@ -515,7 +517,7 @@ class Script2VideoPipeline:
             prefix_prompt = ""
             for i, (image_path, text) in enumerate(reference_image_path_and_text_pairs):
                 prefix_prompt += f"Image {i}: {text}\n"
-            prompt = f"{prefix_prompt}\n{prompt}"
+            prompt = f"{prefix_prompt}\n{prompt}\nStyle: {self._style_prompt}"
             reference_image_paths = [item[0] for item in reference_image_path_and_text_pairs]
 
             frame_image: ImageOutput = await self.image_generator.generate_single_image(

@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Literal, Optional
 from PIL import Image
 
 from interfaces.video_output import VideoOutput
+from utils.style_prompts import is_real_person_rejection
 
 
 def _extract_output(response_json: Dict[str, Any]) -> str:
@@ -271,12 +272,43 @@ class VideoGeneratorDoubaoSeedanceGPUGEEKAPI:
         **kwargs,
     ) -> VideoOutput:
         last_error: Optional[Exception] = None
-        for attempt in range(2):
-            if attempt > 0:
+
+        try:
+            return await self._generate_once(
+                prompt,
+                reference_image_paths,
+                resolution,
+                aspect_ratio,
+                duration,
+                generate_audio=self.generate_audio,
+            )
+        except ValueError as exc:
+            last_error = exc
+            if is_real_person_rejection(str(exc)) and reference_image_paths:
                 logging.warning(
-                    "Retrying Seedance video generation with dialogue audio enabled..."
+                    "Seedance rejected reference image as a real person. "
+                    "Retrying text-only video generation with stylized prompt..."
                 )
-                await asyncio.sleep(3)
+                stylized_prompt = (
+                    f"{prompt}\n"
+                    "Visual style: stylized fictional illustrated animation, "
+                    "clearly not a photograph of a real person."
+                )
+                try:
+                    return await self._generate_once(
+                        stylized_prompt,
+                        [],
+                        resolution,
+                        aspect_ratio,
+                        duration,
+                        generate_audio=self.generate_audio,
+                    )
+                except ValueError as retry_exc:
+                    last_error = retry_exc
+
+        if self.generate_audio and last_error is not None:
+            logging.warning("Retrying Seedance video generation with dialogue audio enabled...")
+            await asyncio.sleep(3)
             try:
                 return await self._generate_once(
                     prompt,
@@ -284,12 +316,10 @@ class VideoGeneratorDoubaoSeedanceGPUGEEKAPI:
                     resolution,
                     aspect_ratio,
                     duration,
-                    generate_audio=self.generate_audio,
+                    generate_audio=True,
                 )
             except ValueError as exc:
                 last_error = exc
-                if attempt >= 1:
-                    raise
 
         if last_error:
             raise last_error

@@ -11,6 +11,7 @@ from tenacity import retry, stop_after_attempt
 from interfaces import CharacterInScene, ImageOutput
 from langchain_core.messages import HumanMessage, SystemMessage
 from utils.retry import after_func
+from utils.style_prompts import expand_style_prompt
 
 
 
@@ -67,7 +68,9 @@ class CharacterPortraitsGenerator:
     ):
         self.image_generator = image_generator
 
-
+    @staticmethod
+    def _style_phrase(style: str) -> str:
+        return expand_style_prompt(style)
     @retry(stop=stop_after_attempt(3), after=after_func, reraise=True)
     async def generate_front_portrait(
         self,
@@ -78,7 +81,7 @@ class CharacterPortraitsGenerator:
         prompt = prompt_template_front.format(
             identifier=character.identifier_in_scene,
             features=features,
-            style=style,
+            style=self._style_phrase(style),
         )
         image_output = await self.image_generator.generate_single_image(
             prompt=prompt,
@@ -97,7 +100,7 @@ class CharacterPortraitsGenerator:
         prompt = prompt_template_side.format(
             identifier=character.identifier_in_scene,
             features=features,
-            style=style,
+            style=self._style_phrase(style),
         )
         image_output = await self.image_generator.generate_single_image(
             prompt=prompt,
@@ -118,7 +121,7 @@ class CharacterPortraitsGenerator:
         prompt = prompt_template_back.format(
             identifier=character.identifier_in_scene,
             features=features,
-            style=style,
+            style=self._style_phrase(style),
         )
         image_output = await self.image_generator.generate_single_image(
             prompt=prompt,
@@ -143,7 +146,7 @@ class CharacterPortraitsGenerator:
         prompt = prompt_template_turnaround.format(
             identifier=character.identifier_in_scene,
             features=features,
-            style=style,
+            style=self._style_phrase(style),
         )
         image_output = await self.image_generator.generate_single_image(
             prompt=prompt,
