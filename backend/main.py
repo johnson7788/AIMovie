@@ -1,12 +1,63 @@
 import os
 import logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s", datefmt="%H:%M:%S")
+import logging.handlers
+import sys
 
 from dotenv import load_dotenv
 _BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
-# Load .env from the backend directory (next to this file)
+# Load .env from the backend directory (next to this file) — must happen before reading LOG_LEVEL
 load_dotenv(os.path.join(_BACKEND_DIR, ".env"))
 SERVER_PORT = int(os.getenv("SERVER_PORT", "8666"))
+
+# ── Logging setup ──────────────────────────────────────────────
+LOG_LEVEL = os.getenv("LOG_LEVEL", "DEBUG").upper()
+LOG_DIR = os.path.join(_BACKEND_DIR, "logs")
+os.makedirs(LOG_DIR, exist_ok=True)
+
+# Detailed format for file logs; shorter format for console
+FILE_FORMAT = logging.Formatter(
+    "%(asctime)s.%(msecs)03d [%(name)s] %(levelname)s %(pathname)s:%(lineno)d: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+CONSOLE_FORMAT = logging.Formatter(
+    "%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+    datefmt="%H:%M:%S",
+)
+
+# Root logger — capture everything at LOG_LEVEL
+root_logger = logging.getLogger()
+root_logger.setLevel(getattr(logging, LOG_LEVEL, logging.DEBUG))
+
+# Remove any pre-existing handlers (e.g. from basicConfig in submodules)
+root_logger.handlers.clear()
+
+# Console handler — stderr so it won't interfere with stdout piping
+console_handler = logging.StreamHandler(sys.stderr)
+console_handler.setLevel(getattr(logging, LOG_LEVEL, logging.DEBUG))
+console_handler.setFormatter(CONSOLE_FORMAT)
+root_logger.addHandler(console_handler)
+
+# File handler — rotating, 10 MB per file, keep 5 backups
+file_handler = logging.handlers.RotatingFileHandler(
+    os.path.join(LOG_DIR, "backend.log"),
+    maxBytes=10 * 1024 * 1024,
+    backupCount=5,
+    encoding="utf-8",
+)
+file_handler.setLevel(logging.DEBUG)  # File always captures DEBUG
+file_handler.setFormatter(FILE_FORMAT)
+root_logger.addHandler(file_handler)
+
+# Ensure uvicorn loggers are also at LOG_LEVEL
+for name in ("uvicorn", "uvicorn.access", "uvicorn.error", "fastapi"):
+    uv_logger = logging.getLogger(name)
+    uv_logger.handlers.clear()
+    uv_logger.propagate = True  # let root handle it
+
+logging.getLogger("uvicorn.access").setLevel(logging.INFO)  # access log stays at INFO (too noisy at DEBUG)
+
+_log = logging.getLogger(__name__)
+_log.info(f"Logging initialized — level={LOG_LEVEL}, file={os.path.join(LOG_DIR, 'backend.log')}")
 
 # Ensure UTF-8 text handling on Windows (avoid GBK decode errors).
 if os.name == "nt":
@@ -35,7 +86,7 @@ import aiohttp
 import yaml
 from fastapi import FastAPI, HTTPException, Query, Header
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
+from fastapi.responses import FileResponse, StreamingResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
 from progress_manager import ProgressManager
 import auth as auth_service
@@ -121,6 +172,85 @@ app = FastAPI(
     description="Agentic Video Generation API - supports script2video and idea2video modes",
     version="0.1.0",
 )
+
+# --- Request logging middleware ---
+MAX_LOG_BODY = 2000  # truncate logged bodies to this many chars
+
+async def _read_request_body(request) -> str:
+    """Read and return request body as text, truncated."""
+    try:
+        body_bytes = await request.body()
+        if not body_bytes:
+            return ""
+        body_str = body_bytes.decode("utf-8", errors="replace")
+        if len(body_str) > MAX_LOG_BODY:
+            body_str = body_str[:MAX_LOG_BODY] + f"... <truncated, total {len(body_str)} chars>"
+        return body_str
+    except Exception:
+        return "<unable to read body>"
+
+@app.middleware("http")
+async def log_requests(request, call_next):
+    start_time = time.time()
+
+    # Log request
+    req_body = await _read_request_body(request)
+    if req_body:
+        _log.info(f"--> {request.method} {request.url.path}  body={req_body}")
+    else:
+        qs = str(request.query_params)
+        if qs:
+            _log.info(f"--> {request.method} {request.url.path}  params={qs}")
+        else:
+            _log.info(f"--> {request.method} {request.url.path}")
+
+    response = await call_next(request)
+    elapsed_ms = (time.time() - start_time) * 1000
+
+    # Log response — but NOT for streams / files (they would be consumed)
+    resp_body = ""
+    content_type = response.headers.get("content-type", "")
+    is_stream = (
+        "text/event-stream" in content_type
+        or isinstance(response, StreamingResponse)
+        or isinstance(response, FileResponse)
+    )
+
+    if not is_stream:
+        try:
+            # Consume the response body, log it, then rebuild it
+            body_chunks = []
+            async for chunk in response.body_iterator:
+                body_chunks.append(chunk)
+            resp_bytes = b"".join(body_chunks)
+            resp_body = resp_bytes.decode("utf-8", errors="replace")
+            if len(resp_body) > MAX_LOG_BODY:
+                resp_body = resp_body[:MAX_LOG_BODY] + f"... <truncated, total {len(resp_body)} chars>"
+
+            # Rebuild the response with the same body
+            response = Response(
+                content=resp_bytes,
+                status_code=response.status_code,
+                headers=dict(response.headers),
+                media_type=response.media_type,
+                background=getattr(response, "background", None),
+            )
+        except Exception:
+            resp_body = "<unable to read response body>"
+
+    status = response.status_code
+    log_msg = f"<-- {request.method} {request.url.path}  {status}  {elapsed_ms:.0f}ms"
+    if resp_body:
+        log_msg += f"  resp={resp_body}"
+
+    if status >= 500:
+        _log.error(log_msg)
+    elif status >= 400:
+        _log.warning(log_msg)
+    else:
+        _log.info(log_msg)
+
+    return response
 
 # --- CORS ---
 app.add_middleware(
@@ -338,20 +468,17 @@ def _build_provider_chat_model(provider: str, model_name: str):
 
 def _build_provider_image_generator(provider: str):
     """Build an image generator for the given provider."""
-    from tools.image_generator_hunyuan_tencent_api import ImageGeneratorHunyuanTencentAPI
-    from tools.image_generator_nanobanana_google_api import ImageGeneratorNanobananaGoogleAPI
-    from tools.image_generator_doubao_seedream_volcengine_api import ImageGeneratorDoubaoSeedreamVolcengineAPI
-    from tools.image_generator_doubao_seedream_gpugeek_api import ImageGeneratorDoubaoSeedreamGPUGEEKAPI
-
     if provider == "tencent":
+        from tools.image_generator_hunyuan_tencent_api import ImageGeneratorHunyuanTencentAPI
         return ImageGeneratorHunyuanTencentAPI()
     elif provider == "google":
+        from tools.image_generator_nanobanana_google_api import ImageGeneratorNanobananaGoogleAPI
         return ImageGeneratorNanobananaGoogleAPI(api_key=os.environ.get("GOOGLE_API_KEY", ""))
-    elif provider == "volcengine":
-        return ImageGeneratorDoubaoSeedreamVolcengineAPI()
     elif provider == "gpugeek":
+        from tools.image_generator_doubao_seedream_gpugeek_api import ImageGeneratorDoubaoSeedreamGPUGEEKAPI
         return ImageGeneratorDoubaoSeedreamGPUGEEKAPI()
     else:
+        from tools.image_generator_doubao_seedream_volcengine_api import ImageGeneratorDoubaoSeedreamVolcengineAPI
         return ImageGeneratorDoubaoSeedreamVolcengineAPI()
 
 
@@ -379,15 +506,14 @@ def _get_video_generator(model_id: Optional[str] = None, config_path: str = "con
 
 def _build_provider_video_generator(provider: str):
     """Build a video generator for the given provider, or fall back to volcengine."""
-    from tools.video_generator_doubao_seedance_volcengine_api import VideoGeneratorDoubaoSeedanceVolcengineAPI
-    from tools.video_generator_vira_gpugeek_api import VideoGeneratorViraGPUGEEKAPI
-    from tools.video_generator_veo_google_api import VideoGeneratorVeoGoogleAPI
-
     if provider == "google":
+        from tools.video_generator_veo_google_api import VideoGeneratorVeoGoogleAPI
         return VideoGeneratorVeoGoogleAPI(api_key=os.environ.get("GOOGLE_API_KEY", ""))
     elif provider == "gpugeek":
+        from tools.video_generator_vira_gpugeek_api import VideoGeneratorViraGPUGEEKAPI
         return VideoGeneratorViraGPUGEEKAPI()
     else:
+        from tools.video_generator_doubao_seedance_volcengine_api import VideoGeneratorDoubaoSeedanceVolcengineAPI
         return VideoGeneratorDoubaoSeedanceVolcengineAPI()
 
 
@@ -1778,4 +1904,19 @@ if __name__ == "__main__":
     import uvicorn
 
     init_db()
-    uvicorn.run(app, host="0.0.0.0", port=SERVER_PORT)
+
+    # Use the same logging config and expose access log
+    log_config = uvicorn.config.LOGGING_CONFIG
+    log_config["formatters"]["default"]["fmt"] = "%(asctime)s [%(name)s] %(levelname)s: %(message)s"
+    log_config["formatters"]["default"]["datefmt"] = "%H:%M:%S"
+    log_config["formatters"]["access"]["fmt"] = '%(asctime)s [%(name)s] %(levelname)s: %(client_addr)s - "%(request_line)s" %(status_code)s'
+    log_config["formatters"]["access"]["datefmt"] = "%H:%M:%S"
+
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=SERVER_PORT,
+        log_config=log_config,
+        log_level="info",  # uvicorn's own startup messages at info
+        access_log=True,   # enable request access log
+    )
