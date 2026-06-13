@@ -11,9 +11,14 @@ from utils.style_prompts import (
 class TestStylePrompts(unittest.TestCase):
     def test_cinematic_image_is_live_action_not_anime(self):
         text = expand_image_style_prompt("cinematic")
-        self.assertIn("Live-action", text)
-        self.assertNotIn("illustrated or animated", text.lower())
+        self.assertIn("film still", text.lower())
+        self.assertIn("fictional virtual actor", text.lower())
         self.assertNotIn("anime", text.lower())
+
+    def test_cinematic_reference_has_seedance_guardrail(self):
+        text = expand_image_style_prompt("cinematic")
+        self.assertIn("Reference image for AI video generation", text)
+        self.assertIn("Not a photograph of a real celebrity", text)
 
     def test_cinematic_video_style(self):
         text = expand_video_style_prompt("cinematic")

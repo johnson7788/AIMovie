@@ -17,7 +17,8 @@ ILLUSTRATED_STYLE_IDS = frozenset({
     "comic",
 })
 
-LIVE_ACTION_DESCRIPTIONS: Dict[str, str] = {
+# Used in Seedance video prompts — can stay strongly cinematic.
+LIVE_ACTION_VIDEO_DESCRIPTIONS: Dict[str, str] = {
     "cinematic": (
         "Live-action cinematic film footage, photorealistic, natural human skin and hair, "
         "professional cinematography, dramatic lighting, shallow depth of field"
@@ -25,6 +26,21 @@ LIVE_ACTION_DESCRIPTIONS: Dict[str, str] = {
     "realistic": (
         "Photorealistic live-action footage, natural colors, realistic human proportions, "
         "film camera look, authentic textures"
+    ),
+}
+
+# Used in Seedream reference images — avoid looking like real-person photos to reduce I2V blocks.
+LIVE_ACTION_REFERENCE_DESCRIPTIONS: Dict[str, str] = {
+    "cinematic": (
+        "Cinematic film still of a fictional virtual actor on a movie set, "
+        "natural proportions, subtle film grain and color grading, dramatic movie lighting, "
+        "shallow depth of field — looks like a movie frame, not a studio headshot, "
+        "not a smartphone selfie, not an ID or stock portrait"
+    ),
+    "realistic": (
+        "Live-action film still of a fictional virtual actor, natural skin texture with "
+        "cinematic color grading, realistic movie lighting — clearly a created character "
+        "in a staged scene, not a real-person photograph or news image"
     ),
 }
 
@@ -37,10 +53,11 @@ ILLUSTRATED_DESCRIPTIONS: Dict[str, str] = {
     "comic": "Comic book illustration, inked lines, bold colors",
 }
 
-# Keep reference images on the "fictional production" side for Seedance moderation.
-LIVE_ACTION_IMAGE_SUFFIX = (
-    "Fictional character in a staged film scene. "
-    "AI-generated cinematic imagery, not a real celebrity or news photograph."
+# Appended to every portrait / storyboard frame used later as Seedance reference input.
+SEEDANCE_REFERENCE_GUARDRAIL = (
+    "Reference image for AI video generation: depict a clearly fictional virtual actor "
+    "in a staged film scene. Not a photograph of a real celebrity, public figure, "
+    "news subject, passport photo, or stock portrait."
 )
 
 ILLUSTRATED_IMAGE_SUFFIX = (
@@ -63,11 +80,13 @@ def is_live_action_style(style: str) -> bool:
 
 
 def expand_image_style_prompt(style: str) -> str:
-    """Style phrase for Seedream frame / portrait generation."""
+    """Style phrase for Seedream portraits / frames that become Seedance reference images."""
     key = _normalize_style_key(style)
     if is_live_action_style(style):
-        base = LIVE_ACTION_DESCRIPTIONS.get(key, LIVE_ACTION_DESCRIPTIONS["cinematic"])
-        return f"{base}. {LIVE_ACTION_IMAGE_SUFFIX}"
+        base = LIVE_ACTION_REFERENCE_DESCRIPTIONS.get(
+            key, LIVE_ACTION_REFERENCE_DESCRIPTIONS["cinematic"]
+        )
+        return f"{base}. {SEEDANCE_REFERENCE_GUARDRAIL}"
     base = ILLUSTRATED_DESCRIPTIONS.get(key, ILLUSTRATED_DESCRIPTIONS["storybook"])
     return f"{base}. {ILLUSTRATED_IMAGE_SUFFIX}"
 
@@ -76,7 +95,9 @@ def expand_video_style_prompt(style: str) -> str:
     """Style phrase appended to Seedance video prompts."""
     key = _normalize_style_key(style)
     if is_live_action_style(style):
-        return LIVE_ACTION_DESCRIPTIONS.get(key, LIVE_ACTION_DESCRIPTIONS["cinematic"])
+        return LIVE_ACTION_VIDEO_DESCRIPTIONS.get(
+            key, LIVE_ACTION_VIDEO_DESCRIPTIONS["cinematic"]
+        )
     return ILLUSTRATED_DESCRIPTIONS.get(key, ILLUSTRATED_DESCRIPTIONS["storybook"])
 
 
