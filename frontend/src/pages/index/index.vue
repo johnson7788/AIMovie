@@ -18,6 +18,8 @@ import { useLoading } from '@/composables/useLoading'
 
 const userStore = useUserStore()
 const modelStore = useModelStore()
+const { MODEL } = useRefs(modelStore)
+const DEFAULT_SCRIPT_MODEL_ID = '5'
 const { USERINFO } = useRefs(userStore);
 watch(USERINFO, () => {
 	addListener();
@@ -361,9 +363,31 @@ const modelPopoverRef = ref();
 const selectedModel = ref<any>({});
 const handleModelSelect = (item: any) => {
 	selectedModel.value = item;
-	// form.model = item.id;
+	form.model = item.id;
 	modelPopoverRef.value?.hide();
 }
+const applyDefaultScriptModel = () => {
+	const model = modelStore.get('creative_script', DEFAULT_SCRIPT_MODEL_ID) as any;
+	if (model?.id) {
+		form.model = model.id;
+		selectedModel.value = model;
+	}
+}
+watch(
+	() => MODEL.value.creative_script,
+	(list) => {
+		if (!list?.length) return;
+		if (!form.model) {
+			applyDefaultScriptModel();
+			return;
+		}
+		const current = modelStore.get('creative_script', form.model) as any;
+		if (current) {
+			selectedModel.value = current;
+		}
+	},
+	{ immediate: true, deep: true },
+)
 const handleScriptChange = (val: any) => {
 	switch (val) {
 		case 'script':
@@ -620,7 +644,7 @@ onUnmounted(() => {
 		</el-popover>
 		<el-popover ref="modelPopoverRef" :show-arrow="false" popper-class="model-popover" :virtual-ref="modelButtonRef"
 			virtual-triggering placement="bottom" width="min(100vw,380px)" trigger="click">
-			<xl-models v-model="form.model" @select="handleModelSelect" scene="creative_script" />
+			<xl-models v-model="form.model" @select="handleModelSelect" scene="creative_script" default-model-id="5" />
 		</el-popover>
 
 

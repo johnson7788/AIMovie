@@ -35,6 +35,9 @@
                             <el-icon v-else-if="stage.status === 'running'" class="stage-icon running"><Loading /></el-icon>
                             <el-icon v-else class="stage-icon pending"><Clock /></el-icon>
                             <span class="stage-name">{{ stage.label }}</span>
+                            <span class="stage-detail" v-if="stage.status === 'running' && stageDetail[stage.name]">
+                                {{ stageDetail[stage.name] }}
+                            </span>
                             <span class="stage-duration" v-if="stage.duration">{{ stage.duration }}</span>
                         </div>
                     </div>
@@ -157,6 +160,7 @@ const errorMessage = ref<string | null>(null);
 const overallProgress = ref(0);
 const elapsedSeconds = ref(0);
 const autoScroll = ref(true);
+const stageDetail = ref<Record<string, string>>({});
 const logViewerRef = ref<HTMLElement | null>(null);
 const artifactsScrollRef = ref<HTMLElement | null>(null);
 const videoReloadToken = ref(0);
@@ -256,6 +260,44 @@ const scrollArtifactsToBottom = async () => {
     }
 };
 
+const MAX_LOG_LINES = 150;
+
+const appendLog = (level: string, message: string) => {
+    if (!message) return;
+    logs.value.push({
+        time: new Date().toLocaleTimeString(),
+        level,
+        message,
+    });
+    if (logs.value.length > MAX_LOG_LINES) {
+        logs.value.splice(0, logs.value.length - MAX_LOG_LINES);
+    }
+};
+
+const shouldDisplayArtifact = (event: SSEEvent) => {
+    if (event.file_type === 'text' || event.file_type === 'json') return true;
+    if (event.file_type === 'video') {
+        return isFinalVideoArtifact(event) || Boolean(event.stage?.startsWith('scene_'));
+    }
+    return false;
+};
+
+const upsertArtifact = (event: SSEEvent) => {
+    const key = event.file_path || `${event.stage}-${event.file_type}`;
+    const existingIdx = artifacts.value.findIndex(
+        (item) => (item.file_path || `${item.stage}-${item.file_type}`) === key,
+    );
+    if (existingIdx >= 0) {
+        artifacts.value[existingIdx] = event;
+    } else {
+        artifacts.value.push(event);
+    }
+    const maxArtifacts = 20;
+    if (artifacts.value.length > maxArtifacts) {
+        artifacts.value.splice(0, artifacts.value.length - maxArtifacts);
+    }
+};
+
 const upsertFinalVideoArtifact = async (filePath = 'final_video.mp4') => {
     const artifact: SSEEvent = {
         type: 'artifact',
@@ -288,11 +330,7 @@ const finalizeComplete = async (result?: string | null) => {
     stopStatusPolling();
     await upsertFinalVideoArtifact('final_video.mp4');
     if (!wasComplete) {
-        logs.value.push({
-            time: new Date().toLocaleTimeString(),
-            level: 'INFO',
-            message: `生成完成! 结果: ${result || 'final_video.mp4'}`,
-        });
+        appendLog('INFO', `生成完成! 结果: ${result || 'final_video.mp4'}`);
     }
 };
 
@@ -406,60 +444,43 @@ const stopStatusPolling = () => {
 const handleEvent = (event: SSEEvent) => {
     isConnecting.value = false;
 
+    if (event.type === 'connected') {
+        return;
+    }
+
     switch (event.type) {
         case 'log':
-            logs.value.push({
-                time: new Date().toLocaleTimeString(),
-                level: event.level || 'INFO',
-                message: event.message || '',
-            });
-            // Keep only last 500 log lines
-            if (logs.value.length > 500) {
-                logs.value = logs.value.slice(-500);
-            }
+            appendLog(event.level || 'INFO', event.message || '');
             break;
 
         case 'stage_start':
         case 'stage_end':
             updateStageStatus(event);
-            logs.value.push({
-                time: new Date().toLocaleTimeString(),
-                level: 'INFO',
-                message: `[${event.stage}] ${event.message || (event.type === 'stage_start' ? '开始' : '完成')}`,
-            });
+            if (event.type === 'stage_end' && event.stage) {
+                delete stageDetail.value[event.stage];
+            }
             break;
 
         case 'artifact':
             if (event.file_type === 'video' && isFinalVideoArtifact(event)) {
                 upsertFinalVideoArtifact(event.file_path || 'final_video.mp4');
-            } else {
-                artifacts.value.push(event);
+            } else if (shouldDisplayArtifact(event)) {
+                upsertArtifact(event);
                 if (event.file_type === 'video') {
                     scrollArtifactsToBottom();
                 }
             }
-            logs.value.push({
-                time: new Date().toLocaleTimeString(),
-                level: 'INFO',
-                message: `[${event.stage}] 产物: ${event.file_path}`,
-            });
             break;
 
         case 'progress':
-            logs.value.push({
-                time: new Date().toLocaleTimeString(),
-                level: 'INFO',
-                message: `[${event.stage}] ${event.message || `进度: ${event.current}/${event.total}`}`,
-            });
+            if (event.stage && event.message) {
+                stageDetail.value[event.stage] = event.message;
+            }
             break;
 
         case 'error':
             errorMessage.value = event.error || '未知错误';
-            logs.value.push({
-                time: new Date().toLocaleTimeString(),
-                level: 'ERROR',
-                message: `生成失败: ${event.error}`,
-            });
+            appendLog('ERROR', `生成失败: ${event.error}`);
             break;
 
         case 'complete':
@@ -598,6 +619,14 @@ onUnmounted(() => {
             &.pending { color: var(--el-text-color-disabled); }
         }
         .stage-name { color: var(--el-text-color-primary); }
+        .stage-detail {
+            color: var(--el-text-color-secondary);
+            font-size: 11px;
+            max-width: 180px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
         .stage-duration { color: var(--el-text-color-secondary); font-size: 11px; }
         &.pending .stage-name { color: var(--el-text-color-disabled); }
     }

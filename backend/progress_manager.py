@@ -9,6 +9,8 @@ import asyncio
 import time
 from typing import Optional
 
+from utils.progress_events import sanitize_progress_event
+
 
 class ProgressManager:
     """Singleton pub/sub for per-task progress events."""
@@ -39,6 +41,10 @@ class ProgressManager:
 
     def emit(self, task_id: str, event: dict):
         """Emit a progress event for a task."""
+        event = sanitize_progress_event(event)
+        if event is None:
+            return
+
         # Add timestamp if not present
         if "timestamp" not in event:
             event["timestamp"] = time.time()

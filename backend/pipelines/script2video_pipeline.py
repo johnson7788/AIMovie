@@ -15,6 +15,12 @@ from langchain.chat_models import init_chat_model
 from tools.render_backend import RenderBackend
 from utils.provider_presets import resolve_chat_model_config
 from utils.image import image_output_to_pil, crop_turnaround_views
+from utils.seedance_prompt import build_seedance_video_prompt
+from utils.pipeline_media import (
+    concat_dimensions_for_aspect,
+    image_size_for_aspect,
+    resolve_aspect_ratio,
+)
 
 async def _noop_progress(_event):
     pass
@@ -23,6 +29,29 @@ async def _noop_progress(_event):
 def _max_shots_from_user_requirement(user_requirement: str) -> Optional[int]:
     match = re.search(r"Use at most (\d+) shots", user_requirement or "")
     return int(match.group(1)) if match else None
+
+
+def _episode_duration_from_user_requirement(user_requirement: str) -> Optional[int]:
+    text = user_requirement or ""
+    match = re.search(r"Episode duration: (\d+)s", text)
+    if match:
+        return int(match.group(1))
+    match = re.search(r"Target episode duration: approximately (\d+) seconds", text)
+    return int(match.group(1)) if match else None
+
+
+_SEEDANCE_SHOT_DURATIONS = (4, 5, 10)
+
+
+def _shot_duration_from_user_requirement(user_requirement: str, shot_count: int) -> int:
+    """Pick Seedance-supported duration (4/5/10s) closest to target per-shot length."""
+    if shot_count <= 0:
+        return 5
+    total = _episode_duration_from_user_requirement(user_requirement)
+    if total is None:
+        return 5
+    per_shot = total / shot_count
+    return min(_SEEDANCE_SHOT_DURATIONS, key=lambda d: abs(d - per_shot))
 
 
 class Script2VideoPipeline:
@@ -104,10 +133,20 @@ class Script2VideoPipeline:
         style: str,
         characters: List[CharacterInScene] = None,
         character_portraits_registry: Optional[Dict[str, Dict[str, Dict[str, str]]]] = None,
+        aspect_ratio: str = "",
         progress_callback: Optional[Callable[[dict], Awaitable[None]]] = None,
     ):
         cb = progress_callback or _noop_progress
         self._progress_callback = cb
+        self._aspect_ratio = resolve_aspect_ratio(user_requirement, explicit=aspect_ratio or None)
+        self._frame_size = image_size_for_aspect(self._aspect_ratio)
+        self._concat_size = concat_dimensions_for_aspect(self._aspect_ratio)
+        self.camera_image_generator.frame_size = self._frame_size
+        self.camera_image_generator.aspect_ratio = self._aspect_ratio
+        print(
+            f"📐 Output aspect ratio: {self._aspect_ratio} "
+            f"(images={self._frame_size}, concat={self._concat_size[0]}x{self._concat_size[1]})"
+        )
 
         if characters is None:
             await cb({"type": "stage_start", "stage": "characters", "message": "Extracting characters from script..."})
@@ -156,6 +195,16 @@ class Script2VideoPipeline:
         )
         await cb({"type": "stage_end", "stage": "visual_descriptions", "duration_ms": int((time.time() - t0) * 1000)})
 
+        self._shot_duration = _shot_duration_from_user_requirement(
+            user_requirement, len(shot_descriptions)
+        )
+        target_episode = _episode_duration_from_user_requirement(user_requirement)
+        if target_episode:
+            print(
+                f"⏱️ Per-shot video duration: {self._shot_duration}s "
+                f"(target episode ~{target_episode}s, {len(shot_descriptions)} shots)"
+            )
+
         # construct camera tree
         await cb({"type": "stage_start", "stage": "camera_tree", "message": "Constructing camera tree..."})
         t0 = time.time()
@@ -202,7 +251,14 @@ class Script2VideoPipeline:
                 os.path.join(self.working_dir, "shots", f"{shot_description.idx}", "video.mp4")
                 for shot_description in shot_descriptions
             ]
-            concat_videos(shot_video_paths, final_video_path)
+            width, height = self._concat_size
+            concat_videos(
+                shot_video_paths,
+                final_video_path,
+                target_width=width,
+                target_height=height,
+                crossfade_seconds=0.35,
+            )
             print(f"☑️ Concatenated videos, saved to {final_video_path}.")
             await cb({"type": "stage_end", "stage": "concatenate", "duration_ms": int((time.time() - t0) * 1000)})
 
@@ -305,7 +361,7 @@ class Script2VideoPipeline:
                 ff_image: ImageOutput = await self.image_generator.generate_single_image(
                     prompt=prompt,
                     reference_image_paths=reference_image_paths,
-                    size="1600x900",
+                    size=self._frame_size,
                 )
                 ff_image.save(first_shot_ff_path)
                 self.frame_events[first_shot_idx]["first_frame"].set()
@@ -388,10 +444,21 @@ class Script2VideoPipeline:
             if shot_description.variation_type in ["medium", "large"]:
                 frame_paths.append(os.path.join(self.working_dir, "shots", f"{shot_description.idx}", "last_frame.png"))
 
-            print(f"🎬 Starting video generation for shot {shot_description.idx}...")
+            shot_duration = getattr(self, "_shot_duration", 5)
+            print(
+                f"🎬 Starting video generation for shot {shot_description.idx} "
+                f"({shot_duration}s)..."
+            )
+            video_prompt = build_seedance_video_prompt(
+                shot_description.motion_desc,
+                shot_description.audio_desc,
+                duration_seconds=shot_duration,
+            )
             video_output = await self.video_generator.generate_single_video(
-                prompt=shot_description.motion_desc + "\n" + shot_description.audio_desc,
+                prompt=video_prompt,
                 reference_image_paths=frame_paths,
+                duration=shot_duration,
+                aspect_ratio=self._aspect_ratio,
             )
             video_output.save(video_path)
             print(f"☑️ Generated video for shot {shot_description.idx}, saved to {video_path}.")
@@ -454,7 +521,7 @@ class Script2VideoPipeline:
             frame_image: ImageOutput = await self.image_generator.generate_single_image(
                 prompt=prompt,
                 reference_image_paths=reference_image_paths,
-                size="1600x900",
+                size=self._frame_size,
             )
             frame_image.save(frame_image_path)
             print(f"☑️ Generated {frame_type} frame for shot {shot_idx}, saved to {frame_image_path}.")

@@ -23,11 +23,14 @@ def build_effective_user_requirement(
     user_requirement: str,
     episode_count: int = 0,
     episode_duration: int = 0,
+    aspect_ratio: str = "",
 ) -> str:
     """Merge UI episode settings into prompts the LLM and storyboard must follow."""
     parts = []
     if user_requirement and user_requirement.strip():
         parts.append(user_requirement.strip())
+    if aspect_ratio and f"Aspect ratio: {aspect_ratio}" not in " ".join(parts):
+        parts.append(f"Aspect ratio: {aspect_ratio}")
     if episode_count == 1:
         parts.append(
             "Generate exactly ONE episode as a single short video. "
@@ -44,6 +47,11 @@ def build_effective_user_requirement(
         parts.append(
             f"Target episode duration: approximately {episode_duration} seconds. "
             f"Use at most {max_shots} shots in the storyboard."
+        )
+        parts.append(
+            "Short drama pacing: hook the audience in the first 3 seconds, "
+            "build one clear conflict, use speakable dialogue, "
+            "and align SHOT blocks to roughly 5 seconds each."
         )
     return " ".join(parts)
 
@@ -201,7 +209,18 @@ class Idea2VideoPipeline:
             print(f"🚀 Loaded script from existing file.")
         else:
             print("🧠 Writing script based on story...")
-            script = await self.screenwriter.write_script_based_on_story(story=story, user_requirement=user_requirement)
+            script = await self.screenwriter.write_script_based_on_story(
+                story=story, user_requirement=user_requirement
+            )
+            polished_scripts = []
+            for idx, scene_script in enumerate(script):
+                print(f"✨ Polishing scene script {idx + 1}/{len(script)}...")
+                polished_scripts.append(
+                    await self.screenwriter.polish_scene_script(
+                        scene_script, user_requirement=user_requirement
+                    )
+                )
+            script = polished_scripts
             with open(save_path, "w", encoding="utf-8") as f:
                 json.dump(script, f, ensure_ascii=False, indent=4)
             print(f"✅ Written script based on story and saved to {save_path}.")
@@ -304,12 +323,16 @@ class Idea2VideoPipeline:
         style: str,
         episode_count: int = 0,
         episode_duration: int = 0,
+        aspect_ratio: str = "",
         progress_callback: Optional[Callable[[dict], Awaitable[None]]] = None,
     ):
         cb = progress_callback or _noop_progress
         self._progress_callback = cb
+        from utils.pipeline_media import resolve_aspect_ratio
+
+        self._aspect_ratio = resolve_aspect_ratio(user_requirement, explicit=aspect_ratio or None)
         effective_requirement = build_effective_user_requirement(
-            user_requirement, episode_count, episode_duration
+            user_requirement, episode_count, episode_duration, self._aspect_ratio
         )
 
         # Stage: Story
@@ -395,6 +418,7 @@ class Idea2VideoPipeline:
                 style=style,
                 characters=characters,
                 character_portraits_registry=character_portraits_registry,
+                aspect_ratio=self._aspect_ratio,
                 progress_callback=scoped_cb,
             )
             await cb({
@@ -414,7 +438,15 @@ class Idea2VideoPipeline:
             t0 = time.time()
             print(f"🎬 Starting concatenating videos...")
             from utils.video import concat_videos
-            concat_videos(all_video_paths, final_video_path)
+            from utils.pipeline_media import concat_dimensions_for_aspect
+            width, height = concat_dimensions_for_aspect(self._aspect_ratio)
+            concat_videos(
+                all_video_paths,
+                final_video_path,
+                target_width=width,
+                target_height=height,
+                crossfade_seconds=0.35,
+            )
             print(f"☑️ Concatenated videos, saved to {final_video_path}.")
             await cb({"type": "stage_end", "stage": "concatenate", "duration_ms": int((time.time() - t0) * 1000)})
 

@@ -90,6 +90,7 @@ from fastapi.responses import FileResponse, StreamingResponse, JSONResponse, Res
 from pydantic import BaseModel, Field
 from progress_manager import ProgressManager
 import auth as auth_service
+from utils.retry import format_exception
 
 def _import_pipelines():
     """Lazy import pipelines to avoid import errors when deps are missing."""
@@ -310,20 +311,24 @@ def error_response(code: int, msg: str):
 
 # --- Log handler that forwards to ProgressManager ---
 class TaskLogHandler(logging.Handler):
-    """Forwards log records to ProgressManager as 'log' events for the active task."""
+    """Forwards filtered log records to ProgressManager as 'log' events."""
 
     def __init__(self, task_id: str):
-        super().__init__()
+        super().__init__(level=logging.INFO)
         self.task_id = task_id
 
     def emit(self, record):
         try:
-            msg = self.format(record)
+            from utils.progress_events import should_forward_log
+
+            msg = record.getMessage()
+            if not should_forward_log(record.name, record.levelname, msg):
+                return
             pm = ProgressManager.get_instance()
             pm.emit(self.task_id, {
                 "type": "log",
                 "level": record.levelname,
-                "message": msg,
+                "message": self.format(record),
             })
         except Exception:
             self.handleError(record)
@@ -353,6 +358,7 @@ class Script2VideoRequest(BaseModel):
     style: str = "Cinematic"
     config_path: str = "configs/script2video.yaml"
     model_id: str = ""
+    aspect_ratio: str = ""
 
 
 class Idea2VideoRequest(BaseModel):
@@ -363,6 +369,7 @@ class Idea2VideoRequest(BaseModel):
     model_id: str = ""
     episode_count: int = 0  # 0 = let LLM decide; >0 = force this many episodes
     episode_duration: int = 0  # seconds per episode; 0 = no hard limit
+    aspect_ratio: str = ""
 
 
 class TaskResponse(BaseModel):
@@ -405,6 +412,7 @@ async def run_script2video(task_id: str, req: Script2VideoRequest):
             req.style,
             req.config_path,
             req.model_id,
+            req.aspect_ratio or "",
         ])
         cache_key = hashlib.sha256(cache_key_raw.encode("utf-8")).hexdigest()[:16]
         pipeline.working_dir = os.path.join(pipeline.working_dir, cache_key)
@@ -429,6 +437,7 @@ async def run_script2video(task_id: str, req: Script2VideoRequest):
             script=req.script,
             user_requirement=req.user_requirement,
             style=req.style,
+            aspect_ratio=req.aspect_ratio,
             progress_callback=progress_callback,
         )
         pm.emit(task_id, {"type": "complete", "result": result_path})
@@ -438,11 +447,11 @@ async def run_script2video(task_id: str, req: Script2VideoRequest):
                 ("completed", result_path, task_id),
             )
     except Exception as e:
-        pm.emit(task_id, {"type": "error", "error": str(e)})
+        pm.emit(task_id, {"type": "error", "error": format_exception(e)})
         with get_db() as conn:
             conn.execute(
                 "UPDATE tasks SET status = ?, error = ? WHERE task_id = ?",
-                ("failed", str(e), task_id),
+                ("failed", format_exception(e), task_id),
             )
     finally:
         _remove_log_handler(log_handler)
@@ -516,7 +525,7 @@ def _get_video_generator(model_id: Optional[str] = None, config_path: str = "con
         if provider == "google":
             config["video_generator"]["class_path"] = "tools.VideoGeneratorVeoGoogleAPI"
         elif provider == "gpugeek":
-            config["video_generator"]["class_path"] = "tools.VideoGeneratorViraGPUGEEKAPI"
+            config["video_generator"]["class_path"] = "tools.VideoGeneratorDoubaoSeedanceGPUGEEKAPI"
         else:
             config["video_generator"]["class_path"] = "tools.VideoGeneratorDoubaoSeedanceVolcengineAPI"
 
@@ -530,8 +539,8 @@ def _build_provider_video_generator(provider: str):
         from tools.video_generator_veo_google_api import VideoGeneratorVeoGoogleAPI
         return VideoGeneratorVeoGoogleAPI(api_key=os.environ.get("GOOGLE_API_KEY", ""))
     elif provider == "gpugeek":
-        from tools.video_generator_vira_gpugeek_api import VideoGeneratorViraGPUGEEKAPI
-        return VideoGeneratorViraGPUGEEKAPI()
+        from tools.video_generator_doubao_seedance_gpugeek_api import VideoGeneratorDoubaoSeedanceGPUGEEKAPI
+        return VideoGeneratorDoubaoSeedanceGPUGEEKAPI(generate_audio=True)
     else:
         from tools.video_generator_doubao_seedance_volcengine_api import VideoGeneratorDoubaoSeedanceVolcengineAPI
         return VideoGeneratorDoubaoSeedanceVolcengineAPI()
@@ -571,6 +580,7 @@ async def run_idea2video(task_id: str, req: Idea2VideoRequest):
             str(req.episode_duration),
             req.model_id,
             req.config_path,
+            req.aspect_ratio or "",
         ])
         cache_key = hashlib.sha256(cache_key_raw.encode("utf-8")).hexdigest()[:16]
         pipeline.working_dir = os.path.join(pipeline.working_dir, cache_key)
@@ -596,6 +606,7 @@ async def run_idea2video(task_id: str, req: Idea2VideoRequest):
             style=req.style,
             episode_count=req.episode_count,
             episode_duration=req.episode_duration,
+            aspect_ratio=req.aspect_ratio,
             progress_callback=progress_callback,
         )
         pm.emit(task_id, {"type": "complete", "result": result_path})
@@ -605,11 +616,11 @@ async def run_idea2video(task_id: str, req: Idea2VideoRequest):
                 ("completed", result_path, task_id),
             )
     except Exception as e:
-        pm.emit(task_id, {"type": "error", "error": str(e)})
+        pm.emit(task_id, {"type": "error", "error": format_exception(e)})
         with get_db() as conn:
             conn.execute(
                 "UPDATE tasks SET status = ?, error = ? WHERE task_id = ?",
-                ("failed", str(e), task_id),
+                ("failed", format_exception(e), task_id),
             )
     finally:
         _remove_log_handler(log_handler)
@@ -628,14 +639,53 @@ def _style_img(color1, color2):
     return f"data:image/svg+xml,{urllib.parse.quote(compact, safe='')}"
 
 
+def _model_icon(color1: str, color2: str, label: str) -> str:
+    """Generate a small gradient SVG icon for model list / avatar."""
+    import urllib.parse
+    svg = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">'
+        f'<defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">'
+        f'<stop offset="0%" stop-color="{color1}"/><stop offset="100%" stop-color="{color2}"/>'
+        f'</linearGradient></defs>'
+        f'<rect width="64" height="64" rx="14" fill="url(#g)"/>'
+        f'<text x="32" y="40" text-anchor="middle" fill="#fff" font-size="15" '
+        f'font-family="system-ui,Arial,sans-serif" font-weight="700">{label}</text>'
+        f'</svg>'
+    )
+    return f"data:image/svg+xml,{urllib.parse.quote(svg, safe='')}"
+
+
+_MODEL_ICONS = {
+    "volcengine": _model_icon("#0066FF", "#FF6B35", "豆"),
+    "tencent": _model_icon("#00B96B", "#0084FF", "混"),
+    "google": _model_icon("#4285F4", "#EA4335", "G"),
+    "openai": _model_icon("#10A37F", "#074763", "AI"),
+    "gpugeek": _model_icon("#6366F1", "#8B5CF6", "DS"),
+}
+
+
+def _with_model_icon(entry: dict) -> dict:
+    item = dict(entry)
+    if not item.get("icon"):
+        item["icon"] = _MODEL_ICONS.get(
+            item.get("provider", ""),
+            _model_icon("#64748B", "#334155", "M"),
+        )
+    return item
+
+
+def _enrich_models_data(data: dict) -> dict:
+    return {scene: [_with_model_icon(m) for m in models] for scene, models in data.items()}
+
+
 # --- Static data for frontend ---
-MODELS_DATA = {
+MODELS_DATA = _enrich_models_data({
     "creative_script": [
+        {"id": "5", "name": "DeepSeek V4 (GPUGeek)", "provider": "gpugeek", "model": "Vendor3/DeepSeek-V4-Flash", "icon": "", "description": "DeepSeek's latest model via GPUGeek proxy with excellent reasoning and creative writing."},
         {"id": "4", "name": "Doubao Pro", "provider": "volcengine", "model": "doubao-seed-2-0-lite-260428", "icon": "", "description": "ByteDance's large language model optimized for Chinese-language creative content."},
         {"id": "1", "name": "Hunyuan (Tencent)", "provider": "tencent", "model": "hunyuan-turbos-latest", "icon": "", "description": "Tencent's powerful large language model with excellent Chinese creative writing and reasoning."},
         {"id": "2", "name": "Gemini 2.5 Pro", "provider": "google", "model": "gemini-2.5-pro", "icon": "", "description": "Google's most capable model for complex reasoning, coding, and creative writing tasks."},
         {"id": "3", "name": "GPT-4o", "provider": "openai", "model": "gpt-4o", "icon": "", "description": "OpenAI's fast multimodal flagship model with strong creative writing capabilities."},
-        {"id": "5", "name": "DeepSeek V4 (GPUGeek)", "provider": "gpugeek", "model": "Vendor3/DeepSeek-V4-Flash", "icon": "", "description": "DeepSeek's latest model via GPUGeek proxy with excellent reasoning and creative writing."},
     ],
     "creative_episode": [],
     "creative_scenes": [
@@ -686,7 +736,7 @@ MODELS_DATA = {
         {"id": "2", "name": "Veo 3 (Google)", "provider": "google", "model": "veo-3", "icon": "", "description": "Google's flagship video model, excelling at complex scenes and natural motion."},
         {"id": "3", "name": "Seedance 2.0 (GPUGeek)", "provider": "gpugeek", "model": "Volcengine/Doubao-Seedance-2.0-fast", "icon": "", "description": "ByteDance's Seedance via GPUGeek proxy with professional video generation quality."},
     ],
-}
+})
 
 STYLES_DATA = [
     {"id": "cinematic", "name": "Cinematic", "classify": "cinematic", "image": _style_img("#1a1a2e", "#16213e")},
@@ -963,6 +1013,7 @@ async def legacy_submit(req: LegacySubmitRequest):
             style=req.style or "Cinematic",
             config_path="configs/script2video.yaml",
             model_id=req.model,
+            aspect_ratio=req.aspect_ratio,
         )
         mode = "script2video"
         with get_db() as conn:
@@ -980,6 +1031,7 @@ async def legacy_submit(req: LegacySubmitRequest):
             model_id=req.model,
             episode_count=episode_count,
             episode_duration=req.episode_duration,
+            aspect_ratio=req.aspect_ratio,
         )
         mode = "idea2video"
         with get_db() as conn:
@@ -1211,11 +1263,11 @@ async def run_scene_image_generation(
             )
     except Exception as e:
         logging.exception(f"Scene image generation failed for task {task_id}")
-        pm.emit(task_id, {"type": "error", "error": str(e)})
+        pm.emit(task_id, {"type": "error", "error": format_exception(e)})
         with get_db() as conn:
             conn.execute(
                 "UPDATE tasks SET status = ?, error = ? WHERE task_id = ?",
-                ("failed", str(e), task_id),
+                ("failed", format_exception(e), task_id),
             )
     finally:
         _remove_log_handler(log_handler)
@@ -1291,11 +1343,11 @@ async def run_storyboard_image_generation(
             )
     except Exception as e:
         logging.exception(f"Storyboard image generation failed for task {task_id}")
-        pm.emit(task_id, {"type": "error", "error": str(e)})
+        pm.emit(task_id, {"type": "error", "error": format_exception(e)})
         with get_db() as conn:
             conn.execute(
                 "UPDATE tasks SET status = ?, error = ? WHERE task_id = ?",
-                ("failed", str(e), task_id),
+                ("failed", format_exception(e), task_id),
             )
     finally:
         _remove_log_handler(log_handler)
@@ -1368,11 +1420,11 @@ async def run_video_generation(
             )
     except Exception as e:
         logging.exception(f"{stage} failed for task {task_id}")
-        pm.emit(task_id, {"type": "error", "error": str(e)})
+        pm.emit(task_id, {"type": "error", "error": format_exception(e)})
         with get_db() as conn:
             conn.execute(
                 "UPDATE tasks SET status = ?, error = ? WHERE task_id = ?",
-                ("failed", str(e), task_id),
+                ("failed", format_exception(e), task_id),
             )
     finally:
         _remove_log_handler(log_handler)
@@ -1432,11 +1484,11 @@ async def run_image_generation_task(
             )
     except Exception as e:
         logging.exception(f"{stage} failed for task {task_id}")
-        pm.emit(task_id, {"type": "error", "error": str(e)})
+        pm.emit(task_id, {"type": "error", "error": format_exception(e)})
         with get_db() as conn:
             conn.execute(
                 "UPDATE tasks SET status = ?, error = ? WHERE task_id = ?",
-                ("failed", str(e), task_id),
+                ("failed", format_exception(e), task_id),
             )
     finally:
         _remove_log_handler(log_handler)
@@ -1757,7 +1809,7 @@ async def login(req: LoginRequest):
             user, _token = auth_service.login_user(conn, req.username, req.password)
         return success_response(user)
     except ValueError as e:
-        return error_response(400, str(e))
+        return error_response(400, format_exception(e))
 
 
 @app.post("/app/user/api/Login/register")
@@ -1769,7 +1821,7 @@ async def register(req: RegisterRequest):
             user, _token = auth_service.register_user(conn, req.username, req.password)
         return success_response(user)
     except ValueError as e:
-        return error_response(400, str(e))
+        return error_response(400, format_exception(e))
 
 
 @app.post("/app/user/api/Login/loginPass")

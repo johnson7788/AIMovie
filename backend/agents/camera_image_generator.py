@@ -112,10 +112,14 @@ class CameraImageGenerator:
         chat_model,
         image_generator,
         video_generator,
+        frame_size: str = "720x1280",
+        aspect_ratio: str = "9:16",
     ):
         self.chat_model = chat_model
         self.image_generator = image_generator
         self.video_generator = video_generator
+        self.frame_size = frame_size
+        self.aspect_ratio = aspect_ratio
 
 
     async def construct_camera_tree(
@@ -164,6 +168,7 @@ class CameraImageGenerator:
         video_output = await self.video_generator.generate_single_video(
             prompt=prompt,
             reference_image_paths=reference_image_paths,
+            aspect_ratio=self.aspect_ratio,
         )
         return video_output
 
@@ -214,6 +219,6 @@ class CameraImageGenerator:
         image_output = await self.image_generator.generate_single_image(
             prompt=prompt,
             reference_image_paths=reference_image_paths,
-            size="1600x900",
+            size=self.frame_size,
         )
         return image_output

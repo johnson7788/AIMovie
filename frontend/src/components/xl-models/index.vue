@@ -6,12 +6,14 @@ const props = withDefaults(defineProps<{
     modelValue?: string | number
     scene: keyof ModelInterface
     noInit?: boolean
+    defaultModelId?: string | number
     scrollProps?: any
     title?: string
 }>(), {
     modelValue: '',
     title: '选择模型',
     noInit: false,
+    defaultModelId: '',
     scrollProps: {
         height: '30vh',
     },
@@ -25,7 +27,10 @@ const MODELS = ref<ModelInterface[keyof ModelInterface]>([]);
 const getModelsList = () => {
     MODELS.value = modelStore.get(props.scene);
     if (!props.noInit && MODELS.value.length) {
-        handleModelsItemClick(MODELS.value[0]);
+        const preferred = props.defaultModelId
+            ? MODELS.value.find((item: any) => String(item.id) === String(props.defaultModelId))
+            : null;
+        handleModelsItemClick(preferred || MODELS.value[0]);
     }
 }
 

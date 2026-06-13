@@ -1,13 +1,49 @@
 import logging
+import math
 import os
 import time
 import aiohttp
 import asyncio
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from tenacity import retry, stop_after_attempt
 from utils.retry import after_func
 from utils.image import image_path_to_b64
+from utils.pipeline_media import SEEDREAM_MIN_PIXELS
 from interfaces.image_output import ImageOutput
+
+
+def _parse_pixel_size(size: str) -> Optional[Tuple[int, int]]:
+    if not size or "x" not in size.lower():
+        return None
+    parts = size.lower().split("x", 1)
+    if len(parts) != 2:
+        return None
+    try:
+        return int(parts[0]), int(parts[1])
+    except ValueError:
+        return None
+
+
+def _ensure_min_pixel_size(size: str, min_pixels: int = SEEDREAM_MIN_PIXELS) -> str:
+    parsed = _parse_pixel_size(size)
+    if parsed is None:
+        return size
+    width, height = parsed
+    if width * height >= min_pixels:
+        return f"{width}x{height}"
+    scale = math.sqrt(min_pixels / (width * height))
+    width = max(2, int(math.ceil(width * scale)))
+    height = max(2, int(math.ceil(height * scale)))
+    if width % 2:
+        width += 1
+    if height % 2:
+        height += 1
+    while width * height < min_pixels:
+        if width <= height:
+            width += 2
+        else:
+            height += 2
+    return f"{width}x{height}"
 
 
 def _map_size(size: Optional[str]) -> str:
@@ -20,7 +56,12 @@ def _map_size(size: Optional[str]) -> str:
         "1600x900": "2K",
         "2048x2048": "4K",
     }
-    return mapping.get(size, size)
+    if size in mapping:
+        return mapping[size]
+    parsed = _parse_pixel_size(size)
+    if parsed is not None:
+        return _ensure_min_pixel_size(size)
+    return size
 
 
 def _extract_output(response_json: Dict[str, Any]) -> str:

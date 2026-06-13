@@ -53,6 +53,7 @@ Main Characters Introduction: Briefly introduce the core characters, including t
 - Logical Consistency: Ensure that event progression and character actions within the story have logical motives and internal consistency, avoiding abrupt or contradictory plots.
 - Show, Don't Tell: Reveal characters' personalities and emotions through their actions, dialogues, and details, rather than stating them flatly. For example, use "He clenched - his fist, nails digging deep into his palm" instead of "He was very angry."
 - Originality & Compliance: Generate original content based on the user's idea, avoiding direct plagiarism of well-known existing works. The generated content must be positive, healthy, and comply with general content safety policies.
+- Short Drama (短剧): When the user requirement mentions short drama, vertical video, or episode duration under 90 seconds, write a tight, dialogue-driven story. Open with a strong hook in the first 3 seconds. Keep one main conflict, use speakable dialogue (not literary prose), and end on a clear emotional beat or mini-cliffhanger.
 """
 
 human_prompt_template_develop_story = \
@@ -98,8 +99,13 @@ You will receive a story within <STORY> and </STORY> tags and a user requirement
 - Scene Division Principles: Each scene must be based on the same time and location. Start a new scene when the time or location changes. If the user specifies the number of scenes, try to match the requirement. Otherwise, divide scenes naturally based on the story, ensuring each scene has independent dramatic conflict or progression.
 - Script Formatting Standards: Use standard script formatting: Scene headings in full caps or bold, character names centered or capitalized, dialogue indented, and action descriptions in parentheses.
 - Coherence and Fluidity: Ensure natural transitions between scenes and overall story flow. Avoid abrupt plot jumps.
-- Visual Enhancement Principles: All descriptions must be "filmable". Use concrete actions instead of abstract emotions (e.g., "He turns away to avoid eye contact" instead of "He feels ashamed"). Decribe rich environmental details include lighting, props, weather, etc., to enhance the atmosphere. Visualize character performances such as express internal states through facial expressions, gestures, and movements (e.g., "She bites her lip, her hands trembling" to imply nervousness).
-- Consistency: Ensure dialogue and actions align with the original story's intent, without deviating from the core plot.
+- Short Drama Script Format: When producing short drama / 短剧, each scene script must be production-ready:
+    - Start with a scene heading (e.g., SCENE 1 - INT. TEAHOUSE - DUSK).
+    - Break the scene into numbered SHOT blocks that match the target duration (roughly one SHOT per 4-5 seconds).
+    - Write dialogue in standard screenplay format with character name on its own line, parenthetical emotion optional, then quoted lines.
+    - Prefer concrete actions and speakable lines over poetic narration.
+    - Include at least 2 dialogue exchanges per 15-second episode unless the user explicitly requests silent scenes.
+    - Do not use camera jargon like "cut to" or "fade to black" inside action lines; describe what the audience sees.
 """
 
 
@@ -174,6 +180,48 @@ class Screenwriter:
         script = response.script
         print(f"✅ Script writing completed in {elapsed:.1f}s ({len(script)} scenes)")
         return script
+
+    async def polish_scene_script(
+        self,
+        scene_script: str,
+        user_requirement: Optional[str] = None,
+    ) -> str:
+        """Second pass: tighten dialogue, pacing, and filmable action for one scene."""
+        system_prompt = """
+[Role]
+You are a vertical short-drama (短剧) script doctor.
+
+[Task]
+Polish ONE scene script for AI storyboard + video generation. Keep the same plot beats and scene count, but improve:
+- Speakable dialogue with clear conflict
+- Concrete visual actions (what actors do on screen)
+- Pacing that fits short episodes (hook early, payoff at the end)
+- Consistent character names and relationships
+
+[Rules]
+- Output language must match the input script language.
+- Keep SCENE / SHOT structure if present; otherwise add SHOT blocks (~5 seconds each).
+- Dialogue format: CHARACTER NAME then quoted line on the next line.
+- No camera directions (cut to, fade, zoom). No literary metaphors.
+- Do not add new scenes or remove major plot points.
+- Make dialogue sound natural for short drama, not novel-like narration.
+"""
+        human_prompt = f"""
+<SCENE_SCRIPT>
+{scene_script}
+</SCENE_SCRIPT>
+
+<USER_REQUIREMENT>
+{user_requirement or ""}
+</USER_REQUIREMENT>
+"""
+        response = await self.chat_model.ainvoke([
+            ("system", system_prompt),
+            ("human", human_prompt),
+        ])
+        polished = (response.content or scene_script).strip()
+        print(f"✨ Polished scene script ({len(polished)} chars)")
+        return polished or scene_script
 
 
 

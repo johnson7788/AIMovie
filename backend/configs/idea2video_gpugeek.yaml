@@ -1,7 +1,7 @@
 # Configuration using GPUGeek (third-party proxy) as the provider.
 # Chat model: Vendor3/DeepSeek-V4-Flash via GPUGeek proxy
 # Image model: Volcengine/Doubao-Seedream-5.0-lite via GPUGeek predictions API
-# Video model: Vira (text2video/image2video/startEnd2video) via GPUGeek predictions API
+# Video model: Volcengine/Doubao-Seedance-2.0-fast (reference task, generate_audio)
 #
 # Set your API key here or export GPUGEEK in the environment.
 
@@ -21,9 +21,13 @@ image_generator:
   max_requests_per_day: 500
 
 video_generator:
-  class_path: tools.VideoGeneratorViraGPUGEEKAPI
+  class_path: tools.VideoGeneratorDoubaoSeedanceGPUGEEKAPI
   init_args:
     api_key:
+    model: Volcengine/Doubao-Seedance-2.0-fast
+    generate_audio: true
+    return_last_frame: true
+    execution_expires_after: 3600
   max_requests_per_minute: 2
   max_requests_per_day: 10
 
