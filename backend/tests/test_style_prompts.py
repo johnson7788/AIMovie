@@ -1,18 +1,32 @@
 import unittest
 
-from utils.style_prompts import expand_style_prompt, is_real_person_rejection
+from utils.style_prompts import (
+    expand_image_style_prompt,
+    expand_video_style_prompt,
+    is_live_action_style,
+    is_real_person_rejection,
+)
 
 
 class TestStylePrompts(unittest.TestCase):
-    def test_expand_storybook_includes_fictional_suffix(self):
-        text = expand_style_prompt("storybook")
-        self.assertIn("Storybook", text)
-        self.assertIn("not a photograph of a real person", text)
+    def test_cinematic_image_is_live_action_not_anime(self):
+        text = expand_image_style_prompt("cinematic")
+        self.assertIn("Live-action", text)
+        self.assertNotIn("illustrated or animated", text.lower())
+        self.assertNotIn("anime", text.lower())
 
-    def test_expand_unknown_style_still_safe(self):
-        text = expand_style_prompt("custom look")
-        self.assertIn("custom look", text)
-        self.assertIn("fictional", text.lower())
+    def test_cinematic_video_style(self):
+        text = expand_video_style_prompt("cinematic")
+        self.assertIn("photorealistic", text.lower())
+        self.assertNotIn("anime", text.lower())
+
+    def test_anime_stays_illustrated(self):
+        text = expand_video_style_prompt("anime")
+        self.assertIn("Anime", text)
+
+    def test_storybook_is_illustrated(self):
+        self.assertFalse(is_live_action_style("storybook"))
+        self.assertIn("Storybook", expand_video_style_prompt("storybook"))
 
     def test_real_person_rejection_detection(self):
         msg = "Video creation failed (HTTP 400): The request failed because the input image may contain real person."

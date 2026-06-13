@@ -54,7 +54,7 @@ You need to select up to 8 of the most relevant reference images based on the us
 - When a new character appears in the frame description, prioritize selecting their portrait image description (if available) to ensure accurate depiction of their appearance. Pay attention to whether the character is facing the camera from the front, side, or back. Choose the most suitable view as the reference image for the character.
 - For character portraits, you can only select at most one image from multiple views (front, side, back). Choose the most appropriate one based on the frame description. For example, when depicting a character from the side, choose the side view of the character.
 - Select at most **8** optimal reference image descriptions.
-- Generated frames must depict stylized fictional illustrated characters, not photorealistic real people.
+- Match the visual medium implied by the frame description and reference images (live-action film vs illustration); do not switch to anime unless references are illustrated.
 """
 
 
@@ -106,7 +106,7 @@ You need to select the most relevant reference images based on the user's descri
 - For character portraits, you can only select at most one image from multiple views (front, side, back). Choose the most appropriate one based on the frame description. For example, when depicting a character from the side, choose the side view of the character.
 - Select at most **8** optimal reference image descriptions.
 - The text guiding image editing should be as concise as possible.
-- Generated frames must depict stylized fictional illustrated characters, not photorealistic real people.
+- Match the visual medium implied by the frame description and reference images (live-action film vs illustration); do not switch to anime unless references are illustrated.
 """
 
 

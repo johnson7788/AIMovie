@@ -21,7 +21,7 @@ from utils.pipeline_media import (
     image_size_for_aspect,
     resolve_aspect_ratio,
 )
-from utils.style_prompts import expand_style_prompt
+from utils.style_prompts import expand_style_prompt, expand_video_style_prompt
 
 async def _noop_progress(_event):
     pass
@@ -143,6 +143,8 @@ class Script2VideoPipeline:
         self._frame_size = image_size_for_aspect(self._aspect_ratio)
         self._concat_size = concat_dimensions_for_aspect(self._aspect_ratio)
         self._style_prompt = expand_style_prompt(style)
+        self._video_style_prompt = expand_video_style_prompt(style)
+        self._style = style
         self.camera_image_generator.frame_size = self._frame_size
         self.camera_image_generator.aspect_ratio = self._aspect_ratio
         print(
@@ -456,11 +458,13 @@ class Script2VideoPipeline:
                 shot_description.audio_desc,
                 duration_seconds=shot_duration,
             )
+            video_prompt = f"{video_prompt}\n\nVisual style: {self._video_style_prompt}"
             video_output = await self.video_generator.generate_single_video(
                 prompt=video_prompt,
                 reference_image_paths=frame_paths,
                 duration=shot_duration,
                 aspect_ratio=self._aspect_ratio,
+                style=self._style,
             )
             video_output.save(video_path)
             print(f"☑️ Generated video for shot {shot_description.idx}, saved to {video_path}.")

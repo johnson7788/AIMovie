@@ -93,7 +93,7 @@ def _sanitize_artifact(event: dict) -> Optional[dict]:
 
     if file_type == "image":
         if stage == "character_portraits":
-            return None
+            return event
         if stage == "frames":
             shot_idx = event.get("shot_idx")
             frame_type = event.get("frame_type") or "frame"

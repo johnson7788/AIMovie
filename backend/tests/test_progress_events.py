@@ -4,14 +4,16 @@ from utils.progress_events import sanitize_progress_event, should_forward_log
 
 
 class TestProgressEvents(unittest.TestCase):
-    def test_drop_character_portrait_artifact(self):
+    def test_keep_character_portrait_artifact(self):
         event = {
             "type": "artifact",
             "stage": "character_portraits",
             "file_type": "image",
-            "file_path": "characters/0/front.png",
+            "file_path": "character_portraits/0_男人/front.png",
+            "character_name": "男人",
+            "view": "front",
         }
-        self.assertIsNone(sanitize_progress_event(event))
+        self.assertEqual(sanitize_progress_event(event), event)
 
     def test_convert_frame_artifact_to_progress(self):
         event = {

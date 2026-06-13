@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Literal, Optional
 from PIL import Image
 
 from interfaces.video_output import VideoOutput
-from utils.style_prompts import is_real_person_rejection
+from utils.style_prompts import expand_video_style_prompt, is_real_person_rejection
 
 
 def _extract_output(response_json: Dict[str, Any]) -> str:
@@ -269,8 +269,11 @@ class VideoGeneratorDoubaoSeedanceGPUGEEKAPI:
         resolution: Literal["480p", "720p", "1080p"] = "720p",
         aspect_ratio: str = "16:9",
         duration: Literal[4, 5, 10] = 5,
+        *,
+        style: str = "",
         **kwargs,
     ) -> VideoOutput:
+        style = style or kwargs.get("style", "")
         last_error: Optional[Exception] = None
 
         try:
@@ -287,16 +290,13 @@ class VideoGeneratorDoubaoSeedanceGPUGEEKAPI:
             if is_real_person_rejection(str(exc)) and reference_image_paths:
                 logging.warning(
                     "Seedance rejected reference image as a real person. "
-                    "Retrying text-only video generation with stylized prompt..."
+                    "Retrying text-only video generation while preserving selected style..."
                 )
-                stylized_prompt = (
-                    f"{prompt}\n"
-                    "Visual style: stylized fictional illustrated animation, "
-                    "clearly not a photograph of a real person."
-                )
+                video_style = expand_video_style_prompt(style)
+                fallback_prompt = f"{prompt}\n\nVisual style: {video_style}"
                 try:
                     return await self._generate_once(
-                        stylized_prompt,
+                        fallback_prompt,
                         [],
                         resolution,
                         aspect_ratio,

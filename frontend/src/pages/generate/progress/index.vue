@@ -90,7 +90,9 @@
                             <template v-else-if="item.file_type === 'image'">
                                 <div class="artifact-header">
                                     <el-tag size="small" type="success">{{ item.stage }}</el-tag>
-                                    <span class="artifact-name">{{ item.character_name || item.frame_type || item.file_path }}</span>
+                                    <span class="artifact-name">
+                                        {{ formatPortraitLabel(item) }}
+                                    </span>
                                 </div>
                                 <el-image
                                     :src="buildFileUrl(item.url || item.file_path)"
@@ -276,6 +278,7 @@ const appendLog = (level: string, message: string) => {
 
 const shouldDisplayArtifact = (event: SSEEvent) => {
     if (event.file_type === 'text' || event.file_type === 'json') return true;
+    if (event.file_type === 'image' && event.stage === 'character_portraits') return true;
     if (event.file_type === 'video') {
         return isFinalVideoArtifact(event) || Boolean(event.stage?.startsWith('scene_'));
     }
@@ -320,7 +323,24 @@ const getArtifactKey = (item: SSEEvent, idx: number) => {
     if (isFinalVideoArtifact(item)) {
         return `final-video-${videoReloadToken.value}`;
     }
+    if (item.stage === 'character_portraits') {
+        return `${item.file_path || item.character_name}-${item.view || idx}`;
+    }
     return `${item.file_path || item.stage || 'artifact'}-${idx}`;
+};
+
+const formatPortraitLabel = (item: SSEEvent) => {
+    if (item.stage === 'character_portraits') {
+        const name = item.character_name || '角色';
+        const viewLabels: Record<string, string> = {
+            front: '正面',
+            side: '侧面',
+            back: '背面',
+        };
+        const view = item.view ? viewLabels[item.view] || item.view : '';
+        return view ? `${name} · ${view}` : name;
+    }
+    return item.character_name || item.frame_type || item.file_path || '产物';
 };
 
 const finalizeComplete = async (result?: string | null) => {
@@ -466,7 +486,12 @@ const handleEvent = (event: SSEEvent) => {
                 upsertFinalVideoArtifact(event.file_path || 'final_video.mp4');
             } else if (shouldDisplayArtifact(event)) {
                 upsertArtifact(event);
-                if (event.file_type === 'video') {
+                if (event.file_type === 'image' && event.stage === 'character_portraits') {
+                    const name = event.character_name || '角色';
+                    const view = event.view ? ` (${event.view})` : '';
+                    appendLog('INFO', `角色画像已生成: ${name}${view}`);
+                    scrollArtifactsToBottom();
+                } else if (event.file_type === 'video') {
                     scrollArtifactsToBottom();
                 }
             }
