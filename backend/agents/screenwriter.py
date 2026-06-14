@@ -223,6 +223,8 @@ Polish ONE scene script for AI storyboard + video generation. Keep the same plot
 - Do not change the scene location, room layout, furniture, props, lighting, or time of day unless the input script explicitly says the story moves.
 - For a single scene, keep all SHOT blocks in the same physical place. Changes should be actor motion, expression, or object interaction, not a new setting.
 - When a character reappears, repeat the same concise visual identity markers (name, clothing, hairstyle, position) so downstream image prompts preserve the same person.
+- For each SHOT ending, avoid staging the final beat as a large frontal human face. Prefer ending on a side profile, back view, over-the-shoulder view, hands/object interaction, or wider environmental composition while keeping the story beat clear.
+- If a character must react at the end of a SHOT, describe the reaction through body posture, side-facing glance, hand movement, object focus, or a medium/wide shot instead of a direct face-to-camera close-up.
 - Never write contradictory labels like "16:9竖屏" or "9:16横屏".
 - Do not include meta commentary about your role (e.g. "剧本医生已就位"); output the polished script only.
 """

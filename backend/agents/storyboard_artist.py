@@ -52,6 +52,7 @@ The user will provide the following input.
 - Never replace a character with a different-looking person across adjacent shots. Preserve each character's face, age, hairstyle, body type, clothing, and side of frame unless the action explicitly moves them.
 - Never jump to a different room, street, time of day, or background inside one scene unless the script explicitly states a location/time change.
 - For short drama / <=3 shots, each new shot should look like the same continuous take from the previous shot, with only the described actor/object motion changing.
+- Avoid ending any shot on a large frontal human face or face-to-camera close-up. Prefer a side profile, back view, over-the-shoulder view, hands/object detail, or medium/wide composition for the final visual state.
 - Each shot requires an independent description without reference to each other.
 - When the shot focuses on a character, describe which specific body part the focus is on.
 - When describing a character, it is necessary to indicate the direction they are facing.
@@ -114,6 +115,8 @@ Additionally, you will receive a sequence of potential characters, each containi
 - Use as few camera positions as possible.
 - Preserve character identity, wardrobe, scene layout, lighting, and props between first frame and last frame. Do not invent a different actor or location.
 - The last frame must be a plausible continuation from the first frame, not a new scene or a replaced character.
+- The last frame should avoid a large frontal human face. If a character is visible at the end, prefer side profile, back view, over-the-shoulder view, hands/object interaction, or a medium/wide shot that still preserves identity through clothing, posture, and context.
+- Do not make the last frame look like a portrait, selfie, passport photo, news photo, celebrity shot, or direct face-to-camera close-up.
 """
 
 
@@ -146,7 +149,7 @@ class VisDescDecompositionResponse(BaseModel):
         examples=[[0], [1], [0, 1], []]
     )
     lf_desc: str = Field(
-        description="A detailed description of the last frame of the shot, capturing the concluding visual elements and composition.",
+        description="A detailed description of the last frame of the shot, capturing the concluding visual elements and composition. Avoid a large frontal face; prefer side profile, back view, over-the-shoulder, hands/object detail, or medium/wide composition when characters are visible.",
     )
     lf_vis_char_idxs: List[int] = Field(
         description="A list of indices of characters that are visible in the last frame of the shot, corresponding to the character list provided in the input.",
