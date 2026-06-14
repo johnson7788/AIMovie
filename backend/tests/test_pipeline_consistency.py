@@ -104,6 +104,27 @@ class TestPipelineConsistency(unittest.TestCase):
                 [first_frame],
             )
 
+    def test_soft_handoff_regenerates_old_forced_first_frame(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            shot_dir = os.path.join(tmpdir, "shots", "1")
+            prev_dir = os.path.join(tmpdir, "shots", "0")
+            os.makedirs(shot_dir, exist_ok=True)
+            os.makedirs(prev_dir, exist_ok=True)
+            first_frame = os.path.join(shot_dir, "first_frame.png")
+            video_path = os.path.join(shot_dir, "video.mp4")
+            prev_tail = os.path.join(prev_dir, "video_last_frame.png")
+            _write_image(first_frame, (10, 20, 30))
+            _write_image(prev_tail, (10, 20, 30))
+            with open(video_path, "wb") as handle:
+                handle.write(b"cached video")
+
+            pipeline = Script2VideoPipeline.__new__(Script2VideoPipeline)
+            pipeline.working_dir = tmpdir
+            pipeline._prepare_soft_handoff_first_frame(1, prev_tail)
+
+            self.assertFalse(os.path.exists(first_frame))
+            self.assertFalse(os.path.exists(video_path))
+
 
 if __name__ == "__main__":
     unittest.main()

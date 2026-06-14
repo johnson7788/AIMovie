@@ -6,7 +6,7 @@ import time
 import aiohttp
 import asyncio
 from io import BytesIO
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Awaitable, Callable, Dict, List, Literal, Optional
 
 from PIL import Image
 
@@ -321,6 +321,9 @@ class VideoGeneratorDoubaoSeedanceGPUGEEKAPI:
         **kwargs,
     ) -> VideoOutput:
         style = style or kwargs.get("style", "")
+        moderation_rewrite_callback: Optional[
+            Callable[[List[str], str], Awaitable[List[str]]]
+        ] = kwargs.get("moderation_rewrite_callback")
         last_error: Optional[Exception] = None
         reference_rejected_as_real_person = False
         text_only_prompt: Optional[str] = None
@@ -356,6 +359,35 @@ class VideoGeneratorDoubaoSeedanceGPUGEEKAPI:
                         last_error = first_ref_exc
                         if not is_real_person_rejection(str(first_ref_exc)):
                             raise
+
+                if moderation_rewrite_callback:
+                    try:
+                        rewritten_refs = await moderation_rewrite_callback(
+                            reference_image_paths[:1],
+                            str(last_error),
+                        )
+                        if rewritten_refs:
+                            logging.warning(
+                                "Retrying Seedance with rewritten moderation-safe "
+                                "reference image(s)..."
+                            )
+                            return await self._generate_once(
+                                prompt,
+                                rewritten_refs[:1],
+                                resolution,
+                                aspect_ratio,
+                                duration,
+                                generate_audio=self.generate_audio,
+                            )
+                    except ValueError as rewrite_exc:
+                        last_error = rewrite_exc
+                        if not is_real_person_rejection(str(rewrite_exc)):
+                            raise
+                    except Exception as rewrite_exc:
+                        logging.warning(
+                            "Reference moderation rewrite failed, falling back to text-only: %s",
+                            rewrite_exc,
+                        )
 
                 logging.warning(
                     "Seedance rejected reference image as a real person. "

@@ -39,6 +39,39 @@ class TestSeedanceGpugeekErrors(unittest.TestCase):
 
 
 class TestSeedanceGpugeekFallback(unittest.IsolatedAsyncioTestCase):
+    async def test_real_person_rejection_retries_rewritten_ref_before_text_only(self):
+        gen = VideoGeneratorDoubaoSeedanceGPUGEEKAPI(generate_audio=True)
+        calls = []
+
+        async def fake_generate_once(prompt, refs, resolution, aspect_ratio, duration, *, generate_audio=None):
+            calls.append((list(refs), generate_audio))
+            if len(calls) == 1:
+                raise ValueError(
+                    "Video creation failed (HTTP 400): "
+                    "The request failed because the input image may contain real person."
+                )
+            return "ok"
+
+        async def fake_rewrite(refs, error):
+            self.assertEqual(refs, ["first.png"])
+            self.assertIn("real person", error)
+            return ["safe.png"]
+
+        with patch.object(gen, "_generate_once", side_effect=fake_generate_once):
+            result = await gen.generate_single_video(
+                prompt="prompt",
+                reference_image_paths=["first.png"],
+                resolution="720p",
+                aspect_ratio="16:9",
+                duration=5,
+                style="cinematic",
+                moderation_rewrite_callback=fake_rewrite,
+            )
+
+        self.assertEqual(result, "ok")
+        self.assertEqual(calls[0][0], ["first.png"])
+        self.assertEqual(calls[1][0], ["safe.png"])
+
     async def test_multi_image_rejection_retries_first_ref_before_text_only(self):
         gen = VideoGeneratorDoubaoSeedanceGPUGEEKAPI(generate_audio=True)
         calls = []

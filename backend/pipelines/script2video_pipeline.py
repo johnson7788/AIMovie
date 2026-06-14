@@ -87,6 +87,16 @@ def _images_are_nearly_identical(path_a: str, path_b: str, threshold: float = 1.
     return mse is not None and mse <= threshold
 
 
+def _safe_last_frame_description(frame_desc: str) -> str:
+    return (
+        f"{frame_desc}\n"
+        "For the final frame, avoid a large frontal human face. Prefer a side profile, "
+        "back view, over-the-shoulder angle, hands/object detail, or wider environmental "
+        "composition while preserving the same character, wardrobe, location, lighting, "
+        "and story continuity."
+    )
+
+
 class Script2VideoPipeline:
 
     # Use turnaround sheet (single image with 3 views) for better character consistency.
@@ -535,22 +545,20 @@ class Script2VideoPipeline:
                 )
 
             if prev_end_pair:
-                self._force_first_frame_from_handoff(shot_idx, prev_end_pair[0])
-                self.frame_events[shot_idx]["first_frame"].set()
-            else:
-                await self.generate_frame_for_single_shot(
-                    shot_idx=shot_idx,
-                    frame_type="first_frame",
-                    first_shot_ff_path_and_text_pair=(
-                        first_shot_ff_path,
-                        shots_by_idx[first_shot_idx].ff_desc,
-                    ),
-                    frame_desc=shot_description.ff_desc,
-                    visible_characters=[characters[idx] for idx in shot_description.ff_vis_char_idxs],
-                    character_portraits_registry=character_portraits_registry,
-                    prev_shot_end_reference=prev_end_pair,
-                )
-                self.frame_events[shot_idx]["first_frame"].set()
+                self._prepare_soft_handoff_first_frame(shot_idx, prev_end_pair[0])
+            await self.generate_frame_for_single_shot(
+                shot_idx=shot_idx,
+                frame_type="first_frame",
+                first_shot_ff_path_and_text_pair=(
+                    first_shot_ff_path,
+                    shots_by_idx[first_shot_idx].ff_desc,
+                ),
+                frame_desc=shot_description.ff_desc,
+                visible_characters=[characters[idx] for idx in shot_description.ff_vis_char_idxs],
+                character_portraits_registry=character_portraits_registry,
+                prev_shot_end_reference=prev_end_pair,
+            )
+            self.frame_events[shot_idx]["first_frame"].set()
 
             if shot_description.variation_type in ["medium", "large"]:
                 await self.generate_frame_for_single_shot(
@@ -584,6 +592,29 @@ class Script2VideoPipeline:
         if cb:
             await cb(event)
 
+    def _prepare_soft_handoff_first_frame(self, shot_idx: int, handoff_path: str) -> None:
+        """Regenerate previously forced handoffs through the image model."""
+        shot_dir = os.path.join(self.working_dir, "shots", f"{shot_idx}")
+        first_frame_path = os.path.join(shot_dir, "first_frame.png")
+        selector_output = os.path.join(shot_dir, "first_frame_selector_output.json")
+        if not (
+            os.path.exists(first_frame_path)
+            and os.path.exists(handoff_path)
+            and _images_are_nearly_identical(first_frame_path, handoff_path)
+            and not os.path.exists(selector_output)
+        ):
+            return
+
+        os.remove(first_frame_path)
+        for stale_name in ("video.mp4", "video_last_frame.png", "video_safe_reference.png"):
+            stale_path = os.path.join(shot_dir, stale_name)
+            if os.path.exists(stale_path):
+                os.remove(stale_path)
+        logging.info(
+            "Removed old forced shot %s first_frame so image model can regenerate a soft handoff.",
+            shot_idx,
+        )
+
     def _force_first_frame_from_handoff(self, shot_idx: int, handoff_path: str) -> None:
         """Make shot N start exactly where shot N-1 video ended."""
         shot_dir = os.path.join(self.working_dir, "shots", f"{shot_idx}")
@@ -609,6 +640,48 @@ class Script2VideoPipeline:
             )
         else:
             logging.info("Shot %s first_frame already matches previous video tail.", shot_idx)
+
+    async def _rewrite_rejected_video_reference(
+        self,
+        shot_description: ShotDescription,
+        rejected_paths: List[str],
+        error: str,
+    ) -> List[str]:
+        if not rejected_paths:
+            return []
+
+        shot_dir = os.path.join(self.working_dir, "shots", f"{shot_description.idx}")
+        os.makedirs(shot_dir, exist_ok=True)
+        source_path = rejected_paths[0]
+        safe_path = os.path.join(shot_dir, "video_safe_reference.png")
+        prompt = (
+            "Create a moderation-safe AI video first-frame reference based on Image 0. "
+            "Preserve the same fictional character identity, wardrobe, location, props, "
+            "lighting, camera continuity, and action setup, but reduce real-person risk: "
+            "avoid a large frontal face, celebrity likeness, passport/photo/headshot look, "
+            "selfie, or news-photo realism. Prefer a side profile, back view, "
+            "over-the-shoulder view, hands/object detail, or slightly wider film still. "
+            "The result must be clearly a fictional AI-generated movie frame and still "
+            "usable as the next clip's first frame."
+        )
+        logging.warning(
+            "Rewriting rejected video reference for shot %s with image model: %s; error=%s",
+            shot_description.idx,
+            source_path,
+            error,
+        )
+        safe_image = await self.image_generator.generate_single_image(
+            prompt=prompt,
+            reference_image_paths=[source_path],
+            size=self._frame_size,
+        )
+        safe_image.save(safe_path)
+        logging.info(
+            "Saved moderation-safe video reference for shot %s: %s",
+            shot_description.idx,
+            safe_path,
+        )
+        return [safe_path]
 
     async def generate_videos_in_order(
         self,
@@ -825,6 +898,11 @@ class Script2VideoPipeline:
             duration=shot_duration,
             aspect_ratio=self._aspect_ratio,
             style=self._style,
+            moderation_rewrite_callback=lambda rejected_paths, error: self._rewrite_rejected_video_reference(
+                shot_description,
+                rejected_paths,
+                error,
+            ),
         )
         video_output.save(video_path)
         api_last_frame_url = getattr(video_output, "last_frame_url", None)
@@ -853,6 +931,9 @@ class Script2VideoPipeline:
         character_portraits_registry: Dict[str, Dict[str, Dict[str, str]]],
         prev_shot_end_reference: Optional[Tuple[str, str]] = None,
     ) -> ImageOutput:
+
+        if frame_type == "last_frame":
+            frame_desc = _safe_last_frame_description(frame_desc)
 
         frame_image_path = os.path.join(self.working_dir, "shots", f"{shot_idx}", f"{frame_type}.png")
 
