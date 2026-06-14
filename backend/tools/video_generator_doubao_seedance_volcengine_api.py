@@ -54,11 +54,13 @@ class VideoGeneratorDoubaoSeedanceVolcengineAPI:
             await self.rate_limiter.acquire()
 
         url = "https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks"
+        supported_ratios = {"16:9", "9:16", "1:1", "4:3", "3:4", "3:2", "2:3"}
+        ratio_arg = f" --ratio {aspect_ratio}" if aspect_ratio in supported_ratios else ""
 
         content = [
             {
                 "type": "text",
-                "text": prompt + f"  --resolution {resolution}  --duration {duration} --camerafixed false --watermark false"
+                "text": prompt + f"  --resolution {resolution} --duration {duration}{ratio_arg} --camerafixed false --watermark false"
             }
         ]
         if len(reference_image_paths) >= 1:

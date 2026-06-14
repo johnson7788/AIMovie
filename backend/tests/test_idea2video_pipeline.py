@@ -382,5 +382,14 @@ class TestProgressManager(unittest.TestCase):
         self.assertIsInstance(events[0]["timestamp"], float)
 
 
+class TestBuildEffectiveUserRequirement(unittest.TestCase):
+    def test_includes_original_content_guardrail(self):
+        from pipelines.idea2video_pipeline import build_effective_user_requirement
+
+        result = build_effective_user_requirement("做一个短剧", episode_count=1, episode_duration=15)
+        self.assertIn("原创虚构角色与场景", result)
+        self.assertIn("避免模仿知名影视或宗教地标", result)
+
+
 if __name__ == "__main__":
     unittest.main()

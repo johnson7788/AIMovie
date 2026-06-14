@@ -49,6 +49,9 @@ The user will provide the following input.
 - Assign at most one dialogue line per character per shot. Each line of dialogue should correspond to a shot.
 - Adjacent shots should maintain visual continuity at the cut point: keep the same location, lighting, wardrobe, and character positions unless the script explicitly changes them.
 - Prefer a single camera position (cam_idx=0) for the entire scene when the user asks for short drama or <=3 shots. Only add a second camera if the story truly requires a new angle.
+- Never replace a character with a different-looking person across adjacent shots. Preserve each character's face, age, hairstyle, body type, clothing, and side of frame unless the action explicitly moves them.
+- Never jump to a different room, street, time of day, or background inside one scene unless the script explicitly states a location/time change.
+- For short drama / <=3 shots, each new shot should look like the same continuous take from the previous shot, with only the described actor/object motion changing.
 - Each shot requires an independent description without reference to each other.
 - When the shot focuses on a character, describe which specific body part the focus is on.
 - When describing a character, it is necessary to indicate the direction they are facing.
@@ -109,6 +112,8 @@ Additionally, you will receive a sequence of potential characters, each containi
 - When describing a character, it is necessary to indicate the direction they are facing.
 - The first shot must establish the overall scene environment, using the widest possible shot.
 - Use as few camera positions as possible.
+- Preserve character identity, wardrobe, scene layout, lighting, and props between first frame and last frame. Do not invent a different actor or location.
+- The last frame must be a plausible continuation from the first frame, not a new scene or a replaced character.
 """
 
 

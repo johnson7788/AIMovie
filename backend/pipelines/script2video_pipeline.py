@@ -23,12 +23,16 @@ from utils.pipeline_media import (
 )
 from utils.pipeline_consistency import (
     build_crossfade_schedule,
+    prev_shot_end_reference_text,
+    resolve_shot_end_reference,
     scene_anchor_prompt,
     scene_anchor_reference_text,
+    should_use_serial_keyframe_pipeline,
     video_last_frame_path,
 )
 from utils.style_prompts import expand_style_prompt, expand_video_style_prompt
 from utils.video import extract_last_frame_from_video
+from utils.video import ensure_valid_cached_video
 from agents.best_image_selector import BestImageSelector
 
 async def _noop_progress(_event):
@@ -61,6 +65,26 @@ def _shot_duration_from_user_requirement(user_requirement: str, shot_count: int)
         return 5
     per_shot = total / shot_count
     return min(_SEEDANCE_SHOT_DURATIONS, key=lambda d: abs(d - per_shot))
+
+
+def _image_mse(path_a: str, path_b: str, size: Tuple[int, int] = (64, 64)) -> Optional[float]:
+    try:
+        image_a = Image.open(path_a).convert("RGB").resize(size)
+        image_b = Image.open(path_b).convert("RGB").resize(size)
+        pixels_a = list(image_a.getdata())
+        pixels_b = list(image_b.getdata())
+        return sum(
+            sum((left - right) ** 2 for left, right in zip(pixel_a, pixel_b)) / 3
+            for pixel_a, pixel_b in zip(pixels_a, pixels_b)
+        ) / len(pixels_a)
+    except Exception as exc:
+        logging.debug("Could not compare continuity images %s and %s: %s", path_a, path_b, exc)
+        return None
+
+
+def _images_are_nearly_identical(path_a: str, path_b: str, threshold: float = 1.0) -> bool:
+    mse = _image_mse(path_a, path_b)
+    return mse is not None and mse <= threshold
 
 
 class Script2VideoPipeline:
@@ -247,28 +271,42 @@ class Script2VideoPipeline:
 
         priority_shot_idxs = [camera.parent_cam_idx for camera in camera_tree if camera.parent_cam_idx is not None]
         total_shots = len(shot_descriptions)
+        use_serial_keyframe = should_use_serial_keyframe_pipeline(camera_tree, user_requirement)
         print(f"📋 Processing {total_shots} shots across {len(camera_tree)} camera(s)...")
-        await cb({"type": "stage_start", "stage": "frames", "message": f"Generating frames for {total_shots} shots across {len(camera_tree)} camera(s)..."})
+        mode_label = "serial keyframe" if use_serial_keyframe else "parallel frames + serial videos"
+        await cb({
+            "type": "stage_start",
+            "stage": "frames",
+            "message": f"Generating frames/videos for {total_shots} shots ({mode_label})...",
+        })
         t0 = time.time()
-        tasks = [
-            self.generate_frames_for_single_camera(
-                camera=camera,
+        if use_serial_keyframe:
+            await self.generate_shots_serial_keyframe(
                 shot_descriptions=shot_descriptions,
                 characters=characters,
                 character_portraits_registry=character_portraits_registry,
-                priority_shot_idxs=priority_shot_idxs,
+                camera_tree=camera_tree,
             )
-            for camera in camera_tree
-        ]
-        await asyncio.gather(*tasks)
-        await cb({"type": "stage_start", "stage": "videos", "message": f"Generating videos for {total_shots} shots sequentially..."})
-        t_video = time.time()
-        await self.generate_videos_in_order(shot_descriptions=shot_descriptions)
-        await cb({"type": "stage_end", "stage": "videos", "duration_ms": int((time.time() - t_video) * 1000)})
+        else:
+            tasks = [
+                self.generate_frames_for_single_camera(
+                    camera=camera,
+                    shot_descriptions=shot_descriptions,
+                    characters=characters,
+                    character_portraits_registry=character_portraits_registry,
+                    priority_shot_idxs=priority_shot_idxs,
+                )
+                for camera in camera_tree
+            ]
+            await asyncio.gather(*tasks)
+            await cb({"type": "stage_start", "stage": "videos", "message": f"Generating videos for {total_shots} shots sequentially..."})
+            t_video = time.time()
+            await self.generate_videos_in_order(shot_descriptions=shot_descriptions)
+            await cb({"type": "stage_end", "stage": "videos", "duration_ms": int((time.time() - t_video) * 1000)})
         await cb({"type": "stage_end", "stage": "frames", "duration_ms": int((time.time() - t0) * 1000)})
 
         final_video_path = os.path.join(self.working_dir, "final_video.mp4")
-        if os.path.exists(final_video_path):
+        if ensure_valid_cached_video(final_video_path, "scene final video"):
             print(f"🚀 Skipped concatenating videos, already exists.")
         else:
             await cb({"type": "stage_start", "stage": "concatenate", "message": "Concatenating shot videos..."})
@@ -379,29 +417,198 @@ class Script2VideoPipeline:
         first_frame_path = os.path.join(
             self.working_dir, "shots", f"{shot_description.idx}", "first_frame.png"
         )
-        paths: List[str] = []
-
-        if shot_description.variation_type in ["medium", "large"]:
-            last_frame_path = os.path.join(
-                self.working_dir, "shots", f"{shot_description.idx}", "last_frame.png"
-            )
-            return [first_frame_path, last_frame_path][:2]
+        scene_anchor = (
+            self._scene_anchor_path
+            if self._scene_anchor_path and os.path.exists(self._scene_anchor_path)
+            else None
+        )
+        if (
+            shot_description.idx > 0
+            and prev_shot_last_frame_path
+            and os.path.exists(prev_shot_last_frame_path)
+            and os.path.exists(first_frame_path)
+        ):
+            mse = _image_mse(prev_shot_last_frame_path, first_frame_path)
+            if mse is not None:
+                log = logging.warning if mse > 1500 else logging.info
+                log(
+                    "Continuity check shot %s: prev video tail vs current first_frame MSE=%.1f",
+                    shot_description.idx,
+                    mse,
+                )
 
         if (
             shot_description.idx > 0
             and prev_shot_last_frame_path
             and os.path.exists(prev_shot_last_frame_path)
         ):
-            return [first_frame_path, prev_shot_last_frame_path][:2]
+            # In serial handoff mode the current first_frame is copied from the previous
+            # video's true tail. Prefer a single first-frame reference for Seedance:
+            # independently generated last-frame targets can make the model morph into
+            # a different person or scene.
+            if os.path.exists(first_frame_path) and _images_are_nearly_identical(
+                first_frame_path,
+                prev_shot_last_frame_path,
+            ):
+                refs = [first_frame_path]
+                self._log_video_reference_paths(shot_description, refs)
+                return refs
+            refs = [prev_shot_last_frame_path, first_frame_path][:2]
+            self._log_video_reference_paths(shot_description, refs)
+            return refs
 
-        if (
-            shot_description.idx == 0
-            and self._scene_anchor_path
-            and os.path.exists(self._scene_anchor_path)
-        ):
-            return [self._scene_anchor_path, first_frame_path][:2]
+        if shot_description.variation_type in ["medium", "large"]:
+            last_frame_path = os.path.join(
+                self.working_dir, "shots", f"{shot_description.idx}", "last_frame.png"
+            )
+            if os.path.exists(last_frame_path):
+                refs = [first_frame_path, last_frame_path][:2]
+                self._log_video_reference_paths(shot_description, refs)
+                return refs
 
-        return [first_frame_path]
+        if scene_anchor:
+            refs = [scene_anchor, first_frame_path][:2]
+            self._log_video_reference_paths(shot_description, refs)
+            return refs
+
+        refs = [first_frame_path]
+        self._log_video_reference_paths(shot_description, refs)
+        return refs
+
+    def _log_video_reference_paths(
+        self,
+        shot_description: ShotDescription,
+        frame_paths: List[str],
+    ) -> None:
+        logging.info(
+            "Shot %s video references (%s): %s",
+            shot_description.idx,
+            shot_description.variation_type,
+            [os.path.relpath(path, self.working_dir) for path in frame_paths],
+        )
+
+    def _resolve_shot_end_reference(
+        self,
+        shot_idx: int,
+        video_path: str,
+        api_last_frame_url: Optional[str] = None,
+    ) -> Optional[str]:
+        return resolve_shot_end_reference(
+            self.working_dir,
+            shot_idx,
+            video_path,
+            extract_last_frame_from_video,
+            api_last_frame_url=api_last_frame_url,
+        )
+
+    async def generate_shots_serial_keyframe(
+        self,
+        shot_descriptions: List[ShotDescription],
+        characters: List[CharacterInScene],
+        character_portraits_registry: Dict[str, Dict[str, Dict[str, str]]],
+        camera_tree: List[Camera],
+    ) -> None:
+        """Generate each shot in order: first_frame → optional last_frame → video → handoff."""
+        prev_handoff_path: Optional[str] = None
+        ordered_shots = sorted(shot_descriptions, key=lambda item: item.idx)
+        if not ordered_shots:
+            return
+        shots_by_idx = {shot.idx: shot for shot in shot_descriptions}
+        first_shot_idx = ordered_shots[0].idx
+        first_shot_ff_path = os.path.join(self.working_dir, "shots", f"{first_shot_idx}", "first_frame.png")
+        prev_shot_idx: Optional[int] = None
+
+        await self._emit_progress({
+            "type": "stage_start",
+            "stage": "videos",
+            "message": f"Generating {len(ordered_shots)} shots in serial keyframe order...",
+        })
+        t_video = time.time()
+
+        for shot_description in ordered_shots:
+            shot_idx = shot_description.idx
+            prev_end_pair: Optional[Tuple[str, str]] = None
+            if prev_handoff_path and os.path.exists(prev_handoff_path) and shot_idx > 0:
+                prev_end_pair = (
+                    prev_handoff_path,
+                    prev_shot_end_reference_text(prev_shot_idx if prev_shot_idx is not None else shot_idx - 1),
+                )
+
+            if prev_end_pair:
+                self._force_first_frame_from_handoff(shot_idx, prev_end_pair[0])
+                self.frame_events[shot_idx]["first_frame"].set()
+            else:
+                await self.generate_frame_for_single_shot(
+                    shot_idx=shot_idx,
+                    frame_type="first_frame",
+                    first_shot_ff_path_and_text_pair=(
+                        first_shot_ff_path,
+                        shots_by_idx[first_shot_idx].ff_desc,
+                    ),
+                    frame_desc=shot_description.ff_desc,
+                    visible_characters=[characters[idx] for idx in shot_description.ff_vis_char_idxs],
+                    character_portraits_registry=character_portraits_registry,
+                    prev_shot_end_reference=prev_end_pair,
+                )
+                self.frame_events[shot_idx]["first_frame"].set()
+
+            if shot_description.variation_type in ["medium", "large"]:
+                await self.generate_frame_for_single_shot(
+                    shot_idx=shot_idx,
+                    frame_type="last_frame",
+                    first_shot_ff_path_and_text_pair=(
+                        first_shot_ff_path,
+                        shots_by_idx[first_shot_idx].ff_desc,
+                    ),
+                    frame_desc=shot_description.lf_desc,
+                    visible_characters=[characters[idx] for idx in shot_description.lf_vis_char_idxs],
+                    character_portraits_registry=character_portraits_registry,
+                    prev_shot_end_reference=prev_end_pair,
+                )
+                self.frame_events[shot_idx]["last_frame"].set()
+
+            prev_handoff_path = await self.generate_video_for_single_shot(
+                shot_description=shot_description,
+                prev_shot_last_frame_path=prev_handoff_path,
+            )
+            prev_shot_idx = shot_idx
+
+        await self._emit_progress({
+            "type": "stage_end",
+            "stage": "videos",
+            "duration_ms": int((time.time() - t_video) * 1000),
+        })
+
+    async def _emit_progress(self, event: dict) -> None:
+        cb = getattr(self, "_progress_callback", None)
+        if cb:
+            await cb(event)
+
+    def _force_first_frame_from_handoff(self, shot_idx: int, handoff_path: str) -> None:
+        """Make shot N start exactly where shot N-1 video ended."""
+        shot_dir = os.path.join(self.working_dir, "shots", f"{shot_idx}")
+        os.makedirs(shot_dir, exist_ok=True)
+        first_frame_path = os.path.join(shot_dir, "first_frame.png")
+        changed = not (
+            os.path.exists(first_frame_path)
+            and _images_are_nearly_identical(first_frame_path, handoff_path)
+        )
+        if changed:
+            shutil.copy(handoff_path, first_frame_path)
+            for stale_name in ("video.mp4", "video_last_frame.png"):
+                stale_path = os.path.join(shot_dir, stale_name)
+                if os.path.exists(stale_path):
+                    os.remove(stale_path)
+            selector_output = os.path.join(shot_dir, "first_frame_selector_output.json")
+            if os.path.exists(selector_output):
+                os.remove(selector_output)
+            logging.info(
+                "Forced shot %s first_frame from previous video tail and invalidated stale video cache: %s",
+                shot_idx,
+                first_frame_path,
+            )
+        else:
+            logging.info("Shot %s first_frame already matches previous video tail.", shot_idx)
 
     async def generate_videos_in_order(
         self,
@@ -581,22 +788,13 @@ class Script2VideoPipeline:
         prev_shot_last_frame_path: Optional[str] = None,
     ) -> Optional[str]:
         video_path = os.path.join(self.working_dir, "shots", f"{shot_description.idx}", "video.mp4")
-        last_frame_path = video_last_frame_path(shot_description.idx, self.working_dir)
-        if os.path.exists(video_path):
+        if ensure_valid_cached_video(video_path, f"shot {shot_description.idx} video"):
             print(f"🚀 Skipped generating video for shot {shot_description.idx}, already exists.")
-            if not os.path.exists(last_frame_path):
-                try:
-                    extract_last_frame_from_video(video_path, last_frame_path)
-                except Exception as exc:
-                    logging.warning(
-                        "Could not extract last frame for cached shot %s: %s",
-                        shot_description.idx,
-                        exc,
-                    )
-                    return prev_shot_last_frame_path
-            return last_frame_path if os.path.exists(last_frame_path) else prev_shot_last_frame_path
+            end_reference = self._resolve_shot_end_reference(shot_description.idx, video_path)
+            return end_reference or prev_shot_last_frame_path
 
-        await self.frame_events[shot_description.idx]["first_frame"].wait()
+        if "first_frame" in self.frame_events[shot_description.idx]:
+            await self.frame_events[shot_description.idx]["first_frame"].wait()
         if shot_description.variation_type in ["medium", "large"]:
             await self.frame_events[shot_description.idx]["last_frame"].wait()
 
@@ -629,15 +827,12 @@ class Script2VideoPipeline:
             style=self._style,
         )
         video_output.save(video_path)
-        try:
-            extract_last_frame_from_video(video_path, last_frame_path)
-        except Exception as exc:
-            logging.warning(
-                "Video saved for shot %s but last-frame extraction failed: %s",
-                shot_description.idx,
-                exc,
-            )
-            last_frame_path = prev_shot_last_frame_path or ""
+        api_last_frame_url = getattr(video_output, "last_frame_url", None)
+        end_reference = self._resolve_shot_end_reference(
+            shot_description.idx,
+            video_path,
+            api_last_frame_url=api_last_frame_url,
+        )
         print(f"☑️ Generated video for shot {shot_description.idx}, saved to {video_path}.")
         cb = getattr(self, "_progress_callback", None)
         if cb:
@@ -646,7 +841,7 @@ class Script2VideoPipeline:
                 "file_path": os.path.join("shots", f"{shot_description.idx}", "video.mp4"),
                 "shot_idx": shot_description.idx,
             })
-        return last_frame_path if os.path.exists(last_frame_path) else prev_shot_last_frame_path
+        return end_reference or prev_shot_last_frame_path
 
     async def generate_frame_for_single_shot(
         self,
@@ -656,6 +851,7 @@ class Script2VideoPipeline:
         frame_desc: str,
         visible_characters: List[CharacterInScene],
         character_portraits_registry: Dict[str, Dict[str, Dict[str, str]]],
+        prev_shot_end_reference: Optional[Tuple[str, str]] = None,
     ) -> ImageOutput:
 
         frame_image_path = os.path.join(self.working_dir, "shots", f"{shot_idx}", f"{frame_type}.png")
@@ -668,13 +864,19 @@ class Script2VideoPipeline:
             available_image_path_and_text_pairs = []
             if self._scene_anchor_path and os.path.exists(self._scene_anchor_path):
                 available_image_path_and_text_pairs.append(self._scene_anchor_pair())
+            if prev_shot_end_reference and frame_type == "first_frame":
+                available_image_path_and_text_pairs.append(prev_shot_end_reference)
             for visible_character in visible_characters:
                 identifier_in_scene = visible_character.identifier_in_scene
                 registry_item = character_portraits_registry[identifier_in_scene]
                 for view, item in registry_item.items():
                     available_image_path_and_text_pairs.append((item["path"], item["description"]))
 
-            available_image_path_and_text_pairs.append(first_shot_ff_path_and_text_pair)
+            # Same-camera anchor: only when the first-shot first_frame file already exists.
+            # Skip while generating that file itself (serial keyframe shot 0 would FileNotFoundError).
+            first_shot_ff_path, first_shot_ff_text = first_shot_ff_path_and_text_pair
+            if os.path.exists(first_shot_ff_path):
+                available_image_path_and_text_pairs.append((first_shot_ff_path, first_shot_ff_text))
 
             selector_output_path = os.path.join(self.working_dir, "shots", f"{shot_idx}", f"{frame_type}_selector_output.json")
             if os.path.exists(selector_output_path):

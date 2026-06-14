@@ -13,10 +13,17 @@ from langchain.chat_models import init_chat_model
 from tools.render_backend import RenderBackend
 from utils.provider_presets import resolve_chat_model_config
 from utils.image import image_output_to_pil, crop_turnaround_views
+from utils.pipeline_media import aspect_ratio_llm_hint
+from agents.best_image_selector import BestImageSelector
 
 
 async def _noop_progress(_event):
     pass
+
+
+ORIGINAL_CONTENT_REQUIREMENT = (
+    "原创虚构角色与场景，避免模仿知名影视或宗教地标。"
+)
 
 
 def build_effective_user_requirement(
@@ -31,6 +38,7 @@ def build_effective_user_requirement(
         parts.append(user_requirement.strip())
     if aspect_ratio and f"Aspect ratio: {aspect_ratio}" not in " ".join(parts):
         parts.append(f"Aspect ratio: {aspect_ratio}")
+        parts.append(aspect_ratio_llm_hint(aspect_ratio))
     if episode_count == 1:
         parts.append(
             "Generate exactly ONE episode as a single short video. "
@@ -58,6 +66,8 @@ def build_effective_user_requirement(
             "build one clear conflict, use speakable dialogue, "
             "and align SHOT blocks to roughly 5 seconds each."
         )
+    if ORIGINAL_CONTENT_REQUIREMENT not in " ".join(parts):
+        parts.append(ORIGINAL_CONTENT_REQUIREMENT)
     return " ".join(parts)
 
 
@@ -81,11 +91,15 @@ class Idea2VideoPipeline:
         image_generator: str,
         video_generator: str,
         working_dir: str,
+        multimodal_chat_model=None,
+        best_image_selector: Optional[BestImageSelector] = None,
     ):
         self.chat_model = chat_model
         self.image_generator = image_generator
         self.video_generator = video_generator
         self.working_dir = working_dir
+        self.multimodal_chat_model = multimodal_chat_model
+        self.best_image_selector = best_image_selector
         os.makedirs(self.working_dir, exist_ok=True)
 
         self.screenwriter = Screenwriter(chat_model=self.chat_model)
@@ -111,6 +125,11 @@ class Idea2VideoPipeline:
             chat_model_args = resolve_chat_model_config(config["chat_model"]["init_args"])
             chat_model = init_chat_model(**chat_model_args)
 
+        multimodal_chat_model = None
+        if "multimodal_chat_model" in config:
+            multimodal_args = resolve_chat_model_config(config["multimodal_chat_model"]["init_args"])
+            multimodal_chat_model = init_chat_model(**multimodal_args)
+
         if image_generator_override is not None and video_generator_override is not None:
             image_generator = image_generator_override
             video_generator = video_generator_override
@@ -119,11 +138,23 @@ class Idea2VideoPipeline:
             image_generator = image_generator_override or backend.image_generator
             video_generator = video_generator_override or backend.video_generator
 
+        best_image_selector = None
+        if "multimodal_chat_model" in config:
+            multimodal_args = resolve_chat_model_config(config["multimodal_chat_model"]["init_args"])
+            if multimodal_args.get("api_key") and multimodal_args.get("base_url") and multimodal_args.get("model"):
+                best_image_selector = BestImageSelector(
+                    base_url=multimodal_args["base_url"],
+                    api_key=multimodal_args["api_key"],
+                    chat_model=multimodal_args["model"],
+                )
+
         return cls(
             chat_model=chat_model,
             image_generator=image_generator,
             video_generator=video_generator,
             working_dir=config["working_dir"],
+            multimodal_chat_model=multimodal_chat_model,
+            best_image_selector=best_image_selector,
         )
 
     async def extract_characters(
@@ -137,14 +168,14 @@ class Idea2VideoPipeline:
                 characters = json.load(f)
             characters = [CharacterInScene.model_validate(
                 character) for character in characters]
-            print(f"🚀 Loaded {len(characters)} characters from existing file.")
+            print(f"Loaded {len(characters)} characters from existing file.")
         else:
             characters = await self.character_extractor.extract_characters(story)
             with open(save_path, "w", encoding="utf-8") as f:
                 json.dump([character.model_dump()
                           for character in characters], f, ensure_ascii=False, indent=4)
             print(
-                f"✅ Extracted {len(characters)} characters from story and saved to {save_path}.")
+                f"Extracted {len(characters)} characters from story and saved to {save_path}.")
 
         return characters
 
@@ -176,10 +207,10 @@ class Idea2VideoPipeline:
                               f, ensure_ascii=False, indent=4)
 
             print(
-                f"✅ Completed character portrait generation for {len(characters)} characters.")
+                f"Completed character portrait generation for {len(characters)} characters.")
         else:
             print(
-                "🚀 All characters already have portraits, skipping portrait generation.")
+                "All characters already have portraits, skipping portrait generation.")
 
         return character_portraits_registry
 
@@ -192,13 +223,13 @@ class Idea2VideoPipeline:
         if os.path.exists(save_path):
             with open(save_path, "r", encoding="utf-8") as f:
                 story = f.read()
-            print(f"🚀 Loaded story from existing file.")
+            print(f"Loaded story from existing file.")
         else:
             print("🧠 Developing story...")
             story = await self.screenwriter.develop_story(idea=idea, user_requirement=user_requirement)
             with open(save_path, "w", encoding="utf-8") as f:
                 f.write(story)
-            print(f"✅ Developed story and saved to {save_path}.")
+            print(f"Developed story and saved to {save_path}.")
 
         return story
 
@@ -206,12 +237,13 @@ class Idea2VideoPipeline:
         self,
         story: str,
         user_requirement: str,
+        aspect_ratio: str = "",
     ):
         save_path = os.path.join(self.working_dir, "script.json")
         if os.path.exists(save_path):
             with open(save_path, "r", encoding="utf-8") as f:
                 script = json.load(f)
-            print(f"🚀 Loaded script from existing file.")
+            print(f"Loaded script from existing file.")
         else:
             print("🧠 Writing script based on story...")
             script = await self.screenwriter.write_script_based_on_story(
@@ -219,16 +251,18 @@ class Idea2VideoPipeline:
             )
             polished_scripts = []
             for idx, scene_script in enumerate(script):
-                print(f"✨ Polishing scene script {idx + 1}/{len(script)}...")
+                print(f"Polishing scene script {idx + 1}/{len(script)}...")
                 polished_scripts.append(
                     await self.screenwriter.polish_scene_script(
-                        scene_script, user_requirement=user_requirement
+                        scene_script,
+                        user_requirement=user_requirement,
+                        aspect_ratio=aspect_ratio,
                     )
                 )
             script = polished_scripts
             with open(save_path, "w", encoding="utf-8") as f:
                 json.dump(script, f, ensure_ascii=False, indent=4)
-            print(f"✅ Written script based on story and saved to {save_path}.")
+            print(f"Written script based on story and saved to {save_path}.")
         return script
 
     async def generate_portraits_for_single_character(
@@ -271,7 +305,7 @@ class Idea2VideoPipeline:
             )
 
         print(
-            f"☑️ Completed character portrait generation for {character.identifier_in_scene}.")
+            f"Completed character portrait generation for {character.identifier_in_scene}.")
 
         # Emit portrait artifact events
         cb = getattr(self, "_progress_callback", None)
@@ -377,7 +411,9 @@ class Idea2VideoPipeline:
         await cb({"type": "stage_start", "stage": "script", "message": "Writing script based on story..."})
         t0 = time.time()
         scene_scripts = await self.write_script_based_on_story(
-            story=story, user_requirement=effective_requirement
+            story=story,
+            user_requirement=effective_requirement,
+            aspect_ratio=self._aspect_ratio,
         )
         raw_scene_count = len(scene_scripts)
         scene_scripts = limit_scene_scripts(scene_scripts, episode_count)
@@ -400,7 +436,7 @@ class Idea2VideoPipeline:
         for idx, scene_script in enumerate(scene_scripts):
             scene_stage = f"scene_{idx}"
             await cb({"type": "stage_start", "stage": scene_stage, "message": f"Processing scene {idx + 1}/{total_scenes}...", "scene_index": idx, "total_scenes": total_scenes})
-            print(f"🎬 [Scene {idx + 1}/{total_scenes}] Processing scene...")
+            print(f"[Scene {idx + 1}/{total_scenes}] Processing scene...")
             scene_working_dir = os.path.join(self.working_dir, f"scene_{idx}")
             os.makedirs(scene_working_dir, exist_ok=True)
             script2video_pipeline = Script2VideoPipeline(
@@ -408,13 +444,18 @@ class Idea2VideoPipeline:
                 image_generator=self.image_generator,
                 video_generator=self.video_generator,
                 working_dir=scene_working_dir,
+                multimodal_chat_model=self.multimodal_chat_model,
+                best_image_selector=self.best_image_selector,
             )
             # Wrap callback to scope artifact paths under this scene directory
             rel_scene_dir = os.path.relpath(scene_working_dir, self.working_dir)
             async def scoped_cb(event):
                 if event.get("type") == "artifact" and "file_path" in event:
                     event = dict(event)
-                    event["file_path"] = os.path.join(rel_scene_dir, event["file_path"])
+                    event["file_path"] = os.path.join(
+                        rel_scene_dir,
+                        event["file_path"],
+                    ).replace(os.sep, "/")
                 await cb(event)
 
             final_video_path = await script2video_pipeline(
@@ -428,20 +469,21 @@ class Idea2VideoPipeline:
             )
             await cb({
                 "type": "artifact", "stage": scene_stage, "file_type": "video",
-                "file_path": os.path.relpath(final_video_path, self.working_dir),
+                "file_path": os.path.relpath(final_video_path, self.working_dir).replace(os.sep, "/"),
             })
             all_video_paths.append(final_video_path)
             await cb({"type": "stage_end", "stage": scene_stage, "message": f"Scene {idx + 1}/{total_scenes} completed"})
 
         # Stage: Concatenate
         final_video_path = os.path.join(self.working_dir, "final_video.mp4")
-        if os.path.exists(final_video_path):
-            print(f"🚀 Skipped concatenating videos, already exists.")
+        from utils.video import ensure_valid_cached_video
+        if ensure_valid_cached_video(final_video_path, "episode final video"):
+            print(f"Skipped concatenating videos, already exists.")
             await cb({"type": "stage_end", "stage": "concatenate", "message": "Final video already exists"})
         else:
             await cb({"type": "stage_start", "stage": "concatenate", "message": "Concatenating all scene videos..."})
             t0 = time.time()
-            print(f"🎬 Starting concatenating videos...")
+            print(f"Starting concatenating videos...")
             from utils.video import concat_videos
             from utils.pipeline_media import concat_dimensions_for_aspect
             width, height = concat_dimensions_for_aspect(self._aspect_ratio)
@@ -452,7 +494,7 @@ class Idea2VideoPipeline:
                 target_height=height,
                 crossfade_seconds=0.12,
             )
-            print(f"☑️ Concatenated videos, saved to {final_video_path}.")
+            print(f"Concatenated videos, saved to {final_video_path}.")
             await cb({"type": "stage_end", "stage": "concatenate", "duration_ms": int((time.time() - t0) * 1000)})
 
         await cb({

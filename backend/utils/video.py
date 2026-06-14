@@ -2,6 +2,7 @@ import logging
 import requests
 import subprocess
 import os
+import re
 import shutil
 import tempfile
 from typing import List, Optional, Union
@@ -117,6 +118,22 @@ def _probe_video(path: str) -> dict:
     return {}
 
 
+def ensure_valid_cached_video(path: str, label: str = "cached video") -> bool:
+    """Return True when an existing cached video is readable; delete corrupt leftovers."""
+    if not os.path.exists(path):
+        return False
+    try:
+        _probe_video(path)
+        return True
+    except Exception as exc:
+        logging.warning("Removing invalid %s at %s: %s", label, path, exc)
+        try:
+            os.remove(path)
+        except OSError as remove_exc:
+            logging.warning("Could not remove invalid %s at %s: %s", label, path, remove_exc)
+        return False
+
+
 def _input_has_audio(path: str) -> bool:
     """Return True if the file contains at least one audio stream."""
     ffprobe = _resolve_ffprobe_exe()
@@ -149,11 +166,45 @@ def _input_has_audio(path: str) -> bool:
 def _format_duration_seconds(path: str) -> Optional[float]:
     info = _probe_video(path)
     duration = info.get('format', {}).get('duration')
-    if duration is None:
-        return None
+    if duration is not None:
+        try:
+            return float(duration)
+        except (TypeError, ValueError):
+            pass
+
+    ffmpeg = _resolve_ffmpeg_exe()
+    result = subprocess.run(
+        [ffmpeg, '-hide_banner', '-i', path],
+        capture_output=True,
+        text=True,
+        encoding='utf-8',
+        errors='replace',
+        timeout=60,
+    )
+    parsed = _parse_ffmpeg_duration(result.stderr or "")
+    if parsed is not None:
+        return parsed
+
     try:
-        return float(duration)
-    except (TypeError, ValueError):
+        from moviepy import VideoFileClip
+        clip = VideoFileClip(os.path.abspath(path))
+        try:
+            return float(clip.duration) if clip.duration is not None else None
+        finally:
+            clip.close()
+    except Exception as exc:
+        logging.warning("Could not determine duration for %s: %s", path, exc)
+        return None
+
+
+def _parse_ffmpeg_duration(stderr_text: str) -> Optional[float]:
+    match = re.search(r"Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)", stderr_text or "")
+    if not match:
+        return None
+    hours, minutes, seconds = match.groups()
+    try:
+        return int(hours) * 3600 + int(minutes) * 60 + float(seconds)
+    except ValueError:
         return None
 
 
@@ -190,28 +241,160 @@ def _normalize_video_to_size(
     return output_path
 
 
+def _run_ffmpeg_frame_extract(cmd: List[str], output_path: str) -> Optional[str]:
+    """Run ffmpeg; return stderr tail on failure."""
+    stderr_path = output_path + ".ffmpeg.stderr.txt"
+    with open(stderr_path, "w", encoding="utf-8") as stderr_f:
+        result = subprocess.run(
+            cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=stderr_f,
+            timeout=120,
+        )
+    stderr_text = _read_stderr_file(stderr_path)
+    if os.path.exists(stderr_path):
+        os.remove(stderr_path)
+    if result.returncode == 0 and os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+        return None
+    tail = stderr_text[-1500:] if stderr_text else ""
+    if os.path.exists(output_path):
+        os.remove(output_path)
+    return tail or "unknown ffmpeg error"
+
+
+def _extract_last_frame_by_dumping_frames(video_path: str, output_path: str) -> None:
+    """Most reliable path for short generated clips: export frames, keep the last valid PNG."""
+    ffmpeg = _resolve_ffmpeg_exe()
+    with tempfile.TemporaryDirectory() as tmpdir:
+        frame_pattern = os.path.join(tmpdir, "frame_%06d.png")
+        cmd = [
+            ffmpeg,
+            "-y",
+            "-i",
+            video_path,
+            "-map",
+            "0:v:0",
+            "-vsync",
+            "0",
+            frame_pattern,
+        ]
+        result = subprocess.run(
+            cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=180,
+        )
+        frames = [
+            os.path.join(tmpdir, name)
+            for name in sorted(os.listdir(tmpdir))
+            if name.endswith(".png")
+        ]
+        frames = [path for path in frames if os.path.getsize(path) > 0]
+        if result.returncode != 0 or not frames:
+            tail = (result.stderr or "")[-1500:]
+            raise RuntimeError(_meaningful_ffmpeg_error(tail))
+        shutil.copyfile(frames[-1], output_path)
+
+
+def _extract_last_frame_moviepy(video_path: str, output_path: str) -> None:
+    """Fallback frame grab when ffmpeg single-frame export fails."""
+    from moviepy import VideoFileClip
+    from PIL import Image
+
+    clip = VideoFileClip(os.path.abspath(video_path))
+    try:
+        if clip.duration is None or clip.duration <= 0:
+            timestamp = 0.0
+        else:
+            fps = clip.fps or 24
+            timestamp = max(0.0, float(clip.duration) - (1.0 / fps))
+        frame = clip.get_frame(timestamp)
+        Image.fromarray(frame.astype("uint8"), "RGB").save(output_path)
+    finally:
+        clip.close()
+
+
 def extract_last_frame_from_video(video_path: str, output_path: str) -> str:
     """Save the final visible frame from a video clip as a PNG reference."""
     if not os.path.exists(video_path):
         raise FileNotFoundError(f"Video file not found: {video_path}")
-    parent = os.path.dirname(output_path)
+
+    abs_video = os.path.abspath(video_path)
+    abs_output = os.path.abspath(output_path)
+    parent = os.path.dirname(abs_output)
     if parent:
         os.makedirs(parent, exist_ok=True)
+
+    errors: List[str] = []
+    try:
+        _extract_last_frame_by_dumping_frames(abs_video, abs_output)
+        if os.path.exists(abs_output) and os.path.getsize(abs_output) > 0:
+            logging.info(
+                "Extracted last frame from %s -> %s (ffmpeg frame dump)",
+                video_path,
+                abs_output,
+            )
+            return abs_output
+    except Exception as exc:
+        errors.append(f"ffmpeg frame dump: {exc}")
+
     ffmpeg = _resolve_ffmpeg_exe()
-    cmd = [
-        ffmpeg, "-y",
-        "-sseof", "-0.08",
-        "-i", os.path.abspath(video_path),
-        "-frames:v", "1",
-        "-q:v", "2",
-        output_path,
+    png_args = ["-map", "0:v:0", "-frames:v", "1", "-f", "image2", "-c:v", "png"]
+
+    strategies: List[List[str]] = [
+        [ffmpeg, "-y", "-sseof", "-0.08", "-i", abs_video, *png_args, abs_output],
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
-    if result.returncode != 0 or not os.path.exists(output_path):
-        tail = (result.stderr or "")[-1000:]
-        raise RuntimeError(f"Failed to extract last frame from {video_path}: {tail}")
-    logging.info("Extracted last frame from %s -> %s", video_path, output_path)
-    return output_path
+
+    duration = _format_duration_seconds(abs_video)
+    if duration is not None and duration > 0.12:
+        seek = max(0.0, duration - 0.08)
+        strategies.append(
+            [ffmpeg, "-y", "-ss", f"{seek:.3f}", "-i", abs_video, *png_args, abs_output],
+        )
+
+    for index, cmd in enumerate(strategies, start=1):
+        error_tail = _run_ffmpeg_frame_extract(cmd, abs_output)
+        if error_tail is None:
+            logging.info(
+                "Extracted last frame from %s -> %s (ffmpeg strategy %s)",
+                video_path,
+                abs_output,
+                index,
+            )
+            return abs_output
+        errors.append(f"ffmpeg {index}: {_meaningful_ffmpeg_error(error_tail)}")
+
+    try:
+        _extract_last_frame_moviepy(abs_video, abs_output)
+        if os.path.exists(abs_output) and os.path.getsize(abs_output) > 0:
+            logging.info(
+                "Extracted last frame from %s -> %s (moviepy fallback)",
+                video_path,
+                abs_output,
+            )
+            return abs_output
+    except Exception as exc:
+        errors.append(f"moviepy: {exc}")
+
+    raise RuntimeError(
+        f"Failed to extract last frame from {video_path}: {' | '.join(errors)}"
+    )
+
+
+def _meaningful_ffmpeg_error(stderr_text: str) -> str:
+    """Prefer explicit error lines over codec banner noise."""
+    for line in reversed(stderr_text.splitlines()):
+        stripped = line.strip()
+        lower = stripped.lower()
+        if not stripped:
+            continue
+        if any(token in lower for token in ("error", "invalid", "failed", "could not", "no such file")):
+            return stripped
+    compact = " ".join(stderr_text.split())
+    return compact[-240:] if compact else "unknown ffmpeg error"
 
 
 def concat_videos(video_paths: List[str], output_path: str,
@@ -276,15 +459,27 @@ def concat_videos(video_paths: List[str], output_path: str,
     for i in range(n):
         vf_parts.append(
             f"[{i}:v]scale={target_width}:{target_height}:force_original_aspect_ratio=decrease,"
-            f"pad={target_width}:{target_height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=24,"
-            f"setpts=PTS-STARTPTS[v{i}]"
+            f"pad={target_width}:{target_height}:(ow-iw)/2:(oh-ih)/2,setsar=1,"
+            f"setpts=PTS-STARTPTS,fps=24,settb=AVTB,format=yuv420p[v{i}]"
         )
 
     use_crossfade = (
-        n >= 2
+        n == 2
         and any(fade > 0 for fade in fade_list)
         and all(d is not None for d in input_durations)
     )
+    if n >= 2:
+        logging.info("Concat crossfade schedule: %s", [round(f, 3) for f in fade_list])
+    if n > 2 and any(fade > 0 for fade in fade_list):
+        logging.warning(
+            "Crossfade disabled for %d clips; using stable concat to avoid chained xfade frame loss.",
+            n,
+        )
+    if n >= 2 and any(fade > 0 for fade in fade_list) and not all(d is not None for d in input_durations):
+        logging.warning(
+            "Crossfade disabled because one or more input durations are unknown: %s",
+            input_durations,
+        )
     uniform_fade = (
         use_crossfade
         and len(set(round(f, 4) for f in fade_list)) == 1
@@ -299,9 +494,11 @@ def concat_videos(video_paths: List[str], output_path: str,
         accumulated = input_durations[0]
         for i in range(1, n):
             out_v = f"vx{i}"
+            tmp_v = f"vxf{i}"
             offset = max(0.0, accumulated - fade)
             v_chain.append(
-                f"[{current_v}][v{i}]xfade=transition=fade:duration={fade:.3f}:offset={offset:.3f}[{out_v}]"
+                f"[{current_v}][v{i}]xfade=transition=fade:duration={fade:.3f}:offset={offset:.3f}[{tmp_v}];"
+                f"[{tmp_v}]fps=24,settb=AVTB,format=yuv420p[{out_v}]"
             )
             current_v = out_v
             accumulated = accumulated + input_durations[i] - fade
@@ -361,9 +558,11 @@ def concat_videos(video_paths: List[str], output_path: str,
             join_fade = fade_list[i - 1]
             if join_fade > 0 and accumulated > join_fade and input_durations[i] > join_fade:
                 out_v = f"vx{i}"
+                tmp_v = f"vxf{i}"
                 offset = max(0.0, accumulated - join_fade)
                 v_chain.append(
-                    f"[{current_v}][v{i}]xfade=transition=fade:duration={join_fade:.3f}:offset={offset:.3f}[{out_v}]"
+                    f"[{current_v}][v{i}]xfade=transition=fade:duration={join_fade:.3f}:offset={offset:.3f}[{tmp_v}];"
+                    f"[{tmp_v}]fps=24,settb=AVTB,format=yuv420p[{out_v}]"
                 )
                 current_v = out_v
                 accumulated = accumulated + input_durations[i] - join_fade
@@ -463,6 +662,22 @@ def concat_videos(video_paths: List[str], output_path: str,
 
     if result.returncode != 0:
         tail = stderr_text[-2000:] if len(stderr_text) > 2000 else stderr_text
+        if use_crossfade and _is_xfade_cfr_error(stderr_text):
+            logging.warning(
+                "ffmpeg xfade failed because of invalid frame-rate metadata; "
+                "retrying final concat without crossfade. Error tail: %s",
+                _meaningful_ffmpeg_error(tail),
+            )
+            if os.path.exists(output_path):
+                os.remove(output_path)
+            return concat_videos(
+                video_paths,
+                output_path,
+                target_width=target_width,
+                target_height=target_height,
+                preserve_audio=preserve_audio,
+                crossfade_seconds=0.0,
+            )
         raise RuntimeError(f"ffmpeg concat failed: {tail}")
 
     out_duration = _format_duration_seconds(output_path)
@@ -484,6 +699,15 @@ def concat_videos(video_paths: List[str], output_path: str,
         logging.info(f"Concatenation complete: {output_path}")
 
     return output_path
+
+
+def _is_xfade_cfr_error(stderr_text: str) -> bool:
+    lower = (stderr_text or "").lower()
+    return "xfade" in lower and (
+        "constant frame rate" in lower
+        or "current rate of 1/0" in lower
+        or "failed to configure output pad" in lower
+    )
 
 
 def _concat_expected_duration(

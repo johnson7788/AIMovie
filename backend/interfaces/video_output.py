@@ -15,10 +15,12 @@ class VideoOutput:
         fmt: Literal["url", "bytes"],
         ext: str,
         data: Union[str, bytes],
+        last_frame_url: Optional[str] = None,
     ):
         self.fmt = fmt
         self.ext = ext
         self.data = data
+        self.last_frame_url = last_frame_url
 
     def save_url(self, path: str) -> None:
         """Download and save a video from a URL to the specified path.

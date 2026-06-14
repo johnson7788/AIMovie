@@ -114,5 +114,67 @@ def resolve_aspect_ratio(
     return parsed
 
 
+def aspect_ratio_llm_hint(aspect_ratio: str) -> str:
+    """Explicit orientation wording for LLM prompts (avoid 16:9竖屏 confusion)."""
+    ratio = aspect_ratio if aspect_ratio in SUPPORTED_ASPECT_RATIOS else DEFAULT_ASPECT_RATIO
+    if ratio == "16:9":
+        return (
+            "Video format: 16:9 landscape horizontal (宽屏横屏). "
+            "Do NOT call this vertical, portrait, or 竖屏."
+        )
+    if ratio == "9:16":
+        return (
+            "Video format: 9:16 vertical portrait (竖屏). "
+            "Do NOT call this landscape, horizontal, or 横屏."
+        )
+    num, den = (int(part) for part in ratio.split(":"))
+    if num >= den:
+        return (
+            f"Video format: {ratio} landscape (width >= height). "
+            "Do NOT describe as vertical/竖屏."
+        )
+    return (
+        f"Video format: {ratio} portrait (height > width). "
+        "Do NOT describe as landscape/横屏."
+    )
+
+
+def sanitize_polished_script(text: str, aspect_ratio: str = "") -> str:
+    """Strip LLM meta preamble and fix common wrong aspect-ratio labels."""
+    import re
+
+    cleaned = (text or "").strip()
+    if not cleaned:
+        return cleaned
+
+    # Drop role/meta intro before the first scene/shot marker.
+    scene_markers = (
+        "**SCENE",
+        "SCENE ",
+        "场景",
+        "**场景",
+        "SHOT ",
+        "**SHOT",
+    )
+    for marker in scene_markers:
+        idx = cleaned.find(marker)
+        if 0 < idx <= 400:
+            cleaned = cleaned[idx:].lstrip()
+            break
+
+    # Remove a leading horizontal rule left after stripping meta.
+    cleaned = re.sub(r"^---+\s*", "", cleaned, count=1)
+
+    ratio = aspect_ratio if aspect_ratio in SUPPORTED_ASPECT_RATIOS else ""
+    if ratio == "16:9":
+        cleaned = re.sub(r"16\s*[:：]\s*9\s*竖屏", "16:9横屏", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"16\s*[:：]\s*9\s*vertical", "16:9 landscape", cleaned, flags=re.IGNORECASE)
+    elif ratio == "9:16":
+        cleaned = re.sub(r"9\s*[:：]\s*16\s*横屏", "9:16竖屏", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"9\s*[:：]\s*16\s*landscape", "9:16 portrait", cleaned, flags=re.IGNORECASE)
+
+    return cleaned.strip()
+
+
 def text_looks_chinese(text: str) -> bool:
     return any("\u4e00" <= char <= "\u9fff" for char in text or "")

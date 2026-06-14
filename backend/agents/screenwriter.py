@@ -53,7 +53,7 @@ Main Characters Introduction: Briefly introduce the core characters, including t
 - Logical Consistency: Ensure that event progression and character actions within the story have logical motives and internal consistency, avoiding abrupt or contradictory plots.
 - Show, Don't Tell: Reveal characters' personalities and emotions through their actions, dialogues, and details, rather than stating them flatly. For example, use "He clenched - his fist, nails digging deep into his palm" instead of "He was very angry."
 - Originality & Compliance: Generate original content based on the user's idea, avoiding direct plagiarism of well-known existing works. The generated content must be positive, healthy, and comply with general content safety policies.
-- Short Drama (短剧): When the user requirement mentions short drama, vertical video, or episode duration under 90 seconds, write a tight, dialogue-driven story. Open with a strong hook in the first 3 seconds. Keep one main conflict, use speakable dialogue (not literary prose), and end on a clear emotional beat or mini-cliffhanger.
+- Short Drama (短剧): When the user requirement mentions short drama or episode duration under 90 seconds, write a tight, dialogue-driven story. Open with a strong hook in the first 3 seconds. Keep one main conflict, use speakable dialogue (not literary prose), and end on a clear emotional beat or mini-cliffhanger. Respect the stated aspect ratio in USER_REQUIREMENT: 16:9 means landscape horizontal (横屏), 9:16 means vertical portrait (竖屏). Never confuse them.
 """
 
 human_prompt_template_develop_story = \
@@ -185,11 +185,21 @@ class Screenwriter:
         self,
         scene_script: str,
         user_requirement: Optional[str] = None,
+        aspect_ratio: str = "",
     ) -> str:
         """Second pass: tighten dialogue, pacing, and filmable action for one scene."""
-        system_prompt = """
+        from utils.pipeline_media import (
+            aspect_ratio_llm_hint,
+            resolve_aspect_ratio,
+            sanitize_polished_script,
+        )
+
+        ratio = resolve_aspect_ratio(user_requirement or "", explicit=aspect_ratio or None)
+        orientation_hint = aspect_ratio_llm_hint(ratio)
+
+        system_prompt = f"""
 [Role]
-You are a vertical short-drama (短剧) script doctor.
+You are a short-drama (短剧) script doctor.
 
 [Task]
 Polish ONE scene script for AI storyboard + video generation. Keep the same plot beats and scene count, but improve:
@@ -197,6 +207,10 @@ Polish ONE scene script for AI storyboard + video generation. Keep the same plot
 - Concrete visual actions (what actors do on screen)
 - Pacing that fits short episodes (hook early, payoff at the end)
 - Consistent character names and relationships
+- Strict visual continuity so later storyboard/video prompts do not change actors or locations
+
+[Video format — mandatory]
+{orientation_hint}
 
 [Rules]
 - Output language must match the input script language.
@@ -205,6 +219,12 @@ Polish ONE scene script for AI storyboard + video generation. Keep the same plot
 - No camera directions (cut to, fade, zoom). No literary metaphors.
 - Do not add new scenes or remove major plot points.
 - Make dialogue sound natural for short drama, not novel-like narration.
+- Do not change character identity, age, face, hairstyle, body type, wardrobe, or named relationships between shots.
+- Do not change the scene location, room layout, furniture, props, lighting, or time of day unless the input script explicitly says the story moves.
+- For a single scene, keep all SHOT blocks in the same physical place. Changes should be actor motion, expression, or object interaction, not a new setting.
+- When a character reappears, repeat the same concise visual identity markers (name, clothing, hairstyle, position) so downstream image prompts preserve the same person.
+- Never write contradictory labels like "16:9竖屏" or "9:16横屏".
+- Do not include meta commentary about your role (e.g. "剧本医生已就位"); output the polished script only.
 """
         human_prompt = f"""
 <SCENE_SCRIPT>
@@ -220,6 +240,7 @@ Polish ONE scene script for AI storyboard + video generation. Keep the same plot
             ("human", human_prompt),
         ])
         polished = (response.content or scene_script).strip()
+        polished = sanitize_polished_script(polished, aspect_ratio=ratio)
         print(f"✨ Polished scene script ({len(polished)} chars)")
         return polished or scene_script
 

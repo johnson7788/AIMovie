@@ -4,12 +4,15 @@ $ErrorActionPreference = "Stop"
 $RootDir = $PSScriptRoot
 $BackendDir = Join-Path $RootDir "backend"
 $FrontendDir = Join-Path $RootDir "frontend"
-    $BackendPort = if ($env:SERVER_PORT) { [int]$env:SERVER_PORT } else { 8666 }
+$BackendPort = if ($env:SERVER_PORT) { [int]$env:SERVER_PORT } else { 8666 }
 $HealthUrl = "http://127.0.0.1:$BackendPort/health"
-$BackendLog = Join-Path $RootDir "backend.log"
-$BackendErrLog = Join-Path $RootDir "backend.err.log"
+$LogDir = Join-Path $RootDir "logs"
+$RunStamp = Get-Date -Format "yyyyMMdd-HHmmss"
+$BackendLog = Join-Path $LogDir "backend-$RunStamp.log"
+$BackendErrLog = Join-Path $LogDir "backend-$RunStamp.err.log"
 
 $BackendProcess = $null
+$StartedBackend = $false
 
 function Write-Step([string]$Message) {
     Write-Host "[start] $Message" -ForegroundColor Green
@@ -26,6 +29,15 @@ function Test-CommandExists([string]$Name) {
     return $null -ne (Get-Command $Name -ErrorAction SilentlyContinue)
 }
 
+function Test-BackendReady {
+    try {
+        $response = Invoke-WebRequest -Uri $HealthUrl -UseBasicParsing -TimeoutSec 2
+        return $response.StatusCode -eq 200
+    } catch {
+        return $false
+    }
+}
+
 try {
     foreach ($cmd in @("uv", "node", "npm")) {
         if (-not (Test-CommandExists $cmd)) {
@@ -33,6 +45,7 @@ try {
             exit 1
         }
     }
+    New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 
     Write-Step "Syncing backend dependencies (uv sync)..."
     Push-Location $BackendDir
@@ -40,23 +53,33 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw "uv sync failed with exit code $LASTEXITCODE"
     }
+
+    Write-Step "Verifying backend runtime deps (ffmpeg for last-frame)..."
+    & uv run python -c "from utils.video import _resolve_ffmpeg_exe; p=_resolve_ffmpeg_exe(); print('ffmpeg:', p); import os; assert os.path.isfile(p)"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Backend dependency verification failed"
+    }
     Pop-Location
 
-    if (Test-Path $BackendLog) { Remove-Item $BackendLog -Force }
-    if (Test-Path $BackendErrLog) { Remove-Item $BackendErrLog -Force }
-
-    Write-Step "Starting backend (backend/main.py)..."
-    $env:PYTHONUTF8 = "1"
-    Push-Location $BackendDir
-    $BackendProcess = Start-Process `
-        -FilePath "uv" `
-        -ArgumentList @("run", "python", "main.py") `
-        -WorkingDirectory $BackendDir `
-        -PassThru `
-        -NoNewWindow `
-        -RedirectStandardOutput $BackendLog `
-        -RedirectStandardError $BackendErrLog
-    Pop-Location
+    if (Test-BackendReady) {
+        Write-Step "Backend is already running on port $BackendPort; reusing it."
+    } else {
+        Write-Step "Starting backend (backend/main.py)..."
+        Write-Step "Backend logs: $BackendLog"
+        Write-Step "Backend error logs: $BackendErrLog"
+        $env:PYTHONUTF8 = "1"
+        Push-Location $BackendDir
+        $BackendProcess = Start-Process `
+            -FilePath "uv" `
+            -ArgumentList @("run", "python", "main.py") `
+            -WorkingDirectory $BackendDir `
+            -PassThru `
+            -NoNewWindow `
+            -RedirectStandardOutput $BackendLog `
+            -RedirectStandardError $BackendErrLog
+        $StartedBackend = $true
+        Pop-Location
+    }
 
     Write-Step "Waiting for backend health check: $HealthUrl"
     $maxWaitSeconds = 120
@@ -64,21 +87,16 @@ try {
     $ready = $false
 
     while ($waited -lt $maxWaitSeconds) {
-        if ($BackendProcess.HasExited) {
+        if ($StartedBackend -and $BackendProcess.HasExited) {
             Write-Host "Error: backend process exited early. Last log lines:" -ForegroundColor Red
             if (Test-Path $BackendErrLog) { Get-Content $BackendErrLog -Tail 30 }
             if (Test-Path $BackendLog) { Get-Content $BackendLog -Tail 30 }
             exit 1
         }
 
-        try {
-            $response = Invoke-WebRequest -Uri $HealthUrl -UseBasicParsing -TimeoutSec 2
-            if ($response.StatusCode -eq 200) {
-                $ready = $true
-                break
-            }
-        } catch {
-            # Backend still starting
+        if (Test-BackendReady) {
+            $ready = $true
+            break
         }
 
         Start-Sleep -Seconds 2
@@ -112,6 +130,8 @@ try {
     & npm run dev
 }
 finally {
-    Stop-Backend
+    if ($StartedBackend) {
+        Stop-Backend
+    }
     Pop-Location -ErrorAction SilentlyContinue
 }

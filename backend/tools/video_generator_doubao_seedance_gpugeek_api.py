@@ -15,13 +15,58 @@ from utils.style_prompts import expand_video_style_prompt, is_real_person_reject
 
 
 def _extract_output(response_json: Dict[str, Any]) -> str:
-    """Extract the output URL from a prediction response."""
+    """Extract the primary video URL from a prediction response."""
+    video_url, _ = _extract_video_and_last_frame_urls(response_json)
+    return video_url
+
+
+def _looks_like_video_url(value: str) -> bool:
+    lower = value.lower().split("?", 1)[0]
+    return lower.endswith((".mp4", ".mov", ".webm", ".mkv"))
+
+
+def _looks_like_image_url(value: str) -> bool:
+    lower = value.lower().split("?", 1)[0]
+    return lower.endswith((".png", ".jpg", ".jpeg", ".webp", ".gif"))
+
+
+def _extract_video_and_last_frame_urls(response_json: Dict[str, Any]) -> tuple[str, Optional[str]]:
+    """Extract video URL and optional last-frame image URL from GPUGEEK response."""
+    video_url: Optional[str] = None
+    last_frame_url: Optional[str] = None
+
     output = response_json.get("output")
-    if isinstance(output, list) and len(output) > 0:
-        return output[0]
+    if isinstance(output, list):
+        for item in output:
+            if not isinstance(item, str):
+                continue
+            if _looks_like_video_url(item):
+                video_url = video_url or item
+            elif _looks_like_image_url(item):
+                last_frame_url = last_frame_url or item
+        if video_url is None and output:
+            video_url = output[0]
+        if last_frame_url is None and len(output) >= 2 and isinstance(output[1], str):
+            if _looks_like_image_url(output[1]):
+                last_frame_url = output[1]
     elif isinstance(output, str):
-        return output
-    raise ValueError(f"Unexpected output format: {output}")
+        video_url = output
+
+    for key in ("last_frame", "last_frame_url", "lastFrame", "lastFrameUrl"):
+        value = response_json.get(key)
+        if isinstance(value, str) and value:
+            last_frame_url = value
+
+    nested = response_json.get("output_metadata")
+    if isinstance(nested, dict):
+        for key in ("last_frame", "last_frame_url", "lastFrame", "lastFrameUrl"):
+            value = nested.get(key)
+            if isinstance(value, str) and value:
+                last_frame_url = value
+
+    if video_url is None:
+        raise ValueError(f"Unexpected output format: {output}")
+    return video_url, last_frame_url
 
 
 def _extract_api_error(response_json: Dict[str, Any]) -> str:
@@ -175,7 +220,7 @@ class VideoGeneratorDoubaoSeedanceGPUGEEKAPI:
                 await asyncio.sleep(2)
                 continue
 
-    async def _poll_prediction(self, prediction_id: str, headers: dict) -> str:
+    async def _poll_prediction(self, prediction_id: str, headers: dict) -> tuple[str, Optional[str]]:
         url = f"{self.base_url}/{prediction_id}"
         max_polls = 600
         start_time = time.time()
@@ -201,11 +246,13 @@ class VideoGeneratorDoubaoSeedanceGPUGEEKAPI:
             status = response_json.get("status")
             if status == "succeeded":
                 elapsed = time.time() - start_time
-                video_url = _extract_output(response_json)
+                video_url, last_frame_url = _extract_video_and_last_frame_urls(response_json)
                 logging.info(
                     f"Video generation completed (elapsed: {elapsed:.0f}s). URL: {video_url}"
                 )
-                return video_url
+                if last_frame_url:
+                    logging.info("Seedance returned last-frame URL for continuity handoff.")
+                return video_url, last_frame_url
             if status == "failed":
                 elapsed = time.time() - start_time
                 error_msg = _extract_api_error(response_json)
@@ -246,9 +293,9 @@ class VideoGeneratorDoubaoSeedanceGPUGEEKAPI:
 
         status = response_json.get("status")
         if status == "succeeded":
-            video_url = _extract_output(response_json)
+            video_url, last_frame_url = _extract_video_and_last_frame_urls(response_json)
             logging.info(f"Video generation completed synchronously. URL: {video_url}")
-            return VideoOutput(fmt="url", ext="mp4", data=video_url)
+            return VideoOutput(fmt="url", ext="mp4", data=video_url, last_frame_url=last_frame_url)
 
         if status == "failed":
             error_msg = _extract_api_error(response_json)
@@ -257,10 +304,10 @@ class VideoGeneratorDoubaoSeedanceGPUGEEKAPI:
 
         task_id = response_json["id"]
         logging.info(f"Video generation task created. ID: {task_id}, status: {status}")
-        video_url = await self._poll_prediction(task_id, {
+        video_url, last_frame_url = await self._poll_prediction(task_id, {
             "Authorization": f"Bearer {self.api_key}",
         })
-        return VideoOutput(fmt="url", ext="mp4", data=video_url)
+        return VideoOutput(fmt="url", ext="mp4", data=video_url, last_frame_url=last_frame_url)
 
     async def generate_single_video(
         self,
@@ -275,6 +322,8 @@ class VideoGeneratorDoubaoSeedanceGPUGEEKAPI:
     ) -> VideoOutput:
         style = style or kwargs.get("style", "")
         last_error: Optional[Exception] = None
+        reference_rejected_as_real_person = False
+        text_only_prompt: Optional[str] = None
 
         try:
             return await self._generate_once(
@@ -288,15 +337,35 @@ class VideoGeneratorDoubaoSeedanceGPUGEEKAPI:
         except ValueError as exc:
             last_error = exc
             if is_real_person_rejection(str(exc)) and reference_image_paths:
+                reference_rejected_as_real_person = True
+                if len(reference_image_paths) > 1:
+                    logging.warning(
+                        "Seedance rejected multi-image references as a real person. "
+                        "Retrying with the first-frame reference only..."
+                    )
+                    try:
+                        return await self._generate_once(
+                            prompt,
+                            reference_image_paths[:1],
+                            resolution,
+                            aspect_ratio,
+                            duration,
+                            generate_audio=self.generate_audio,
+                        )
+                    except ValueError as first_ref_exc:
+                        last_error = first_ref_exc
+                        if not is_real_person_rejection(str(first_ref_exc)):
+                            raise
+
                 logging.warning(
                     "Seedance rejected reference image as a real person. "
-                    "Retrying text-only video generation while preserving selected style..."
+                    "Retrying text-only video generation and disabling reference-image retries..."
                 )
                 video_style = expand_video_style_prompt(style)
-                fallback_prompt = f"{prompt}\n\nVisual style: {video_style}"
+                text_only_prompt = f"{prompt}\n\nVisual style: {video_style}"
                 try:
                     return await self._generate_once(
-                        fallback_prompt,
+                        text_only_prompt,
                         [],
                         resolution,
                         aspect_ratio,
@@ -307,12 +376,18 @@ class VideoGeneratorDoubaoSeedanceGPUGEEKAPI:
                     last_error = retry_exc
 
         if self.generate_audio and last_error is not None:
-            logging.warning("Retrying Seedance video generation with dialogue audio enabled...")
+            retry_refs = [] if reference_rejected_as_real_person else reference_image_paths
+            retry_prompt = text_only_prompt or prompt
+            logging.warning(
+                "Retrying Seedance video generation with dialogue audio enabled "
+                "(images=%d)...",
+                len(retry_refs),
+            )
             await asyncio.sleep(3)
             try:
                 return await self._generate_once(
-                    prompt,
-                    reference_image_paths,
+                    retry_prompt,
+                    retry_refs,
                     resolution,
                     aspect_ratio,
                     duration,
