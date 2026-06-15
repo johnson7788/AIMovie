@@ -36,8 +36,8 @@ const form = reactive({
 	prompt: '',
 	style: '',
 	aspect_ratio: '9:16',
-	episode_sum: 20,
-	episode_duration: 60
+	episode_sum: 3,
+	episode_duration: 15
 })
 
 interface ExamplePreset {
@@ -59,7 +59,7 @@ const examplePresets: ExamplePreset[] = [
 		style: 'storybook',
 		aspect_ratio: '9:16',
 		episode_sum: 3,
-		episode_duration: 60,
+		episode_duration: 15,
 		model_id: '5',
 	},
 	{
@@ -69,7 +69,7 @@ const examplePresets: ExamplePreset[] = [
 		style: 'storybook',
 		aspect_ratio: '9:16',
 		episode_sum: 4,
-		episode_duration: 60,
+		episode_duration: 15,
 		model_id: '5',
 	},
 	{
@@ -79,7 +79,7 @@ const examplePresets: ExamplePreset[] = [
 		style: 'cinematic',
 		aspect_ratio: '9:16',
 		episode_sum: 5,
-		episode_duration: 60,
+		episode_duration: 15,
 		model_id: '5',
 	},
 	{
@@ -89,7 +89,7 @@ const examplePresets: ExamplePreset[] = [
 		style: 'cinematic',
 		aspect_ratio: '9:16',
 		episode_sum: 20,
-		episode_duration: 60,
+		episode_duration: 15,
 		model_id: '5',
 	},
 	{
@@ -99,7 +99,7 @@ const examplePresets: ExamplePreset[] = [
 		style: 'anime',
 		aspect_ratio: '9:16',
 		episode_sum: 40,
-		episode_duration: 60,
+		episode_duration: 15,
 		model_id: '5',
 	},
 ]
@@ -259,8 +259,8 @@ const resetForm = () => {
 	form.prompt = '';
 	form.style = '';
 	form.aspect_ratio = '9:16';
-	form.episode_sum = 20;
-	form.episode_duration = 60;
+	form.episode_sum = 3;
+	form.episode_duration = 15;
 	styleFind.value = { id: '' };
 	selectedModel.value = { id: '' };
 }
@@ -394,7 +394,7 @@ const handleScriptChange = (val: any) => {
 			form.episode_sum = 3;
 			break;
 		case 'drama':
-			form.episode_sum = 80;
+			form.episode_sum = 3;
 			break;
 	}
 }
