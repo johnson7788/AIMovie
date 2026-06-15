@@ -9,14 +9,14 @@
                         </el-icon>
                     </div>
                     <span class="box-drama-episode ">
-                        共{{ item.episode_num }}集
+                        {{ $t('works.totalEpisodes', { num: item.episode_num }) }}
                     </span>
                     <el-avatar :src="item.cover" class="box-image" shape="square">
                         <div class="flex flex-column grid-gap-1 flex-center" v-if="item.cover_state">
                             <el-icon size="40">
                                 <Loading class="circular" />
                             </el-icon>
-                            <span class="h10 font-weight-600 text-success">AI正在生成封面...</span>
+                            <span class="h10 font-weight-600 text-success">{{ $t('works.aiGenCovering') }}</span>
                         </div>
                     </el-avatar>
                     <div class="box-content">
@@ -33,7 +33,7 @@
                 </div>
             </div>
             <div class="flex flex-center" v-else>
-                <el-empty description="暂无作品" />
+                <el-empty :description="$t('works.noWorks')" />
             </div>
         </div>
     </el-scrollbar>
@@ -45,7 +45,9 @@ import { $http } from '@/common/http';
 import { ResponseCode } from '@/common/const';
 import { useUserStore } from '@/stores';
 import { ElMessageBox, ElMessage } from 'element-plus';
+import { useI18n } from 'vue-i18n';
 import router from '@/routers';
+const { t } = useI18n()
 
 const userStore = useUserStore();
 const SearchForm = reactive({
@@ -80,16 +82,16 @@ const scrollBarEndReached = () => {
 }
 
 const handleDelete = (item: any) => {
-    ElMessageBox.confirm('确定删除该作品吗？', '提示', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
+    ElMessageBox.confirm(t('works.deleteConfirm'), t('common.tips'), {
+        confirmButtonText: t('common.confirm'),
+        cancelButtonText: t('common.cancel'),
         type: 'warning',
     }).then(() => {
         $http.post('/app/shortplay/api/Drama/delete', {
             id: item.id,
         }).then((res: any) => {
             if (res.code === ResponseCode.SUCCESS) {
-                ElMessage.success('删除作品成功');
+                ElMessage.success(t('works.deleteSuccess'));
                 // 删除成功后重新加载列表
                 list.value = [];
                 SearchForm.page = 1;

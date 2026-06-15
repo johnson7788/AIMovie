@@ -15,6 +15,9 @@ import { usePush } from '@/composables/usePush'
 import ScriptSvg from '@/svg/icon/video-file.vue'
 import DramaSvg from '@/svg/icon/drama.vue'
 import { useLoading } from '@/composables/useLoading'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const userStore = useUserStore()
 const modelStore = useModelStore()
@@ -51,9 +54,9 @@ interface ExamplePreset {
 	model_id: string
 }
 
-const examplePresets: ExamplePreset[] = [
+const examplePresets = computed<ExamplePreset[]>(() => [
 	{
-		label: '橘猫探访书店',
+		label: t('home.exampleCat'),
 		mode: 'script',
 		prompt: 'A curious orange tabby cat explores a cozy old bookshop filled with towering shelves and warm golden lamplight. The cat leaps between stacked books, knocks over a pile, and chases a dust mote caught in a sunbeam. Between adventures, it curls up on an open novel by the window and purrs contentedly.',
 		style: 'storybook',
@@ -63,7 +66,7 @@ const examplePresets: ExamplePreset[] = [
 		model_id: '5',
 	},
 	{
-		label: '蝴蝶的第一次飞翔',
+		label: t('home.exampleButterfly'),
 		mode: 'script',
 		prompt: 'A newly emerged orange-striped butterfly takes its first flight in a spring garden. It accidentally picks up pollen while brushing flower buds, pauses on a kitten\'s paw, and touches an old grandma\'s half-finished butterfly embroidery. Finally it delivers carried pollen to a waiting rose, which unfurls all its petals.',
 		style: 'storybook',
@@ -73,7 +76,7 @@ const examplePresets: ExamplePreset[] = [
 		model_id: '5',
 	},
 	{
-		label: '赛博朋克侦探',
+		label: t('home.exampleCyberpunk'),
 		mode: 'script',
 		prompt: 'In a neon-lit cyberpunk city, a hard-boiled detective investigates a series of AI malfunctions. Rain-slicked streets reflect holographic ads as the detective follows digital breadcrumbs through underground hacker dens and corporate towers.',
 		style: 'cinematic',
@@ -83,7 +86,7 @@ const examplePresets: ExamplePreset[] = [
 		model_id: '5',
 	},
 	{
-		label: '都市爱情故事',
+		label: t('home.exampleRomance'),
 		mode: 'drama',
 		prompt: '两个年轻人在繁忙的都市中偶然相遇，从误解到理解，从陌生到熟悉。在追逐梦想的路上，他们互相扶持，共同成长，一段温暖治愈的都市爱情故事徐徐展开。',
 		style: 'cinematic',
@@ -93,7 +96,7 @@ const examplePresets: ExamplePreset[] = [
 		model_id: '5',
 	},
 	{
-		label: '古装武侠传奇',
+		label: t('home.exampleWuxia'),
 		mode: 'drama',
 		prompt: '少年侠客初入江湖，意外卷入一场惊天阴谋。在刀光剑影中磨砺成长，在恩怨情仇中坚守本心。江湖路远，儿女情长，一段荡气回肠的武侠传奇就此展开。',
 		style: 'anime',
@@ -102,7 +105,7 @@ const examplePresets: ExamplePreset[] = [
 		episode_duration: 15,
 		model_id: '5',
 	},
-]
+])
 
 const options = ref<MentionOption[]>([])
 const loading = ref(false)
@@ -184,54 +187,54 @@ const addListener = () => {
 	}
 }
 const xlLoading = useLoading({
-	title: '剧本创作中，预计3-5分钟~',
-	tips: '退出页面，剧本会继续生成',
+	title: t('home.loadingTitle'),
+	tips: t('home.loadingTips'),
 	auto: true,
 	list: [
 		{
-			title: '解析剧本中...',
+			title: t('home.loadingParse'),
 			start: 0,
 			end: 20,
 			progress: 20
 		},
 		{
-			title: '正在创作剧本卖点...',
+			title: t('home.loadingSelling'),
 			start: 20,
 			end: 25,
 			progress: 10,
 		},
 		{
-			title: '正在创作剧本爽点...',
+			title: t('home.loadingHighlight'),
 			start: 25,
 			end: 30,
 			progress: 10,
 		},
 		{
-			title: '正在创作剧本主线...',
+			title: t('home.loadingMainPlot'),
 			start: 30,
 			end: 35,
 			progress: 10,
 		},
 		{
-			title: '正在创作剧本关系...',
+			title: t('home.loadingRelation'),
 			start: 35,
 			end: 40,
 			progress: 10,
 		},
 		{
-			title: '正在创作剧本描述...',
+			title: t('home.loadingDescription'),
 			start: 40,
 			end: 45,
 			progress: 10,
 		},
 		{
-			title: '正在创作剧本背景...',
+			title: t('home.loadingBackground'),
 			start: 45,
 			end: 50,
 			progress: 10,
 		},
 		{
-			title: '正在创作剧本大纲...',
+			title: t('home.loadingOutline'),
 			start: 50,
 			end: 9999,
 			progress: 20,
@@ -239,8 +242,8 @@ const xlLoading = useLoading({
 	],
 	showCancelButton: true,
 	showConfirmButton: true,
-	cancelButtonText: '返回首页',
-	confirmButtonText: '去作品广场',
+	cancelButtonText: t('home.backHome'),
+	confirmButtonText: t('home.goSquare'),
 	confirmButtonClick: () => {
 		xlLoading.close();
 		router.push('/square');
@@ -290,7 +293,7 @@ const submit = () => {
 			ElMessage.error(res.msg);
 		}
 	}).catch(() => {
-		ElMessage.error('提交失败');
+		ElMessage.error(t('home.submitFail'));
 	}).finally(() => {
 		loading.value = false;
 	});
@@ -300,7 +303,7 @@ const showDramaCreateDialog = () => {
 		return login.open();
 	}
 	if (!form.style) {
-		ElMessage.error('请选择风格');
+		ElMessage.error(t('home.selectStyle'));
 		return;
 	}
 	dramaCreateDialogVisible.value = true;
@@ -422,10 +425,10 @@ onUnmounted(() => {
 
 <template>
 	<div class="flex flex-column  flex-center px-10 page-layouts grid-gap-6">
-		<span class="head-title">一站式长片创作平台</span>
-		<span class="head-subtitle">剧本、分镜、画面、配音、剪辑，一站式智能生成</span>
+		<span class="head-title">{{ $t('home.title') }}</span>
+		<span class="head-subtitle">{{ $t('home.subtitle') }}</span>
 		<el-segmented v-model="form.script" :disabled="loading"
-			:options="[{ label: '剧本模式', value: 'drama', icon: DramaSvg }, { label: '创意模式', value: 'script', icon: ScriptSvg }]"
+			:options="[{ label: $t('home.scriptMode'), value: 'drama', icon: DramaSvg }, { label: $t('home.creativeMode'), value: 'script', icon: ScriptSvg }]"
 			class="tabs-segmented border" @change="handleScriptChange">
 			<template #default="{ item }">
 				<div class="flex flex-center grid-gap-2">
@@ -440,7 +443,7 @@ onUnmounted(() => {
 			<div class="rounded-4 p-4 input-bg">
 				<el-mention ref="mentionRef" v-model="form.prompt" :autosize="{ minRows: 6, maxRows: 50 }"
 					popper-class="prompt-popper" type="textarea" :prefix="mentionPrefix"
-					placeholder="请输入剧本创作提示词，@演员名称可以引用演员，#物品名称可以引用物品，Shift + Enter换行，Enter提交" :options="options"
+					:placeholder="t('home.placeholder')" :options="options"
 					:loading="loading" whole :check-is-whole="checkIsWhole" @search="handleSearch"
 					@keydown="handleKeyDown" @select="handleSelect"
 					@focus="stateStore.setState('InputFocusState', true)"
@@ -535,7 +538,7 @@ onUnmounted(() => {
 			</div>
 		</div>
 		<div class="example-presets">
-			<span class="example-presets-label">示例：</span>
+			<span class="example-presets-label">{{ $t('home.example') }}</span>
 			<span
 				v-for="example in examplePresets"
 				:key="example.label"
@@ -652,11 +655,11 @@ onUnmounted(() => {
 
 		<el-dialog v-model="dramaCreateDialogVisible" class="drama-dialog" draggable>
 			<template #header>
-				<span class="font-weight-600">为短剧命名</span>
+				<span class="font-weight-600">{{ $t('home.nameDrama') }}</span>
 			</template>
-			<span class="h10">剧本名称</span>
-			<el-input v-model="form.title" placeholder="请输入剧本标题" size="large" class="input-title" />
-			<span class="h10">剧本封面</span>
+			<span class="h10">{{ $t('home.dramaName') }}</span>
+			<el-input v-model="form.title" :placeholder="t('home.dramaNamePlaceholder')" size="large" class="input-title" />
+			<span class="h10">{{ $t('home.dramaCover') }}</span>
 			<el-upload ref="uploadCoverRef" class="input-upload flex-1" drag
 				:data="{ dir_name: 'drama/cover', dir_title: '剧本封面' }"
 				:action="$http.getCompleteUrl('app/shortplay/api/Uploads/upload')" :before-upload="beforeUpload"
@@ -667,15 +670,15 @@ onUnmounted(() => {
 						<IconUploadImageSvg />
 					</el-icon>
 					<div class="el-upload__text">
-						<span class="h10">拖拽剧本封面到此处或</span>
-						<span class="h10">点击上传</span>
+						<span class="h10">{{ $t('home.dragCover') }}</span>
+						<span class="h10">{{ $t('home.clickUpload') }}</span>
 					</div>
 					<div class="el-upload__text">
-						<span class="h10">支持上传格式：</span>
+						<span class="h10">{{ $t('home.supportFormat') }}</span>
 						<span class="h10">PNG, JPG, JPEG</span>
 					</div>
 					<div class="el-upload__text">
-						<span class="h10">封面比例：</span>
+						<span class="h10">{{ $t('home.coverRatio') }}</span>
 						<span class="h10">4:3</span>
 					</div>
 				</template>
@@ -685,13 +688,13 @@ onUnmounted(() => {
 			</el-upload>
 			<template #footer>
 				<el-button type="info" @click="dramaCreateDialogVisible = false" size="large" color="#F9F9F9"><span
-						class="text-bg">取消</span></el-button>
-				<el-button type="success" @click="submit" size="large">提交</el-button>
+						class="text-bg">{{ $t('common.cancel') }}</span></el-button>
+				<el-button type="success" @click="submit" size="large">{{ $t('common.submit') }}</el-button>
 			</template>
 		</el-dialog>
 		<el-dialog v-model="dramaUploadDialogVisible" class="drama-dialog" draggable>
 			<template #header>
-				<span class="font-weight-600">导入本地文件</span>
+				<span class="font-weight-600">{{ $t('home.importFile') }}</span>
 			</template>
 			<el-upload ref="uploadRef" class="input-upload flex-1" drag
 				:data="{ dir_name: 'drama/content', dir_title: '剧本' }"
@@ -708,21 +711,21 @@ onUnmounted(() => {
 					</div>
 				</template>
 				<div class="el-upload__text">
-					<span class="h10 text-success">拖拽文件到此处或点击上传</span>
+					<span class="h10 text-success">{{ $t('home.dragFile') }}</span>
 				</div>
 				<div class="el-upload__text">
-					<span class="h10">支持上传格式：</span>
+					<span class="h10">{{ $t('home.supportFormat') }}</span>
 					<span class="h10">DOCX, TXT,EXCEL</span>
 				</div>
 				<div class="el-upload__text">
-					<span class="h10">限制说明：</span>
-					<span class="h10">单个文件不超过 10MB 或 20页（以先达到者为准）</span>
+					<span class="h10">{{ $t('home.limitDesc') }}</span>
+					<span class="h10">{{ $t('home.limitDetail') }}</span>
 				</div>
 			</el-upload>
 			<template #footer>
 				<el-button type="info" @click="dramaUploadDialogVisible = false" size="large" color="#F9F9F9"><span
-						class="text-bg">取消</span></el-button>
-				<el-button type="success" @click="submit" size="large">提交</el-button>
+						class="text-bg">{{ $t('common.cancel') }}</span></el-button>
+				<el-button type="success" @click="submit" size="large">{{ $t('common.submit') }}</el-button>
 			</template>
 		</el-dialog>
 	</div>

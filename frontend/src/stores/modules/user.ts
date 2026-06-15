@@ -1,6 +1,7 @@
 import { useStorage } from '@/composables/useStorage';
 import { onStoreageChange } from '@/common/functions';
 import router from '@/routers';
+import { i18n } from '@/locale';
 export default () => {
     const storage = useStorage()
     const UserInfoStorageKey = 'USERINFO'
@@ -18,10 +19,10 @@ export default () => {
                 if (hasLogin()) {
                     resolve(true);
                 } else {
-                    reject('设置用户信息失败');
+                    reject(i18n.global.t('store.setUserInfoFail'));
                 }
             }).catch(() => {
-                reject('设置本地储存失败')
+                reject(i18n.global.t('store.setStorageFail'))
             })
         })
     }

@@ -11,6 +11,8 @@ import { useRoute } from 'vue-router';
 import router from '@/routers';
 import { Loading, UploadFilled } from '@element-plus/icons-vue';
 import { usePush } from '@/composables/usePush';
+import { useI18n } from 'vue-i18n';
+const { t } = useI18n();
 const route = useRoute();
 const userStore = useUserStore();
 const { USERINFO } = useRefs(userStore);
@@ -30,7 +32,7 @@ const getDramaInfo = () => {
             ElMessage.error(res.msg);
         }
     }).catch(() => {
-        ElMessage.error('获取短剧详情失败');
+        ElMessage.error(t('common.loadFail'));
     })
 }
 const ActorSearch = reactive({
@@ -198,7 +200,7 @@ const generateImageLoading = ref(false);
 const handleGenerateImage = () => {
     if (generateImageLoading.value || currentActor.value.status_enum.value === 'pending') return;
     if(!currentActorForm.value.image_model_id&&!currentActorForm.value.three_view_model_id) {
-        ElMessage.error('请先选择形象图模型或三视图模型');
+        ElMessage.error(t('actor.selectModelFirst'));
         return;
     }
     generateImageLoading.value = true;
@@ -214,7 +216,7 @@ const handleGenerateImage = () => {
             ElMessage.error(res.msg);
         }
     }).catch(() => {
-        ElMessage.error('生成图片失败');
+        ElMessage.error(t('actor.genImageFail'));
     }).finally(() => {
         generateImageLoading.value = false;
     })
@@ -255,7 +257,7 @@ const handleReplaceActor = (item: any) => {
             ElMessage.error(res.msg);
         }
     }).catch(() => {
-        ElMessage.error('替换演员失败');
+        ElMessage.error(t('actor.replaceFail'));
     }).finally(() => {
         replaceActorLoading.value = false;
     })
@@ -328,7 +330,7 @@ const handleVoiceSuccess = (data: any) => {
         }
     }).catch((error) => {
         console.error('handleVoiceSuccess error', error);
-        ElMessage.error('设置演员音色失败');
+        ElMessage.error(t('actor.setVoiceFail'));
     })
 }
 const characterLookRef = ref();
@@ -410,7 +412,7 @@ onUnmounted(() => {
             <div class="flex-1 flex flex-column grid-gap-4 overflow-hidden">
                 <el-form class="flex flex-center grid-gap-4" @submit.prevent="getActorList">
                     <el-form-item class="mb-0">
-                        <el-input v-model="ActorSearch.name" placeholder="搜索演员" clearable @change="getActorList">
+                        <el-input v-model="ActorSearch.name" :placeholder="t('actor.search')" clearable @change="getActorList">
                             <template #suffix>
                                 <el-icon>
                                     <Search />
@@ -420,21 +422,21 @@ onUnmounted(() => {
                     </el-form-item>
                     <div class="flex-1"></div>
                     <el-form-item class="mb-0" style="width: 80px;">
-                        <el-select v-model="ActorSearch.species_type" placeholder="物种" clearable :teleported="false"
+                        <el-select v-model="ActorSearch.species_type" :placeholder="t('actor.species')" clearable :teleported="false"
                             @change="getActorList">
                             <el-option v-for="item in WEBCONFIG?.enum?.actor_species_type" :key="item.value"
                                 :label="item.label" :value="item.value" />
                         </el-select>
                     </el-form-item>
                     <el-form-item class="mb-0" style="width: 80px;">
-                        <el-select v-model="ActorSearch.gender" placeholder="性别" clearable :teleported="false"
+                        <el-select v-model="ActorSearch.gender" :placeholder="t('actor.gender')" clearable :teleported="false"
                             @change="getActorList">
                             <el-option v-for="item in WEBCONFIG?.enum?.actor_gender" :key="item.value"
                                 :label="item.label" :value="item.value" />
                         </el-select>
                     </el-form-item>
                     <el-form-item class="mb-0" style="width: 80px;">
-                        <el-select v-model="ActorSearch.age" placeholder="年龄" clearable :teleported="false"
+                        <el-select v-model="ActorSearch.age" :placeholder="t('actor.age')" clearable :teleported="false"
                             @change="getActorList">
                             <el-option v-for="item in WEBCONFIG?.enum?.actor_age" :key="item.value" :label="item.label"
                                 :value="item.value" />
@@ -450,12 +452,12 @@ onUnmounted(() => {
                                 style="height: 40px; width: 40px;background-color: var(--el-fill-color-dark);">
                                 <Plus />
                             </el-icon>
-                            <span>添加演员</span>
+                            <span>{{ t('actor.addActor') }}</span>
                         </div>
                         <div class="grid-column-1 rounded-4 flex flex-column flex-center grid-gap-2 actor-item bg-overlay border"
                             :class="{ 'border-success': item.id === currentActorForm.id }" v-for="item in actorList"
                             :key="item.id">
-                            <el-avatar :src="item.headimg" class="actor-avatar bg-mosaic" fit="cover" :title="item.is_edit?item.name:'公共角色不可编辑'">
+                            <el-avatar :src="item.headimg" class="actor-avatar bg-mosaic" fit="cover" :title="item.is_edit?item.name:t('actor.publicNoEdit')">
                                 {{ item.name }}
                             </el-avatar>
                             <div class="actor-edit-mask flex flex-column grid-gap-4 flex-center pointer"
@@ -465,9 +467,9 @@ onUnmounted(() => {
                                     <el-icon size="16">
                                         <UploadFilled />
                                     </el-icon>
-                                    <span class="h10">手动上传</span>
+                                    <span class="h10">{{ t('actor.manualUpload') }}</span>
                                 </div>
-                                <el-popconfirm title="确定删除该演员吗？" width="fit-content" @confirm="handleDeleteActor(item)"
+                                <el-popconfirm :title="t('actor.deleteConfirm')" width="fit-content" @confirm="handleDeleteActor(item)"
                                     placement="bottom-end">
                                     <template #reference>
                                         <div class="flex flex-center bg-overlay rounded-round p-2 pointer grid-gap-2"
@@ -475,7 +477,7 @@ onUnmounted(() => {
                                             <el-icon size="16">
                                                 <Delete />
                                             </el-icon>
-                                            <span class="h10">删除演员</span>
+                                            <span class="h10">{{ t('actor.deleteActor') }}</span>
                                         </div>
                                     </template>
                                 </el-popconfirm>
@@ -510,14 +512,14 @@ onUnmounted(() => {
                             </div>
                             <div class="actor-action flex flex-center px-4">
                                 <el-button text bg @click="handleVoiceActor(item)" class="flex-1 text-ellipsis-1">
-                                    <span v-if="item.voice">音色:{{ item.voice.name }}</span>
-                                    <span v-else>演员音色</span>
+                                    <span v-if="item.voice">{{ t('actor.voice') }}:{{ item.voice.name }}</span>
+                                    <span v-else>{{ t('actor.actorVoice') }}</span>
                                 </el-button>
                                 <el-button text bg @click="handleCharacterLookActor(item)"
                                     class="flex-1 text-ellipsis-1" :disabled="!!item.character_look_state">
-                                    <span v-if="item.character_look_state">换装中</span>
+                                    <span v-if="item.character_look_state">{{ t('actor.changingLook') }}</span>
                                     <span v-else-if="item.characterLook">{{ item.characterLook.title }}</span>
-                                    <span v-else>演员装扮</span>
+                                    <span v-else>{{ t('actor.actorLook') }}</span>
                                 </el-button>
                             </div>
                         </div>
@@ -527,24 +529,24 @@ onUnmounted(() => {
             <div class="actor-form-wrapper bg-overlay border rounded-4 actor-form flex flex-column grid-gap-4">
                 <template v-if="currentActorForm.id">
                     <div class="border-bottom flex flex-center">
-                        <el-input v-model="currentActorForm.name" placeholder="角色演员" size="large"
+                        <el-input v-model="currentActorForm.name" :placeholder="t('actor.roleActor')" size="large"
                             class="actor-form-input flex-1">
                         </el-input>
                     </div>
                     <div class="flex flex-column grid-gap-2 px-4">
-                        <span>基础信息</span>
+                        <span>{{ t('actor.basicInfo') }}</span>
                         <div class="flex grid-gap-2">
-                            <el-select v-model="currentActorForm.species_type" placeholder="请选择物种" size="small"
+                            <el-select v-model="currentActorForm.species_type" :placeholder="t('actor.selectSpecies')" size="small"
                                 class="flex-1 actor-form-select">
                                 <el-option v-for="item in WEBCONFIG?.enum?.actor_species_type" :key="item.value"
                                     :label="item.label" :value="item.value" />
                             </el-select>
-                            <el-select v-model="currentActorForm.gender" placeholder="请选择性别" size="small"
+                            <el-select v-model="currentActorForm.gender" :placeholder="t('actor.selectGender')" size="small"
                                 class="flex-1 actor-form-select">
                                 <el-option v-for="item in WEBCONFIG?.enum?.actor_gender" :key="item.value"
                                     :label="item.label" :value="item.value" />
                             </el-select>
-                            <el-select v-model="currentActorForm.age" placeholder="请选择年龄" size="small"
+                            <el-select v-model="currentActorForm.age" :placeholder="t('actor.selectAge')" size="small"
                                 class="flex-1 actor-form-select">
                                 <el-option v-for="item in WEBCONFIG?.enum?.actor_age" :key="item.value"
                                     :label="item.label" :value="item.value" />
@@ -552,13 +554,13 @@ onUnmounted(() => {
                         </div>
                     </div>
                     <div class="flex flex-column grid-gap-2 px-4">
-                        <span>角色描述</span>
+                        <span>{{ t('actor.roleDesc') }}</span>
                         <div class="bg rounded-4 p-4 border">
-                            <el-input v-model="currentActorForm.remarks" placeholder="请输入角色描述" size="small"
+                            <el-input v-model="currentActorForm.remarks" :placeholder="t('actor.inputRoleDesc')" size="small"
                                 class="actor-form-textarea" type="textarea" :autosize="{ minRows: 6, maxRows: 20 }" />
                             <div class="flex flex-y-center grid-gap-2">
                                 <div class="bg-overlay rounded-round p-3 flex flex-center grid-gap-2 pointer hover-bg-hover"
-                                    ref="modelButtonRef" title="选择使用AI生成形象图">
+                                    ref="modelButtonRef" :title="t('actor.selectAiImage')">
                                     <template v-if="model.id">
                                         <el-avatar :src="model.icon" :alt="model.name" shape="square"
                                             :size="16"></el-avatar>
@@ -572,14 +574,14 @@ onUnmounted(() => {
                                         <el-icon size="16">
                                             <IconModelSvg />
                                         </el-icon>
-                                        <span class="h10">形象图</span>
+                                        <span class="h10">{{ t('actor.imagePhoto') }}</span>
                                         <el-icon size="16">
                                             <ArrowDown />
                                         </el-icon>
                                     </template>
                                 </div>
                                 <div class="bg-overlay rounded-round p-3 flex flex-center grid-gap-2 pointer hover-bg-hover"
-                                    ref="threeViewModelButtonRef" title="选择使用AI生成三视图">
+                                    ref="threeViewModelButtonRef" :title="t('actor.selectAiThreeView')">
                                     <template v-if="threeViewModel.id">
                                         <el-avatar :src="threeViewModel.icon" :alt="threeViewModel.name" shape="square"
                                             :size="16"></el-avatar>
@@ -593,14 +595,14 @@ onUnmounted(() => {
                                         <el-icon size="16">
                                             <IconModelSvg />
                                         </el-icon>
-                                        <span class="h10">三视图</span>
+                                        <span class="h10">{{ t('actor.threeView') }}</span>
                                         <el-icon size="16">
                                             <ArrowDown />
                                         </el-icon>
                                     </template>
                                 </div>
-                                <el-upload ref="uploadImageRef" title="添加参考图"
-                                    :data="{ dir_name: 'actor/reference', dir_title: '演员形象参考照片' }"
+                                <el-upload ref="uploadImageRef" :title="t('actor.addRefImage')"
+                                    :data="{ dir_name: 'actor/reference', dir_title: t('actor.refPhoto') }"
                                     :action="$http.getCompleteUrl('app/shortplay/api/Uploads/upload')"
                                     :headers="$http.getHeaders()" accept="image/jpeg,image/png" :limit="1" type="cover"
                                     :disabled="uploadLoading"
@@ -650,7 +652,7 @@ onUnmounted(() => {
                             no-init scene="actor_three_view_image" />
                     </el-popover>
                     <div class="flex flex-column grid-gap-2 px-4 pt-4">
-                        <span>角色原始形象记录</span>
+                        <span>{{ t('actor.originRecord') }}</span>
                     </div>
                     <el-scrollbar class="flex-1">
                         <div class="grid-columns-2 grid-gap-4 p-4" v-if="taskList.length > 0">
@@ -664,14 +666,14 @@ onUnmounted(() => {
                                         <Loading class="circular" v-if="replaceActorLoading" />
                                         <IconReplaceSvg v-else />
                                     </el-icon>
-                                    <span class="h10 text-nowrap">替换原始形象</span>
+                                    <span class="h10 text-nowrap">{{ t('actor.replaceOrigin') }}</span>
                                 </div>
                             </div>
                         </div>
-                        <el-empty v-else description="暂无原始形象记录" />
+                        <el-empty v-else :description="t('actor.noOriginRecord')" />
                     </el-scrollbar>
                 </template>
-                <el-empty v-else description="点击角色名称选择角色" />
+                <el-empty v-else :description="t('actor.clickToSelect')" />
             </div>
         </div>
         <div class="p-4 w-100 flex grid-gap-4 flex-center">
@@ -679,7 +681,7 @@ onUnmounted(() => {
                 <el-icon size="16">
                     <IconPrevStepSvg />
                 </el-icon>
-                <span>上一步</span>
+                <span>{{ t('common.prev') }}</span>
             </el-button>
             <el-button type="success" size="large"
                 :disabled="actorList.filter((item: any) => item.status === 'initializing').length <= 0"
@@ -687,10 +689,10 @@ onUnmounted(() => {
                 <el-icon size="16">
                     <IconBatchSvg />
                 </el-icon>
-                <span>批量生成</span>
+                <span>{{ t('common.batchGenerate') }}</span>
             </el-button>
             <el-button type="success" size="large" @click="nextStep">
-                <span>下一步</span>
+                <span>{{ t('common.next') }}</span>
                 <el-icon size="16" class="ml-2">
                     <IconNextStepSvg />
                 </el-icon>
@@ -700,22 +702,22 @@ onUnmounted(() => {
         <xl-actor-create ref="actorCreateRef" @success="getActorList" />
         <el-dialog v-model="batchGenerateDialogVisible" class="generate-storyboard-dialog" draggable width="800px">
             <template #header>
-                <span class="font-weight-600">批量生成演员</span>
+                <span class="font-weight-600">{{ t('actor.batchGenerate') }}</span>
             </template>
             <div class="flex grid-gap-10">
-                <xl-models title="形象模型" v-model="currentActorForm.image_model_id" @select="handleModelSelect" no-init
+                <xl-models :title="t('actor.imageModel')" v-model="currentActorForm.image_model_id" @select="handleModelSelect" no-init
                     class="flex-1 bg-overlay rounded-4 p-4" scene="actor_image" />
-                <xl-models title="三视图模型" v-model="currentActorForm.three_view_model_id"
+                <xl-models :title="t('actor.threeViewModel')" v-model="currentActorForm.three_view_model_id"
                     @select="handleThreeViewModelSelect" class="flex-1 bg-overlay rounded-4 p-4" no-init
                     scene="actor_three_view_image" />
             </div>
             <template #footer>
                 <el-button type="info" @click="batchGenerateDialogVisible = false"
-                    :disabled="batchGenerateLoading">取消</el-button>
+                    :disabled="batchGenerateLoading">{{ t('common.cancel') }}</el-button>
                 <div class="flex-1"></div>
                 <el-button type="success" icon="Check" @click="submitBatchGenerate"
                     :disabled="!currentActorForm.image_model_id || !currentActorForm.three_view_model_id"
-                    :loading="batchGenerateLoading">生成</el-button>
+                    :loading="batchGenerateLoading">{{ t('common.generate') }}</el-button>
             </template>
         </el-dialog>
         <xl-voice ref="voiceDialogRef" @success="handleVoiceSuccess" />

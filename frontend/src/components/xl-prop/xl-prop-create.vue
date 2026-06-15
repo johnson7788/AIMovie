@@ -7,6 +7,8 @@ import IconPropSvg from '@/svg/icon/icon-actor.vue';
 import IconPropThreeViewSvg from '@/svg/icon/icon-actor-three-view.vue';
 import IconImageSvg from '@/svg/icon/icon-image.vue';
 import IconUploadImageSvg from '@/svg/icon/icon-upload-image.vue';
+import { useI18n } from 'vue-i18n';
+const { t } = useI18n();
 const emit = defineEmits(['success']);
 const propDialogVisible = ref(false);
 const propForm = reactive<any>({
@@ -17,7 +19,7 @@ const propForm = reactive<any>({
     image_model_id: '',
     three_view_image_state: false,
     three_view_model_id: '',
-    status_enum: { value: 'initializing', label: '待初始化' },
+    status_enum: { value: 'initializing', label: t('prop.pendingInitializing') },
     name: '',
     image: '',
     three_view_image: '',
@@ -28,9 +30,9 @@ const propForm = reactive<any>({
 const propFormRef = ref<any>(null);
 const propLoading = ref(false);
 const propFormRules = reactive({
-    image_model_id: [{ required: true, message: '请选择图片模型', trigger: 'change' }],
-    three_view_model_id: [{ required: true, message: '请选择三维模型', trigger: 'change' }],
-    description: [{ required: true, message: '请输入备注', trigger: 'change' }],
+    image_model_id: [{ required: true, message: t('prop.selectImageModel'), trigger: 'change' }],
+    three_view_model_id: [{ required: true, message: t('prop.selectThreeViewModel'), trigger: 'change' }],
+    description: [{ required: true, message: t('prop.inputRemarks'), trigger: 'change' }],
 })
 const showForm = ref(false);
 const openPropCreateDialog = (prop?: any, drama_id?: string | number, episode_id?: string | number) => {
@@ -81,7 +83,7 @@ const cancelPropDialog = () => {
     propForm.image_model_id = '';
     propForm.three_view_model_state = false;
     propForm.three_view_model_id = '';
-    propForm.status_enum = { value: 'initializing', label: '待初始化' };
+    propForm.status_enum = { value: 'initializing', label: t('prop.pendingInitializing') };
     propForm.image = '';
     propForm.three_view_image = '';
     propForm.drama_id = '';
@@ -102,7 +104,7 @@ const submitPropDialog = (callback?: () => void) => {
             ElMessage.error(res.msg);
         }
     }).catch(() => {
-        ElMessage.error('更新失败');
+        ElMessage.error(t('prop.updateFail'));
     })
 }
 const uploadImageRef = ref<any>(null);
@@ -183,7 +185,7 @@ const handleGenerateImage = () => {
             ElMessage.error(res.msg);
         }
     }).catch(() => {
-        ElMessage.error('生成图片失败');
+        ElMessage.error(t('prop.genImageFail'));
     }).finally(() => {
         generateImageLoading.value = false;
     })
@@ -223,30 +225,30 @@ defineExpose({
         <el-dialog v-model="propDialogVisible" class="generate-scene-dialog" draggable :width="showForm?'min(100%,840px)':'min(100%,426px)'"
             @close="cancelPropDialog">
             <template #header>
-                <span class="font-weight-600" v-if="showForm">上传物品</span>
-                <span class="font-weight-600" v-else-if="!propForm.id">创建物品</span>
-                <span class="font-weight-600" v-else>编辑物品</span>
+                <span class="font-weight-600" v-if="showForm">{{ t('prop.uploadProp') }}</span>
+                <span class="font-weight-600" v-else-if="!propForm.id">{{ t('prop.createProp') }}</span>
+                <span class="font-weight-600" v-else>{{ t('prop.editProp') }}</span>
             </template>
             <el-form label-position="top" :model="propForm" :rules="propFormRules" ref="propFormRef" class="prop-form"
                 :disabled="propForm.status_enum.value !== 'initializing'">
                 <div class="flex grid-gap-4 flex-y-flex-start">
                     <div class="flex-1 grid-columns-6 grid-gap-4" v-if="showForm">
-                        <el-form-item label="物品名称" prop="title" class="grid-column-6">
-                            <el-input v-model="propForm.name" placeholder="请输入物品名称"
+                        <el-form-item :label="t('prop.propName')" prop="title" class="grid-column-6">
+                            <el-input v-model="propForm.name" :placeholder="t('prop.propNamePlaceholder')"
                                 class="prop-form-input bg-overlay" />
                         </el-form-item>
-                        <el-form-item label="物品图" class="grid-column-6">
+                        <el-form-item :label="t('prop.propImageLabel')" class="grid-column-6">
                             <div class="flex flex-column grid-gap-4 w-100">
                                 <el-segmented v-model="propImageModel" class="tabs-segmented"
-                                    :options="[{ label: '文本生成', value: 'description' }, { label: '本地上传', value: 'upload' }]" />
+                                    :options="[{ label: t('prop.textGen'), value: 'description' }, { label: t('prop.localUpload'), value: 'upload' }]" />
                                 <div class="bg-overlay rounded-4 p-4 w-100">
-                                    <el-input v-model="propForm.description" placeholder="请输入物品描述" size="small"
+                                    <el-input v-model="propForm.description" :placeholder="t('prop.propDescPlaceholder')" size="small"
                                         class="prop-form-textarea" type="textarea"
                                         :autosize="{ minRows: 6, maxRows: 20 }" />
                                     <div class="flex flex-y-center grid-gap-2 line-height-1 mt-4"
                                         v-if="propImageModel === 'description'">
                                         <div class="bg rounded-round p-3 flex flex-center grid-gap-2 pointer hover-bg-hover"
-                                            ref="propHeadimgButtonRef" title="选择使用AI生成图">
+                                            ref="propHeadimgButtonRef" :title="t('prop.aiGenImage')">
                                             <template v-if="propHeadimgModel.id">
                                                 <el-avatar :src="propHeadimgModel.icon" :alt="propHeadimgModel.name"
                                                     shape="square" :size="16"></el-avatar>
@@ -263,14 +265,14 @@ defineExpose({
                                                     <IconModelSvg />
                                                 </el-icon>
                                                 <span class="h10 overflow-hidden text-nowrap"
-                                                    style="max-width: 60px;">物品图</span>
+                                                    style="max-width: 60px;">{{ t('prop.propImage') }}</span>
                                                 <el-icon size="16">
                                                     <ArrowDown />
                                                 </el-icon>
                                             </template>
                                         </div>
                                         <div class="bg rounded-round p-3 flex flex-center grid-gap-2 pointer hover-bg-hover"
-                                            ref="propThreeViewModelButtonRef" title="选择使用AI生成三视图">
+                                            ref="propThreeViewModelButtonRef" :title="t('prop.aiGenThreeView')">
                                             <template v-if="propImageThreeViewModel.id">
                                                 <el-avatar :src="propImageThreeViewModel.icon"
                                                     :alt="propImageThreeViewModel.name" shape="square"
@@ -287,14 +289,14 @@ defineExpose({
                                                     <IconModelSvg />
                                                 </el-icon>
                                                 <span class="h10 overflow-hidden text-nowrap"
-                                                    style="max-width: 60px;">三视图</span>
+                                                    style="max-width: 60px;">{{ t('prop.threeView') }}</span>
                                                 <el-icon size="16">
                                                     <ArrowDown />
                                                 </el-icon>
                                             </template>
                                         </div>
-                                        <el-upload ref="uploadReferenceImageRef" title="添加参考图"
-                                            :data="{ dir_name: 'prop/reference', dir_title: '物品图参考照片' }"
+                                        <el-upload ref="uploadReferenceImageRef" :title="t('prop.addRefImage')"
+                                            :data="{ dir_name: 'prop/reference', dir_title: t('prop.propRefPhoto') }"
                                             :action="$http.getCompleteUrl('app/shortplay/api/Uploads/upload')"
                                             :headers="$http.getHeaders()" accept="image/jpeg,image/png" :limit="1"
                                             type="cover" :disabled="uploadLoading"
@@ -344,16 +346,16 @@ defineExpose({
                                     <Loading class="circular" v-if="generateImageLoading" />
                                     <IconImageSvg v-else />
                                 </el-icon>
-                                <span class="h10">填写左侧表单，使用AI生成物品图</span>
+                                <span class="h10">{{ t('prop.genPropImageHint') }}</span>
                                 <div class="flex flex-center grid-gap-2 h10">
-                                    <span>点击“</span>
+                                    <span>{{ t('prop.clickButtonHintPrefix') }}</span>
                                     <div class="rounded-round p-1 flex flex-center grid-gap-2"
                                         style="background-color: #FFFFFF;color:#141414;">
                                         <el-icon size="14">
                                             <Top />
                                         </el-icon>
                                     </div>
-                                    <span>”按钮生成</span>
+                                    <span>{{ t('prop.clickButtonHintSuffix') }}</span>
                                 </div>
                             </div>
                             <div class="flex flex-column flex-center grid-gap-2"
@@ -361,7 +363,7 @@ defineExpose({
                                 <el-icon size="64">
                                     <Loading class="circular" />
                                 </el-icon>
-                                <span class="h10">生成中...</span>
+                                <span class="h10">{{ t('common.generating') }}</span>
                             </div>
                         </el-avatar>
                     </div>
@@ -369,7 +371,7 @@ defineExpose({
                         <div>
                             <el-upload v-if="uploadImageModel === 'image'" ref="uploadImageRef"
                                 class="input-upload rounded-4" drag
-                                :data="{ dir_name: 'prop/image', dir_title: '物品图照片' }"
+                                :data="{ dir_name: 'prop/image', dir_title: t('prop.propPhoto') }"
                                 :action="$http.getCompleteUrl('app/shortplay/api/Uploads/upload')"
                                 :headers="$http.getHeaders()" accept="image/jpeg,image/png" :limit="1" type="cover"
                                 :disabled="uploadHeadimgLoading"
@@ -381,15 +383,15 @@ defineExpose({
                                         <IconUploadImageSvg />
                                     </el-icon>
                                     <div class="el-upload__text">
-                                        <span class="h10">拖拽物品图照片到此处或</span>
-                                        <span class="h10">点击上传</span>
+                                        <span class="h10">{{ t('prop.dragPropPhoto') }}</span>
+                                        <span class="h10">{{ t('home.clickUpload') }}</span>
                                     </div>
                                     <div class="el-upload__text">
-                                        <span class="h10">支持上传格式：</span>
+                                        <span class="h10">{{ t('home.supportFormat') }}</span>
                                         <span class="h10">PNG, JPG, JPEG</span>
                                     </div>
                                     <div class="el-upload__text">
-                                        <span class="h10">图照片建议比例：</span>
+                                        <span class="h10">{{ t('prop.photoRatio') }}</span>
                                         <span class="h10">1:1</span>
                                     </div>
                                 </template>
@@ -399,7 +401,7 @@ defineExpose({
                             </el-upload>
                             <el-upload v-else-if="uploadImageModel === 'three_view'" ref="uploadImageRef"
                                 class="input-upload rounded-4" drag
-                                :data="{ dir_name: 'prop/three_view', dir_title: '物品三视图' }"
+                                :data="{ dir_name: 'prop/three_view', dir_title: t('prop.propThreeViewPhoto') }"
                                 :action="$http.getCompleteUrl('app/shortplay/api/Uploads/upload')"
                                 :headers="$http.getHeaders()" accept="image/jpeg,image/png" :limit="1" type="cover"
                                 :disabled="uploadThreeViewLoading"
@@ -411,15 +413,15 @@ defineExpose({
                                         <IconUploadImageSvg />
                                     </el-icon>
                                     <div class="el-upload__text">
-                                        <span class="h10">拖拽物品三视图到此处或</span>
-                                        <span class="h10">点击上传</span>
+                                        <span class="h10">{{ t('prop.dragPropThreeViewPhoto') }}</span>
+                                        <span class="h10">{{ t('home.clickUpload') }}</span>
                                     </div>
                                     <div class="el-upload__text">
-                                        <span class="h10">支持上传格式：</span>
+                                        <span class="h10">{{ t('home.supportFormat') }}</span>
                                         <span class="h10">PNG, JPG, JPEG</span>
                                     </div>
                                     <div class="el-upload__text">
-                                        <span class="h10">图照片建议比例：</span>
+                                        <span class="h10">{{ t('prop.photoRatio') }}</span>
                                         <span class="h10">1:1</span>
                                     </div>
                                 </template>
@@ -438,7 +440,7 @@ defineExpose({
                                         <Loading class="circular" v-if="uploadHeadimgLoading" />
                                         <IconPropSvg v-else />
                                     </el-icon>
-                                    <span class="h10">物品图</span>
+                                    <span class="h10">{{ t('prop.propImage') }}</span>
                                 </div>
                             </el-avatar>
                             <el-avatar :src="propForm.three_view_image" shape="square" :size="60" class="pointer"
@@ -449,7 +451,7 @@ defineExpose({
                                         <Loading class="circular" v-if="uploadThreeViewLoading" />
                                         <IconPropThreeViewSvg v-else />
                                     </el-icon>
-                                    <span class="h10">三视图</span>
+                                    <span class="h10">{{ t('prop.threeView') }}</span>
                                 </div>
                             </el-avatar>
                         </div>
@@ -458,10 +460,10 @@ defineExpose({
             </el-form>
             <template #footer>
                 <div class="flex flex-center grid-gap-2 w-100">
-                    <el-button type="info" @click="cancelPropDialog" :disabled="propLoading">取消</el-button>
+                    <el-button type="info" @click="cancelPropDialog" :disabled="propLoading">{{ t('common.cancel') }}</el-button>
                     <div class="flex-1"></div>
                     <el-button type="success" @click="submitPropDialog()" :disabled="propLoading"
-                        :loading="propLoading">提交</el-button>
+                        :loading="propLoading">{{ t('common.submit') }}</el-button>
                 </div>
             </template>
         </el-dialog>

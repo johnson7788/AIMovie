@@ -7,7 +7,9 @@ import ScriptSvg from '@/svg/icon/video-file.vue';
 import IconUploadImageSvg from '@/svg/icon/icon-upload-image.vue';
 
 import { ElMessage, ElMessageBox } from 'element-plus';
+import { useI18n } from 'vue-i18n';
 import router from '@/routers';
+const { t } = useI18n();
 const userStore = useUserStore();
 const SearchForm = reactive({
     page: 1,
@@ -69,12 +71,12 @@ const handleUploadSuccess = (response: any) => {
                     cover: response.data.url,
                 }).then((res: any) => {
                     if (res.code === ResponseCode.SUCCESS) {
-                        ElMessage.success('上传封面成功');
+                        ElMessage.success(t('works.uploadCoverSuccess'));
                     } else {
                         ElMessage.info(res.msg);
                     }
                 }).catch(() => {
-                    ElMessage.error('上传封面失败');
+                    ElMessage.error(t('works.uploadCoverFail'));
                 }).finally(() => {
                     uploadCoverDialogVisible.value = false;
                     uploadCoverLoading.value = false;
@@ -92,16 +94,16 @@ const handleUploadError = () => {
     uploadCoverLoading.value = false;
 }
 const handleDelete = (item: any) => {
-    ElMessageBox.confirm('确定删除该作品吗？', '提示', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
+    ElMessageBox.confirm(t('works.deleteConfirm'), t('common.tips'), {
+        confirmButtonText: t('common.confirm'),
+        cancelButtonText: t('common.cancel'),
         type: 'warning',
     }).then(() => {
         $http.post('/app/shortplay/api/Drama/delete', {
             id: item.id,
         }).then((res: any) => {
             if (res.code === ResponseCode.SUCCESS) {
-                ElMessage.success('删除作品成功');
+                ElMessage.success(t('works.deleteSuccess'));
             }
         });
     });
@@ -125,7 +127,7 @@ const handleModelSelect = (item: any) => {
             ElMessage.error(res.msg);
         }
     }).catch(() => {
-        ElMessage.error('生成封面失败');
+        ElMessage.error(t('works.genCoverFail'));
     }).finally(() => {
         modelLoading.value = false;
         modelPopoverRef.value?.hide();
@@ -149,19 +151,19 @@ onMounted(() => {
         <el-form-item class="mb-0">
             <xl-tabs v-model="SearchForm.script" class="text-info" @change="getList">
                 <xl-tabs-item value="all">
-                    <span class="h8 font-weight-600">全部</span>
+                    <span class="h8 font-weight-600">{{ $t('works.all') }}</span>
                 </xl-tabs-item>
                 <xl-tabs-item value="drama">
-                    <span class="h8 font-weight-600">剧本短剧</span>
+                    <span class="h8 font-weight-600">{{ $t('works.scriptDrama') }}</span>
                 </xl-tabs-item>
                 <xl-tabs-item value="script">
-                    <span class="h8 font-weight-600">创意短剧</span>
+                    <span class="h8 font-weight-600">{{ $t('works.creativeDrama') }}</span>
                 </xl-tabs-item>
             </xl-tabs>
         </el-form-item>
         <div class="flex-1"></div>
         <el-form-item class="mb-0">
-            <el-input v-model="SearchForm.title" placeholder="搜索作品" clearable @change="getList">
+            <el-input v-model="SearchForm.title" :placeholder="$t('works.searchWorks')" clearable @change="getList">
                 <template #suffix>
                     <el-icon>
                         <Search />
@@ -180,17 +182,17 @@ onMounted(() => {
                         <el-icon size="40">
                             <Loading class="circular" />
                         </el-icon>
-                        <span class="h10 font-weight-600 text-success">AI正在生成封面...</span>
+                        <span class="h10 font-weight-600 text-success">{{ $t('works.aiGenCovering') }}</span>
                     </div>
                     <div class="flex flex-column grid-gap-1" v-else>
                         <span>{{ item.title }}</span>
                         <div class="h10 flex grid-gap-2 action-cover" v-if="!item.cover && !modelLoading">
                             <span class="text-success"
-                                @click.stop="openGenerateCover($event, item, index)">AI生成封面</span>
-                            <span class="text-info" @click.stop="openUploadCoverDialog(item)">上传封面</span>
+                                @click.stop="openGenerateCover($event, item, index)">{{ $t('works.aiGenCover') }}</span>
+                            <span class="text-info" @click.stop="openUploadCoverDialog(item)">{{ $t('works.uploadCover') }}</span>
                         </div>
                         <div class="h10 flex grid-gap-2 action-cover" v-else-if="modelLoading">
-                            <span class="text-success">提交中...</span>
+                            <span class="text-success">{{ $t('works.submitting') }}</span>
                         </div>
                     </div>
                 </el-avatar>
@@ -204,7 +206,7 @@ onMounted(() => {
                         <span class="text-secondary h10 text-ellipsis-1">{{ item.create_time }}</span>
                     </div>
                 </div>
-                <span class="drama-episode">共{{ item.episode_num }}集</span>
+                <span class="drama-episode">{{ $t('works.totalEpisodes', { num: item.episode_num }) }}</span>
                 <el-icon class="delete-icon" @click.stop="handleDelete(item)">
                     <Delete />
                 </el-icon>
@@ -217,7 +219,7 @@ onMounted(() => {
     </template>
     <template v-else>
         <div class="flex flex-center grid-gap-4 p-10">
-            <el-empty description="暂无作品" />
+            <el-empty :description="$t('works.noWorks')" />
         </div>
     </template>
     <el-dialog v-model="uploadCoverDialogVisible" class="drama-dialog" draggable>
@@ -225,7 +227,7 @@ onMounted(() => {
             <span class="font-weight-600">《{{ currentItem.title }}》上传封面</span>
         </template>
         <el-upload ref="uploadCoverRef" class="input-upload flex-1" drag v-loading="uploadCoverLoading"
-            :data="{ dir_name: 'drama/cover', dir_title: '剧本封面' }"
+            :data="{ dir_name: 'drama/cover', dir_title: $t('home.dramaCover') }"
             :action="$http.getCompleteUrl('app/shortplay/api/Uploads/upload')" :before-upload="beforeUpload"
             :headers="$http.getHeaders()" accept="image/jpeg,image/png" :limit="1" type="cover"
             :on-success="handleUploadSuccess" :show-file-list="false" :on-error="handleUploadError">
@@ -234,15 +236,15 @@ onMounted(() => {
                     <IconUploadImageSvg />
                 </el-icon>
                 <div class="el-upload__text">
-                    <span class="h10">拖拽剧本封面到此处或</span>
-                    <span class="h10">点击上传</span>
+                    <span class="h10">{{ $t('home.dragCover') }}</span>
+                    <span class="h10">{{ $t('home.clickUpload') }}</span>
                 </div>
                 <div class="el-upload__text">
-                    <span class="h10">支持上传格式：</span>
+                    <span class="h10">{{ $t('home.supportFormat') }}</span>
                     <span class="h10">PNG, JPG, JPEG</span>
                 </div>
                 <div class="el-upload__text">
-                    <span class="h10">封面比例：</span>
+                    <span class="h10">{{ $t('home.coverRatio') }}</span>
                     <span class="h10">4:3</span>
                 </div>
             </template>

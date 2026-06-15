@@ -9,6 +9,8 @@ import { useUserStore, useRefs } from '@/stores';
 import { useRoute } from 'vue-router';
 import { Loading } from '@element-plus/icons-vue';
 import { usePush } from '@/composables/usePush';
+import { useI18n } from 'vue-i18n';
+const { t } = useI18n();
 const route = useRoute();
 const userStore = useUserStore();
 const { USERINFO } = useRefs(userStore);
@@ -25,7 +27,7 @@ const getDramaInfo = () => {
             ElMessage.error(res.msg);
         }
     }).catch(() => {
-        ElMessage.error('获取短剧详情失败');
+        ElMessage.error(t('works.getDramaFail'));
     })
 }
 const PropSearch = reactive({
@@ -172,7 +174,7 @@ const generateImageLoading = ref(false);
 const handleGenerateImage = () => {
     if (generateImageLoading.value || currentProp.value.status_enum.value === 'pending') return;
     if (!currentPropForm.value.image_model_id && !currentPropForm.value.three_view_model_id) {
-        ElMessage.error('请先选择物品图模型或三视图模型');
+        ElMessage.error(t('prop.selectModelFirst'));
         return;
     }
     generateImageLoading.value = true;
@@ -188,7 +190,7 @@ const handleGenerateImage = () => {
             ElMessage.error(res.msg);
         }
     }).catch(() => {
-        ElMessage.error('生成图片失败');
+        ElMessage.error(t('prop.genImageFail'));
     }).finally(() => {
         generateImageLoading.value = false;
     })
@@ -226,7 +228,7 @@ const handleReplaceProp = (item: any) => {
             ElMessage.error(res.msg);
         }
     }).catch(() => {
-        ElMessage.error('替换物品失败');
+        ElMessage.error(t('prop.replaceFail'));
     }).finally(() => {
         replacePropLoading.value = false;
     })
@@ -320,10 +322,10 @@ onUnmounted(() => {
                         <el-icon size="16">
                             <IconBatchSvg />
                         </el-icon>
-                        <span>批量生成</span>
+                        <span>{{ $t('common.batchGenerate') }}</span>
                     </el-button>
                     <el-form-item class="mb-0">
-                        <el-input v-model="PropSearch.name" placeholder="搜索物品" clearable @change="getPropList">
+                        <el-input v-model="PropSearch.name" :placeholder="$t('prop.search')" clearable @change="getPropList">
                             <template #suffix>
                                 <el-icon>
                                     <Search />
@@ -342,7 +344,7 @@ onUnmounted(() => {
                                 style="height: 40px; width: 40px;background-color: var(--el-fill-color-dark);">
                                 <Plus />
                             </el-icon>
-                            <span>添加物品</span>
+                            <span>{{ $t('prop.addProp') }}</span>
                         </div>
                         <div class="grid-column-1 rounded-4 flex flex-column flex-center grid-gap-2 prop-item bg-overlay border"
                             :class="{ 'border-success': item.id === currentPropForm.id }" v-for="item in propList"
@@ -358,9 +360,9 @@ onUnmounted(() => {
                                     <el-icon size="16">
                                         <UploadFilled />
                                     </el-icon>
-                                    <span class="h10">手动上传</span>
+                                    <span class="h10">{{ $t('prop.manualUpload') }}</span>
                                 </div>
-                                <el-popconfirm title="确定删除该物品吗？" width="fit-content" @confirm="handleDeleteProp(item)"
+                                <el-popconfirm :title="$t('prop.deleteConfirm')" width="fit-content" @confirm="handleDeleteProp(item)"
                                     placement="bottom-end">
                                     <template #reference>
                                         <div class="flex flex-center bg-overlay rounded-round p-2 pointer grid-gap-2"
@@ -368,7 +370,7 @@ onUnmounted(() => {
                                             <el-icon size="16">
                                                 <Delete />
                                             </el-icon>
-                                            <span class="h10">删除物品</span>
+                                            <span class="h10">{{ $t('prop.deleteProp') }}</span>
                                         </div>
                                     </template>
                                 </el-popconfirm>
@@ -398,18 +400,18 @@ onUnmounted(() => {
             <div class="prop-form-wrapper bg-overlay border rounded-4 prop-form flex flex-column grid-gap-4">
                 <template v-if="currentPropForm.id">
                     <div class="border-bottom flex flex-center">
-                        <el-input v-model="currentPropForm.name" placeholder="物品物品" size="large"
+                        <el-input v-model="currentPropForm.name" :placeholder="$t('prop.propFormInput')" size="large"
                             class="prop-form-input flex-1">
                         </el-input>
                     </div>
                     <div class="flex flex-column grid-gap-2 px-4">
-                        <span>物品描述</span>
+                        <span>{{ $t('prop.propDesc') }}</span>
                         <div class="bg rounded-4 p-4 border">
-                            <el-input v-model="currentPropForm.description" placeholder="请输入物品描述" size="small"
+                            <el-input v-model="currentPropForm.description" :placeholder="$t('prop.propDescPlaceholder')" size="small"
                                 class="prop-form-textarea" type="textarea" :autosize="{ minRows: 6, maxRows: 20 }" />
                             <div class="flex flex-y-center grid-gap-2">
                                 <div class="bg-overlay rounded-round p-3 flex flex-center grid-gap-2 pointer hover-bg-hover"
-                                    ref="modelButtonRef" title="选择使用AI生成图">
+                                    ref="modelButtonRef" :title="$t('prop.aiGenImage')">
                                     <template v-if="model.id">
                                         <el-avatar :src="model.icon" :alt="model.name" shape="square"
                                             :size="16"></el-avatar>
@@ -423,14 +425,14 @@ onUnmounted(() => {
                                         <el-icon size="16">
                                             <IconModelSvg />
                                         </el-icon>
-                                        <span class="h10">物品图</span>
+                                        <span class="h10">{{ $t('prop.propImage') }}</span>
                                         <el-icon size="16">
                                             <ArrowDown />
                                         </el-icon>
                                     </template>
                                 </div>
                                 <div class="bg-overlay rounded-round p-3 flex flex-center grid-gap-2 pointer hover-bg-hover"
-                                    ref="threeViewModelButtonRef" title="选择使用AI生成三视图">
+                                    ref="threeViewModelButtonRef" :title="$t('prop.aiGenThreeView')">
                                     <template v-if="threeViewModel.id">
                                         <el-avatar :src="threeViewModel.icon" :alt="threeViewModel.name" shape="square"
                                             :size="16"></el-avatar>
@@ -444,14 +446,14 @@ onUnmounted(() => {
                                         <el-icon size="16">
                                             <IconModelSvg />
                                         </el-icon>
-                                        <span class="h10">三视图</span>
+                                        <span class="h10">{{ $t('prop.threeView') }}</span>
                                         <el-icon size="16">
                                             <ArrowDown />
                                         </el-icon>
                                     </template>
                                 </div>
-                                <el-upload ref="uploadImageRef" title="添加参考图"
-                                    :data="{ dir_name: 'prop/reference', dir_title: '物品参考照片' }"
+                                <el-upload ref="uploadImageRef" :title="$t('prop.addRefImage')"
+                                    :data="{ dir_name: 'prop/reference', dir_title: $t('prop.propRefPhoto') }"
                                     :action="$http.getCompleteUrl('app/shortplay/api/Uploads/upload')"
                                     :headers="$http.getHeaders()" accept="image/jpeg,image/png" :limit="1" type="cover"
                                     :disabled="uploadLoading"
@@ -501,7 +503,7 @@ onUnmounted(() => {
                             no-init scene="prop_three_view_image" />
                     </el-popover>
                     <div class="flex flex-column grid-gap-2 px-4 pt-4">
-                        <span>物品原始记录</span>
+                        <span>{{ $t('prop.originalRecord') }}</span>
                     </div>
                     <el-scrollbar class="flex-1">
                         <div class="grid-columns-2 grid-gap-4 p-4" v-if="taskList.length > 0">
@@ -515,36 +517,36 @@ onUnmounted(() => {
                                         <Loading class="circular" v-if="replacePropLoading" />
                                         <IconReplaceSvg v-else />
                                     </el-icon>
-                                    <span class="h10 text-nowrap">替换原始</span>
+                                    <span class="h10 text-nowrap">{{ $t('prop.replaceOriginal') }}</span>
                                 </div>
                             </div>
                         </div>
-                        <el-empty v-else description="暂无原始记录" />
+                        <el-empty v-else :description="$t('prop.noOriginal')" />
                     </el-scrollbar>
                 </template>
-                <el-empty v-else description="点击物品名称选择物品" />
+                <el-empty v-else :description="$t('prop.clickToSelect')" />
             </div>
         </div>
         <el-image-viewer :url-list="imageList" v-if="previewImageVisible" @close="previewImageVisible = false" />
         <xl-prop-create ref="propCreateRef" @success="getPropList" />
         <el-dialog v-model="batchGenerateDialogVisible" class="generate-storyboard-dialog" draggable width="800px">
             <template #header>
-                <span class="font-weight-600">批量生成物品</span>
+                <span class="font-weight-600">{{ $t('prop.batchGenProp') }}</span>
             </template>
             <div class="flex grid-gap-10">
-                <xl-models title="模型" v-model="currentPropForm.image_model_id" @select="handleModelSelect" no-init
+                <xl-models :title="$t('prop.model')" v-model="currentPropForm.image_model_id" @select="handleModelSelect" no-init
                     class="flex-1 bg-overlay rounded-4 p-4" scene="prop_image" />
-                <xl-models title="三视图模型" v-model="currentPropForm.three_view_model_id"
+                <xl-models :title="$t('prop.threeViewModel')" v-model="currentPropForm.three_view_model_id"
                     @select="handleThreeViewModelSelect" class="flex-1 bg-overlay rounded-4 p-4" no-init
                     scene="prop_three_view_image" />
             </div>
             <template #footer>
                 <el-button type="info" @click="batchGenerateDialogVisible = false"
-                    :disabled="batchGenerateLoading">取消</el-button>
+                    :disabled="batchGenerateLoading">{{ $t('common.cancel') }}</el-button>
                 <div class="flex-1"></div>
                 <el-button type="success" icon="Check" @click="submitBatchGenerate"
                     :disabled="!currentPropForm.image_model_id || !currentPropForm.three_view_model_id"
-                    :loading="batchGenerateLoading">生成</el-button>
+                    :loading="batchGenerateLoading">{{ $t('prop.generate') }}</el-button>
             </template>
         </el-dialog>
     </div>

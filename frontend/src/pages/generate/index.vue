@@ -33,7 +33,7 @@ const generateRef = ref();
         <div class="control-layouts-header">
             <div class="flex-1">
                 <div class="control-layouts-header-logo">
-                    <el-icon class="rounded-4 pointer" size="24" title="返回选集目录"
+                    <el-icon class="rounded-4 pointer" size="24" :title="$t('generate.backToEpisodes')"
                         @click="$router.push(`/works/${dramaInfo.id}`)"
                         style="width: 40px; height: 40px; background-color: var(--el-fill-color-dark);">
                         <Back />
@@ -41,13 +41,13 @@ const generateRef = ref();
                     <el-avatar :src="dramaInfo.cover" fit="contain" :size="40" shape="square" class="bg-overlay" />
                     <div class="flex flex-column">
                         <span class="control-layouts-header-logo-text">{{ dramaInfo.title }}</span>
-                        <span class="h10 text-secondary">共 {{ dramaInfo.episode_num }} 集</span>
+                        <span class="h10 text-secondary">{{ $t('generate.totalEpisodes', { num: dramaInfo.episode_num }) }}</span>
                     </div>
                 </div>
             </div>
             <div class="flex-1 flex flex-center">
                 <el-segmented v-model="action"
-                    :options="[{ label: '剧本调整', value: 'generate-drama' }, { label: '角色演员', value: 'generate-actors' }, { label: '物品道具', value: 'generate-props' }, { label: '场景绘制', value: 'generate-scene' }, { label: '分镜画面', value: 'generate-storyboard' }]"
+                    :options="[{ label: $t('generate.scriptAdjust'), value: 'generate-drama' }, { label: $t('generate.actorManage'), value: 'generate-actors' }, { label: $t('generate.propManage'), value: 'generate-props' }, { label: $t('generate.sceneDraw'), value: 'generate-scene' }, { label: $t('generate.storyboardView'), value: 'generate-storyboard' }]"
                     class="tabs-segmented border" />
             </div>
             <div class="flex-1 flex flex-x-flex-end flex-y-center">
@@ -59,19 +59,19 @@ const generateRef = ref();
                                 <el-icon>
                                     <IconBatchSvg />
                                 </el-icon>
-                                <span>批量生成</span>
+                                <span>{{ $t('generate.batchGen') }}</span>
                             </el-button>
                         </template>
                         <div class="flex flex-column grid-gap-2">
                             <div class="p-4 hover-bg-overlay pointer rounded-4" @click="generateRef?.BatchImage?.()">
-                                批量生成图片</div>
+                                {{ $t('generate.batchGenImage') }}</div>
                             <div class="p-4 hover-bg-overlay pointer rounded-4" @click="generateRef?.BatchVideo?.()">
-                                批量生成视频</div>
+                                {{ $t('generate.batchGenVideo') }}</div>
                             <div class="p-4 hover-bg-overlay pointer rounded-4" @click="generateRef?.BatchAudio?.()">
-                                批量生成配音</div>
+                                {{ $t('generate.batchGenVoice') }}</div>
                             <div class="p-4 hover-bg-overlay pointer rounded-4"
                                 @click="generateRef?.BatchNarration?.()">
-                                批量生成旁白</div>
+                                {{ $t('generate.batchGenNarration') }}</div>
                             <!-- <div class="p-4 hover-bg-overlay pointer rounded-4" @click="generateRef?.BatchSFX?.()"> 批量生成音效</div> -->
                         </div>
                     </el-popover>
@@ -79,13 +79,13 @@ const generateRef = ref();
                         <el-icon>
                             <Download />
                         </el-icon>
-                        <span>打包下载</span>
+                        <span>{{ $t('generate.packDownload') }}</span>
                     </el-button>
                     <el-button color="#FFFFFF" @click="generateRef?.compsite?.()">
                         <el-icon>
                             <Download />
                         </el-icon>
-                        <span>导出视频</span>
+                        <span>{{ $t('generate.exportVideo') }}</span>
                     </el-button>
                 </template>
             </div>

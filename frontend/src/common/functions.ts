@@ -457,7 +457,7 @@ export function deepGet<
 
     // ③ 递归深入：取出首键，继续在剩余子集上查找
     const [firstKey, ...restKeys] = keys;
-    // 使用 `as any` 避免 TS “索引类型” 报错
+    // 使用 `as any` 避免 TS "索引类型" 报错
     return deepGet<T>((data as any)[firstKey], restKeys);
 }
 /**

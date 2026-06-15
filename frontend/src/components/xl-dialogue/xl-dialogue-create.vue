@@ -3,6 +3,9 @@ import { ResponseCode } from '@/common/const';
 import { $http } from '@/common/http';
 import { useRefs, useWebConfigStore } from '@/stores';
 import { ElMessage } from 'element-plus';
+import { useI18n } from 'vue-i18n';
+
+const { t } = useI18n();
 const webConfigStore = useWebConfigStore();
 const { WEBCONFIG } = useRefs(webConfigStore);
 const dialogueCreateDialogVisible = ref(false);
@@ -19,18 +22,18 @@ const dialogueForm = ref<any>({
     end_time: 1000,
     content: '',
     actor: {
-        name: "选择演员",
+        name: '',
         headimg: "",
     }
 });
 const dialogueFormRules = ref<any>({
-    actor_id: [{ required: true, message: '请选择演员', trigger: 'change' }],
-    content: [{ required: true, message: '请输入对话内容', trigger: 'blur' }],
-    prosody_speed: [{ required: true, message: '请选择语速', trigger: 'change' }],
-    prosody_volume: [{ required: true, message: '请选择音量', trigger: 'change' }],
-    emotion: [{ required: true, message: '请选择情感', trigger: 'change' }],
-    start_time: [{ required: true, message: '请选择字幕&语音开始时间', trigger: 'change' }],
-    end_time: [{ required: true, message: '请选择字幕结束时间', trigger: 'change' }],
+    actor_id: [{ required: true, message: '', trigger: 'change' }],
+    content: [{ required: true, message: '', trigger: 'blur' }],
+    prosody_speed: [{ required: true, message: '', trigger: 'change' }],
+    prosody_volume: [{ required: true, message: '', trigger: 'change' }],
+    emotion: [{ required: true, message: '', trigger: 'change' }],
+    start_time: [{ required: true, message: '', trigger: 'change' }],
+    end_time: [{ required: true, message: '', trigger: 'change' }],
 });
 const emit = defineEmits(['success']);
 const dialogueFormRef = ref<any>();
@@ -41,6 +44,18 @@ const openDialogueCreateDialog = (item: any, form?: any) => {
     storyboard.value = item;
     dialogueForm.value.storyboard_id = item.id;
     dialogueForm.value.drama_id = item.drama_id;
+    // Update validation messages with current locale
+    dialogueFormRules.value.actor_id[0].message = t('storyboard.selectActor');
+    dialogueFormRules.value.content[0].message = t('storyboard.dialoguePlaceholder');
+    dialogueFormRules.value.prosody_speed[0].message = t('storyboard.selectSpeed');
+    dialogueFormRules.value.prosody_volume[0].message = t('storyboard.selectVolume');
+    dialogueFormRules.value.emotion[0].message = t('storyboard.selectEmotion');
+    dialogueFormRules.value.start_time[0].message = t('common.selectSpeed');
+    dialogueFormRules.value.end_time[0].message = t('common.selectEndTime');
+    // Set default actor name
+    if (!dialogueForm.value.actor.name) {
+        dialogueForm.value.actor.name = t('storyboard.selectActor');
+    }
     nextTick(() => {
         dialogueCreateDialogVisible.value = true;
     });
@@ -59,7 +74,7 @@ const closeDialogueCreateDialog = () => {
         end_time: 1000,
         content: '',
         actor: {
-            name: "选择演员",
+            name: t('storyboard.selectActor'),
             headimg: "",
         }
     };
@@ -80,7 +95,7 @@ const submitDialogueCreateDialog = () => {
                     ElMessage.error(res.msg);
                 }
             }).catch(() => {
-                ElMessage.error('创建失败');
+                ElMessage.error(t('storyboard.createFail'));
             }).finally(() => {
                 submitDialogueCreateLoading.value = false;
             });
@@ -96,19 +111,19 @@ const handleActorSelect = (actor: any) => {
 }
 const speedFormatTooltip = (value: number) => {
     if (value === 1) {
-        return '正常';
+        return t('storyboard.normal');
     }
-    return `${value}x倍速`;
+    return t('storyboard.speedFormat', { value });
 }
 const volumeFormatTooltip = (value: number) => {
     if (value === 0) {
-        return '静音';
+        return t('storyboard.mute');
     }
     if (value === 100) {
-        return '最大';
+        return t('storyboard.max');
     }
     if (value === 50) {
-        return '正常';
+        return t('storyboard.normal');
     }
     if (value < 50) {
         return `-${value}%`;
@@ -130,13 +145,13 @@ defineExpose({
             :close-on-press-escape="false" :close-on-click-modal="false" :before-close="handleBeforeClose"
             width="min(100%,800px)">
             <template #header>
-                <span class="font-weight-600" v-if="!dialogueForm.id">新增对话</span>
-                <span class="font-weight-600" v-else>编辑对话</span>
+                <span class="font-weight-600" v-if="!dialogueForm.id">{{ t('storyboard.addDialogue') }}</span>
+                <span class="font-weight-600" v-else>{{ t('storyboard.editDialogue') }}</span>
             </template>
             <el-form label-position="top" :model="dialogueForm" :rules="dialogueFormRules" ref="dialogueFormRef"
                 size="large">
                 <div class="flex grid-gap-4">
-                    <el-form-item label="演员" prop="actor" class="w-30">
+                    <el-form-item :label="t('storyboard.actor')" prop="actor" class="w-30">
                         <div class="flex flex-y-center grid-gap-2 rounded-4 p-4 bg-overlay w-100 pointer bg-hover-bg"
                             ref="actorButtonRef">
                             <el-avatar :src="dialogueForm.actor.headimg" :alt="dialogueForm.actor.name" shape="square"
@@ -144,26 +159,26 @@ defineExpose({
                             <span class="h10">{{ dialogueForm.actor.name }}</span>
                         </div>
                     </el-form-item>
-                    <el-form-item label="对话内容" prop="content" class="flex-1">
-                        <el-input type="textarea" v-model="dialogueForm.content" placeholder="请输入对话内容"
+                    <el-form-item :label="t('storyboard.dialogueContent')" prop="content" class="flex-1">
+                        <el-input type="textarea" v-model="dialogueForm.content" :placeholder="t('storyboard.dialoguePlaceholder')"
                             :autosize="{ minRows: 3, maxRows: 10 }" />
                     </el-form-item>
                 </div>
                 <div class="flex grid-gap-4">
-                    <el-form-item label="语速" prop="prosody_speed" class="flex-1">
+                    <el-form-item :label="t('storyboard.speedLabel')" prop="prosody_speed" class="flex-1">
                         <div class="w-100 px-6">
                             <el-slider v-model="dialogueForm.prosody_speed" :step="0.1" show-stops :min="0.5" :max="2"
                                 :format-tooltip="speedFormatTooltip" />
                         </div>
                     </el-form-item>
-                    <el-form-item label="音量" prop="prosody_volume" class="flex-1">
+                    <el-form-item :label="t('storyboard.volumeLabel')" prop="prosody_volume" class="flex-1">
                         <div class="w-100 px-6 pb-7">
                             <el-slider v-model="dialogueForm.prosody_volume" :step="1" :min="0" :max="100"
-                                :format-tooltip="volumeFormatTooltip" :marks="{ 0: '静音', 100: '最大', 50: '正常' }" />
+                                :format-tooltip="volumeFormatTooltip" :marks="{ 0: t('storyboard.mute'), 100: t('storyboard.max'), 50: t('storyboard.normal') }" />
                         </div>
                     </el-form-item>
                 </div>
-                <el-form-item label="情感" prop="emotion">
+                <el-form-item :label="t('storyboard.emotionLabel')" prop="emotion">
                     <el-radio-group v-model="dialogueForm.emotion">
                         <el-radio v-for="item in WEBCONFIG?.enum?.voice_emotion" :key="item.value" :value="item.value"
                             border>{{
@@ -171,10 +186,10 @@ defineExpose({
                     </el-radio-group>
                 </el-form-item>
                 <div class="flex grid-gap-4">
-                    <el-form-item label="字幕&语音开始时间(毫秒)" prop="start_time">
+                    <el-form-item :label="t('storyboard.subtitleStart')" prop="start_time">
                         <el-input-number v-model="dialogueForm.start_time" :min="0" :max="1000000" :step="100" />
                     </el-form-item>
-                    <el-form-item label="字幕结束时间(毫秒)" prop="end_time">
+                    <el-form-item :label="t('storyboard.subtitleEnd')" prop="end_time">
                         <el-input-number v-model="dialogueForm.end_time" :min="0" :max="1000000" :step="100" />
                     </el-form-item>
                 </div>
@@ -182,17 +197,17 @@ defineExpose({
             <template #footer>
                 <div class="flex flex-center grid-gap-2 w-100">
                     <el-button type="info" @click="closeDialogueCreateDialog"
-                        :disabled="submitDialogueCreateLoading">取消</el-button>
+                        :disabled="submitDialogueCreateLoading">{{ t('common.cancel') }}</el-button>
                     <div class="flex-1"></div>
                     <el-button type="success" @click="submitDialogueCreateDialog"
-                        :loading="submitDialogueCreateLoading">提交</el-button>
+                        :loading="submitDialogueCreateLoading">{{ t('common.submit') }}</el-button>
                 </div>
             </template>
         </el-dialog>
         <el-popover ref="actorPopoverRef" :virtual-ref="actorButtonRef" virtual-triggering placement="bottom-start"
             width="min(100vw,880px)" trigger="click">
             <xl-actor @select="handleActorSelect"
-                :types="[{ label: '本集', value: 'episode' }, { label: '本剧', value: 'drama' }]"
+                :types="[{ label: t('storyboard.thisEpisode'), value: 'episode' }, { label: t('storyboard.thisDrama'), value: 'drama' }]"
                 :query="{ drama_id: storyboard?.drama_id, episode_id: storyboard?.episode_id }" />
         </el-popover>
     </div>

@@ -15,6 +15,8 @@ import { useStateStore, useRefs, useUserStore ,useWebConfigStore} from '@/stores
 import { useLogin } from '@/composables/useLogin'
 import XlNotice from '@/components/xl-notice/index.vue'
 import { Close } from '@element-plus/icons-vue'
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 const iconMap: Record<string, any> = {
     ...ElementPlusIconsVue,
     HomeSvg,
@@ -27,10 +29,10 @@ const iconMap: Record<string, any> = {
     NoticeSvg,
     NoticeActiveSvg,
 }
-const menus = ref([
+const menus = computed(() => [
     {
         type: 'router',
-        name: '首页',
+        name: t('menu.home'),
         path: '/',
         menu: 'index',
         icon: 'HomeSvg',
@@ -38,7 +40,7 @@ const menus = ref([
     },
     {
         type: 'router',
-        name: '创意圈',
+        name: t('menu.square'),
         path: '/square',
         menu: 'square',
         icon: 'SquareSvg',
@@ -46,7 +48,7 @@ const menus = ref([
     },
     {
         type: 'router',
-        name: '通知',
+        name: t('menu.notice'),
         path: '/notice',
         menu: 'notice',
         icon: 'NoticeSvg',
@@ -54,7 +56,7 @@ const menus = ref([
     },
     {
         type: 'router',
-        name: '个人中心',
+        name: t('menu.user'),
         path: '/user',
         menu: 'user',
         icon: 'UserSvg',
@@ -192,7 +194,7 @@ onMounted(() => {
         </div>
         <router-view />
         <el-popover :visible="noticePopoverVisible" width="430px" placement="right-end" :show-arrow="false"
-            trigger="click" title="消息中心" popper-style="height:90dvh;margin-top:10dvh;inset:auto auto 5dvh 88px;">
+            trigger="click" :title="t('header.messageCenter')" popper-style="height:90dvh;margin-top:10dvh;inset:auto auto 5dvh 88px;">
             <div class="position-relative">
                 <XlNotice ref="noticeRef" />
                 <div class="position-absolute top--10 right-4 pointer z-10">

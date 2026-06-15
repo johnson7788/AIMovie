@@ -2,6 +2,8 @@
 import { ResponseCode } from '@/common/const';
 import { $http } from '@/common/http';
 import { ElMessage } from 'element-plus';
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 const props = withDefaults(defineProps<{
     modelValue: string | number
     scene: any[]
@@ -72,7 +74,7 @@ const handleDeleteScene = (row: any) => {
     })
         .then((res: any) => {
             if (res.code === ResponseCode.SUCCESS) {
-                ElMessage.success('删除成功');
+                ElMessage.success(t('common.deleteSuccess'));
                 if (currentSceneId.value == row.id) {
                     currentSceneId.value = '';
                 }
@@ -84,7 +86,7 @@ const handleDeleteScene = (row: any) => {
             }
         })
         .catch(() => {
-            ElMessage.error('删除失败');
+            ElMessage.error(t('common.deleteFail'));
 
             // ❗请求失败 → 回滚
             sceneList.value = backup;
@@ -122,7 +124,7 @@ const handleSave = (item: any) => {
             ElMessage.error(res.msg)
         }
     }).catch(() => {
-        ElMessage.error('保存失败')
+        ElMessage.error(t('common.saveFail'))
     }).finally(() => {
         item.saveLoading = false
     })
@@ -155,7 +157,7 @@ const handleGenerateScene = () => {
         }
     }).catch(() => {
         initLoading.value = false;
-        ElMessage.error('绘制场景失败');
+        ElMessage.error(t('scene.drawFail'));
     }).finally(() => {
         initLoading.value = false;
     });
@@ -198,19 +200,19 @@ defineExpose({
 <template>
     <el-scrollbar class="p-4" v-loading="handleCopySceneLoading || handleDeleteSceneLoading">
         <div class="scene-list pb-10">
-            <el-empty v-if="sceneList.length === 0" description="暂无场景">
+            <el-empty v-if="sceneList.length === 0" :description="t('scene.noScene')">
                 <el-dialog v-model="generateSceneDialogVisible" class="generate-scene-dialog" draggable>
                     <template #header>
-                        <span class="font-weight-600">AI绘制场景</span>
+                        <span class="font-weight-600">{{ t('scene.aiDraw') }}</span>
                     </template>
-                    <el-alert title="当前分集尚未创建场景和分镜，是否使用AI绘制？" type="warning" :closable="false" />
+                    <el-alert :title="t('scene.aiDrawConfirm')" type="warning" :closable="false" />
                     <xl-models v-model="initForm.model_id" scene="creative_scenes" no-init />
                     <template #footer>
                         <div class="flex flex-center grid-gap-2">
                             <el-button type="info" @click="handleGenerateSceneCancel"
-                                :disabled="initLoading">取消</el-button>
+                                :disabled="initLoading">{{ t('common.cancel') }}</el-button>
                             <el-button type="success" icon="Check" @click="handleGenerateScene"
-                                :disabled="!initForm.model_id || initLoading" :loading="initLoading">绘制</el-button>
+                                :disabled="!initForm.model_id || initLoading" :loading="initLoading">{{ t('scene.aiDraw') }}</el-button>
                         </div>
                     </template>
                 </el-dialog>
@@ -227,29 +229,29 @@ defineExpose({
                             <el-icon size="16">
                                 <Edit />
                             </el-icon>
-                            <span class="text-nowrap">编辑</span>
+                            <span class="text-nowrap">{{ t('common.edit') }}</span>
                         </div>
-                        <el-popconfirm icon="Delete" title="确定删除该场景吗？" placement="bottom-end"
+                        <el-popconfirm icon="Delete" :title="t('scene.deleteConfirm')" placement="bottom-end"
                             confirm-button-type="danger" width="fit-content" @confirm="handleDeleteScene(item)">
                             <template #reference>
                                 <div class="flex flex-center grid-gap-2 scene-item-delete">
                                     <el-icon size="16">
                                         <Delete />
                                     </el-icon>
-                                    <span class="text-nowrap">删除</span>
+                                    <span class="text-nowrap">{{ t('common.delete') }}</span>
                                 </div>
                             </template>
                         </el-popconfirm>
                     </div>
                     <div class="flex flex-column grid-gap-4 position-relative" v-if="item.component === 'view'">
                         <div class="flex flex-center">
-                            <span class="scene-item-label">场景：</span>
+                            <span class="scene-item-label">{{ t('scene.name') }}：</span>
                             <div class="flex-1">
                                 <span class="text-text-primary">{{ item.title }}</span>
                             </div>
                         </div>
                         <div class="flex flex-center">
-                            <span class="scene-item-label">地点：</span>
+                            <span class="scene-item-label">{{ t('scene.locationLabel') }}</span>
                             <div class="flex-1">
                                 <span class="text-text-primary">{{ item.scene_space }}·{{ item.scene_location }}·{{
                                     item.scene_time }}·{{ item.scene_weather }}</span>
@@ -262,34 +264,34 @@ defineExpose({
                     <el-form v-else-if="item.component === 'form'" class=" flex flex-column grid-gap-4"
                         :disabled="item.saveLoading">
                         <div class="flex grid-gap-2">
-                            <span class="scene-item-label pt-3">地点：</span>
+                            <span class="scene-item-label pt-3">{{ t('scene.locationLabel') }}</span>
                             <div class="flex-1 grid-columns-2 grid-gap-2">
-                                <el-input v-model="item.scene_space" placeholder="内景OR外景"
+                                <el-input v-model="item.scene_space" :placeholder="t('scene.interiorExterior')"
                                     class="scene-item-input grid-column-1 w-100" @input="item.editMode = true" />
-                                <el-input v-model="item.scene_location" placeholder="地点"
+                                <el-input v-model="item.scene_location" :placeholder="t('scene.location')"
                                     class="scene-item-input grid-column-1" @input="item.editMode = true" />
-                                <el-input v-model="item.scene_time" placeholder="大概时间"
+                                <el-input v-model="item.scene_time" :placeholder="t('scene.time')"
                                     class="scene-item-input grid-column-1" @input="item.editMode = true" />
-                                <el-input v-model="item.scene_weather" placeholder="天气"
+                                <el-input v-model="item.scene_weather" :placeholder="t('scene.weather')"
                                     class="scene-item-input grid-column-1" @input="item.editMode = true" />
                             </div>
                         </div>
                         <div class="flex grid-gap-2">
-                            <span class="scene-item-label pt-3">描述：</span>
+                            <span class="scene-item-label pt-3">{{ t('scene.desc') }}：</span>
                             <el-input v-model="item.description" type="textarea" :autosize="{ minRows: 1, maxRows: 10 }"
-                                placeholder="请输入描述" class="scene-item-textarea" @input="item.editMode = true" />
+                                :placeholder="t('scene.descPlaceholder')" class="scene-item-textarea" @input="item.editMode = true" />
                         </div>
                         <div class="flex flex-x-flex-end">
-                            <el-button type="info" @click.stop="handleCancel(item)">取消</el-button>
+                            <el-button type="info" @click.stop="handleCancel(item)">{{ t('common.cancel') }}</el-button>
                             <el-button type="success" icon="Check" @click.stop="handleSave(item)"
-                                :disabled="!item.editMode" :loading="item.saveLoading">保存</el-button>
+                                :disabled="!item.editMode" :loading="item.saveLoading">{{ t('common.save') }}</el-button>
                         </div>
                     </el-form>
                 </div>
             </template>
         </div>
         <div class="loading-mask" v-if="episodeInfo.init_scene_state" v-loading="episodeInfo.init_scene_state"
-            element-loading-text="绘制场景中..."></div>
+            :element-loading-text="t('scene.drawing')"></div>
         <xl-scene-create ref="sceneCreateRef" @success="handleCreateSceneSuccess" />
     </el-scrollbar>
 </template>

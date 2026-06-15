@@ -2,6 +2,8 @@
 import { ResponseCode } from '@/common/const';
 import { truncate } from '@/common/functions';
 import { $http } from '@/common/http';
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 const props = withDefaults(defineProps<{
     query?: any
     types?: any[]
@@ -41,8 +43,8 @@ onMounted(() => {
         <el-form class="flex flex-center grid-gap-4" @submit.prevent="getPropList">
             <el-form-item class="mb-0">
                 <xl-tabs v-model="PropSearch.type" class="text-info" @change="getPropList">
-                    <xl-tabs-item value="all">全部</xl-tabs-item>
-                    <xl-tabs-item value="personal">个人</xl-tabs-item>
+                    <xl-tabs-item value="all">{{ $t('common.all') }}</xl-tabs-item>
+                    <xl-tabs-item value="personal">{{ $t('common.personal') }}</xl-tabs-item>
                     <xl-tabs-item v-for="item in props.types" :key="item.value" :value="item.value">
                         {{ item.label }}
                     </xl-tabs-item>
@@ -50,7 +52,7 @@ onMounted(() => {
             </el-form-item>
             <div class="flex-1"></div>
             <el-form-item class="mb-0">
-                <el-input v-model="PropSearch.name" placeholder="搜索物品" clearable @change="getPropList">
+                <el-input v-model="PropSearch.name" :placeholder="t('prop.search')" clearable @change="getPropList">
                     <template #suffix>
                         <el-icon>
                             <Search />
@@ -68,7 +70,7 @@ onMounted(() => {
                         style="height: 40px; width: 40px;background-color: var(--el-fill-color-dark);">
                         <Plus />
                     </el-icon>
-                    <span>添加物品</span>
+                    <span>{{ $t('prop.addProp') }}</span>
                 </div>
                 <div class="grid-column-2 rounded-4 p-4 border-2 border-solid flex flex-center grid-gap-2 prop-item"
                     v-for="item in propList" @click="handlePropItemClick(item)">

@@ -15,7 +15,7 @@
 
             <!-- 提示文字 -->
             <div class="record-tip" v-if="recordingState === 'idle'">
-                点击开始录制
+                {{ t('voice.clickToStart') }}
             </div>
 
             <!-- 计时器 -->
@@ -25,9 +25,9 @@
 
             <!-- 协议文本 -->
             <div class="agreement-text">
-                我已阅读并同意
+                {{ t('voice.agreePrefix') }}
                 <el-link type="success" @click="showProtocol" class="protocol-link">
-                    《声音克隆协议》
+                    {{ t('voice.protocol') }}
                 </el-link>
             </div>
         </div>
@@ -60,9 +60,9 @@
 
             <!-- 协议文本 -->
             <div class="agreement-text">
-                我已阅读并同意
+                {{ t('voice.agreePrefix') }}
                 <el-link type="success" @click="showProtocol" class="protocol-link">
-                    《声音克隆协议》
+                    {{ t('voice.protocol') }}
                 </el-link>
             </div>
         </div>
@@ -74,8 +74,10 @@ import IconPause from '@/svg/icon/icon-pause.vue'
 import IconPlay1 from '@/svg/icon/icon-play-1.vue'
 import { Microphone, RefreshRight } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 
 const emit = defineEmits(['success', 'confirm'])
+const { t } = useI18n()
 
 // 录制状态：idle(待录制) | recording(录制中) | review(试听)
 const recordingState = ref<'idle' | 'recording' | 'review'>('idle')
@@ -107,11 +109,11 @@ const checkMicrophonePermission = async () => {
         console.error('麦克风权限检查失败:', error)
         hasMicrophonePermission.value = false
         if (error.name === 'NotAllowedError') {
-            ElMessage.warning('请允许访问麦克风权限')
+            ElMessage.warning(t('voice.allowMic'))
         } else if (error.name === 'NotFoundError') {
-            ElMessage.warning('未检测到麦克风设备')
+            ElMessage.warning(t('voice.noMic'))
         } else {
-            ElMessage.warning('无法访问麦克风，请检查设备设置')
+            ElMessage.warning(t('voice.micAccessFail'))
         }
     }
 }
@@ -121,7 +123,7 @@ const startRecording = async () => {
     try {
         // 检查 HTTPS
         if (!isHTTPS.value) {
-            ElMessage.error('录音功能需要在 HTTPS 环境下使用')
+            ElMessage.error(t('voice.needHTTPS'))
             return
         }
 
@@ -168,7 +170,7 @@ const startRecording = async () => {
 
     } catch (error: any) {
         console.error('开始录制失败:', error)
-        ElMessage.error('开始录制失败，请检查麦克风权限')
+        ElMessage.error(t('voice.startRecordFail'))
         recordingState.value = 'idle'
     }
 }
@@ -191,7 +193,7 @@ const stopRecording = () => {
 
     // 检查录制时长（至少10秒）
     if (recordingTime.value < 10) {
-        ElMessage.warning('录制时长至少需要10秒，请重新录制')
+        ElMessage.warning(t('voice.recordDurationMin'))
         recordingState.value = 'idle'
         recordingTime.value = 0
         if (audioUrl.value) {
@@ -221,9 +223,9 @@ const formatTime = (seconds: number): string => {
 
 // 重录
 const handleRerecord = () => {
-    ElMessageBox.confirm('确定要重新录制吗？', '提示', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
+    ElMessageBox.confirm(t('voice.rerecordConfirm'), t('common.tips'), {
+        confirmButtonText: t('common.confirm'),
+        cancelButtonText: t('common.cancel'),
         type: 'warning'
     }).then(() => {
         // 清理资源
@@ -269,7 +271,7 @@ const handlePlay = () => {
 // 确认
 const handleConfirm = () => {
     if (!audioBlob.value) {
-        ElMessage.warning('请先完成录制')
+        ElMessage.warning(t('voice.recordFirst'))
         return
     }
 
@@ -297,7 +299,7 @@ const handleConfirm = () => {
 // 显示协议
 const showProtocol = () => {
     // TODO: 打开协议弹窗或跳转到协议页面
-    ElMessage.info('协议功能待实现')
+    ElMessage.info(t('voice.protocolNotImplemented'))
 }
 
 // 组件卸载时清理资源

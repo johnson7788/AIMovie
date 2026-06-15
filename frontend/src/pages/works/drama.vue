@@ -9,6 +9,8 @@ import Details from '@/pages/works/modules/details.vue';
 import Actors from '@/pages/works/modules/actors.vue';
 import Props from '@/pages/works/modules/props.vue';
 import { usePush } from '@/composables/usePush';
+import { useI18n } from 'vue-i18n';
+const { t } = useI18n();
 const userStore = useUserStore();
 const SearchForm = reactive({
     ...router.currentRoute.value.query,
@@ -37,7 +39,7 @@ const getDetails = () => {
     } else {
         loadingInstance = ElLoading.service({
             lock: true,
-            text: '加载中...',
+            text: t('common.loading'),
         });
     }
     $http.get('/app/shortplay/api/Works/details', { params: SearchForm }).then((res: any) => {
@@ -46,9 +48,9 @@ const getDetails = () => {
             addListener();
         } else {
             loadingInstance?.close();
-            ElMessageBox.confirm(res.msg, '提示', {
-                confirmButtonText: '重新加载',
-                cancelButtonText: '返回',
+            ElMessageBox.confirm(res.msg, t('common.tips'), {
+                confirmButtonText: t('common.reload'),
+                cancelButtonText: t('common.back'),
                 type: 'warning',
             }).then(() => {
                 getDetails();
@@ -58,9 +60,9 @@ const getDetails = () => {
         }
     }).catch(() => {
         loadingInstance?.close();
-        ElMessageBox.confirm('加载失败，请重新加载', '提示', {
-            confirmButtonText: '重新加载',
-            cancelButtonText: '返回',
+        ElMessageBox.confirm(t('common.loadFail'), t('common.tips'), {
+            confirmButtonText: t('common.reload'),
+            cancelButtonText: t('common.back'),
             type: 'warning',
         }).then(() => {
             getDetails();
@@ -116,7 +118,7 @@ onUnmounted(() => {
                     </div>
                 </div>
                 <el-segmented v-model="action" :disabled="loading"
-                    :options="[{ label: '分集', value: 'episodes', component: Episodes }, { label: '角色库', value: 'actors', component: 'Actors' }, { label: '物品库', value: 'props', component: 'Props' }, { label: '详情', value: 'details', component: 'Details' }]"
+                    :options="[{ label: $t('works.episodes'), value: 'episodes', component: Episodes }, { label: $t('works.actorLib'), value: 'actors', component: 'Actors' }, { label: $t('works.propLib'), value: 'props', component: 'Props' }, { label: $t('works.details'), value: 'details', component: 'Details' }]"
                     class="tabs-segmented border" />
                 <div class="flex-1"></div>
             </div>

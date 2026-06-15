@@ -1,5 +1,5 @@
 <template>
-    <el-dialog v-model="dialogVisible" title="音色编辑" width="620px">
+    <el-dialog v-model="dialogVisible" :title="t('voice.editTitle')" width="620px">
         <div class="flex flex-center">
             <div class="bg-overlay rounded-4 p-4 box flex flex-center">
                 <div class="record-player" v-if="form.audio">
@@ -19,7 +19,7 @@
                     <el-icon :size="16" color="var(--el-text-color-secondary)">
                         <Picture />
                     </el-icon>
-                    <span class="empty-text">暂无音频</span>
+                    <span class="empty-text">{{ t('voice.noAudio') }}</span>
                 </div>
             </div>
         </div>
@@ -28,13 +28,13 @@
                 <el-form :model="form" label-width="100px">
                     <el-row>
                         <el-col :span="24">
-                            <el-form-item label="声音名称：">
+                            <el-form-item :label="t('voice.voiceName')">
                                 <el-input v-model="form.name" maxlength="20" :show-word-limit="true"
-                                    placeholder="请输入声音名称" />
+                                    :placeholder="t('voice.voiceNamePlaceholder')" />
                             </el-form-item>
                         </el-col>
                         <el-col :span="14">
-                            <el-form-item label="声音设置：">
+                            <el-form-item :label="t('voice.voiceSetting')">
                                 <el-select v-model="form.gender" placeholder="性别">
                                     <el-option v-for="item in WEBCONFIG?.enum?.actor_gender" :key="item.value"
                                         :label="item.label" :value="item.value" />
@@ -61,15 +61,15 @@
                     <el-icon :size="24" v-if="!uploadLoading">
                         <Plus />
                     </el-icon>
-                    <span>点击上传</span>
+                    <span>{{ t('common.upload') }}</span>
                 </div>
                 <el-image v-else :src="form.headimg" class="cover-image" fit="cover"></el-image>
             </el-upload>
         </div>
         <template #footer>
             <div class="flex flex-center w-100">
-                <el-button color="var(--el-color-white)" @click="dialogVisible = false">取消</el-button>
-                <el-button type="success" @click="handleSubmit">确定</el-button>
+                <el-button color="var(--el-color-white)" @click="dialogVisible = false">{{ t('common.cancel') }}</el-button>
+                <el-button type="success" @click="handleSubmit">{{ t('common.confirm') }}</el-button>
             </div>
         </template>
     </el-dialog>
@@ -80,8 +80,11 @@ import { $http } from '@/common/http';
 import { useWebConfigStore, useRefs } from '@/stores';
 import { Plus, Picture } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
+import { useI18n } from 'vue-i18n';
 import IconPlay1 from '@/svg/icon/icon-play-1.vue';
 import IconPause from '@/svg/icon/icon-pause.vue';
+
+const { t } = useI18n();
 
 const webConfigStore = useWebConfigStore();
 const { WEBCONFIG } = useRefs(webConfigStore);
@@ -110,7 +113,7 @@ const form = ref<any>({
 // 播放/暂停音频
 const handlePlayAudio = () => {
     if (!form.value.audio) {
-        ElMessage.warning('暂无音频')
+        ElMessage.warning(t('voice.noAudio'))
         return
     }
 
@@ -127,7 +130,7 @@ const handlePlayAudio = () => {
         }
         audioElement.value.onerror = () => {
             isAudioPlaying.value = false
-            ElMessage.error('音频播放失败')
+            ElMessage.error(t('voice.audioPlayFail'))
         }
     }
 
@@ -136,7 +139,7 @@ const handlePlayAudio = () => {
     } else {
         audioElement.value.play().catch((error) => {
             console.error('播放失败:', error)
-            ElMessage.error('音频播放失败')
+            ElMessage.error(t('voice.audioPlayFail'))
         })
     }
 }
@@ -147,16 +150,16 @@ const handleUploadSuccess = (response: any) => {
     if (response.code === ResponseCode.SUCCESS) {
         form.value.headimg = response.data.url
         uploadImageRef.value?.clearFiles()
-        ElMessage.success('上传成功')
+        ElMessage.success(t('common.uploadSuccess'))
     } else {
-        ElMessage.error(response.msg || '上传失败')
+        ElMessage.error(response.msg || t('common.uploadFail'))
     }
 }
 
 // 上传失败回调
 const handleUploadError = () => {
     uploadImageRef.value?.clearFiles()
-    ElMessage.error('上传失败，请稍后重试')
+    ElMessage.error(t('voice.uploadFailRetry'))
 }
 
 // 清理音频资源
@@ -184,7 +187,7 @@ defineExpose({
                     form.value.audio = res.data.audio || ''
                 }
             }).catch(() => {
-                ElMessage.error('获取声音详情失败')
+                ElMessage.error(t('voice.getDetailFail'))
             })
         }
         dialogVisible.value = true
@@ -206,7 +209,7 @@ const handleSubmit = () => {
             ElMessage.error(res.msg)
         }
     }).catch(() => {
-        ElMessage.error('修改失败')
+        ElMessage.error(t('voice.modifyFail'))
     })
 }
 </script>

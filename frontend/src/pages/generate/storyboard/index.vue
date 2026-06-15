@@ -20,7 +20,9 @@ import { usePush } from '@/composables/usePush';
 import { ElLoadingService, ElMessageBox, ElMessageBoxOptions, TabPaneName } from 'element-plus';
 import { COMPSITE_EVENTS, useCompsite } from '@/composables/useCompsite';
 import { useLoading } from '@/composables/useLoading';
+import { useI18n } from 'vue-i18n';
 const route = useRoute();
+const { t } = useI18n();
 const userStore = useUserStore();
 const { USERINFO } = useRefs(userStore);
 const modelStore = useModelStore();
@@ -39,7 +41,7 @@ const getDramaInfo = () => {
             ElMessage.error(res.msg);
         }
     }).catch(() => {
-        ElMessage.error('获取短剧详情失败');
+        ElMessage.error(t('storyboard.getDramaFail'));
     })
 }
 const StoryboardSearch = reactive({
@@ -250,7 +252,7 @@ const handleGenerateImage = () => {
             ElMessage.error(res.msg);
         }
     }).catch(() => {
-        ElMessage.error('生成图片失败');
+        ElMessage.error(t('storyboard.genImageFail'));
     }).finally(() => {
         generateImageLoading.value = false;
     })
@@ -277,7 +279,7 @@ const handleGenerateVideo = () => {
             ElMessage.error(res.msg);
         }
     }).catch(() => {
-        ElMessage.error('生成视频失败');
+        ElMessage.error(t('storyboard.genVideoFail'));
     }).finally(() => {
         generateVideoLoading.value = false;
     });
@@ -298,7 +300,7 @@ const handleReplaceStoryboard = (item: any) => {
             ElMessage.error(res.msg);
         }
     }).catch(() => {
-        ElMessage.error('替换分镜失败');
+        ElMessage.error(t('storyboard.replaceFail'));
     }).finally(() => {
         replaceStoryboardLoading.value = false;
     })
@@ -369,7 +371,7 @@ const addListener = () => {
                 findItem.image = res.image;
                 findItem.use_material_type = 'image';
             }else{
-                ElMessage.error('生成图片失败');
+                ElMessage.error(t('storyboard.genFailMsg'));
             }
             if (findItem.id === currentStoryboard.value.id) {
                 handleCurrentStoryboard(findItem);
@@ -387,7 +389,7 @@ const addListener = () => {
                         find.image = res.image;
                         find.use_material_type = 'image';
                     }else{
-                        ElMessage.error('生成图片失败');
+                        ElMessage.error(t('storyboard.genFailMsg'));
                     }
                     if (find.id === currentStoryboard.value.id) {
                         handleCurrentStoryboard(find);
@@ -401,7 +403,7 @@ const addListener = () => {
                         find.video = res.video;
                         find.use_material_type = 'video';
                     }else{
-                        ElMessage.error('生成视频失败');
+                        ElMessage.error(t('storyboard.genVideoFailMsg'));
                     }
                     if (find.id === currentStoryboard.value.id) {
                         handleCurrentStoryboard(find);
@@ -414,7 +416,7 @@ const addListener = () => {
                     if (res.audio) {
                         find.narration_audio = res.audio;
                     }else{
-                        ElMessage.error('生成旁白音频失败');
+                        ElMessage.error(t('storyboard.genNarrationAudioFail'));
                     }
                 }
                 break;
@@ -427,7 +429,7 @@ const addListener = () => {
                         } else {
                             actor.character_look_id = null;
                             actor.character_look_state = 0;
-                            ElMessage.error('生成演员形象失败');
+                            ElMessage.error(t('storyboard.genActorImageFail'));
                         }
                     }
                 }
@@ -440,7 +442,7 @@ const addListener = () => {
                             actor.three_view_image = res.image;
                         } else {
                             actor.character_look_id = null;
-                            ElMessage.error('生成演员形象失败');
+                            ElMessage.error(t('storyboard.genActorImageFail'));
                         }
                         actor.character_look_state = 0;
                     }
@@ -453,7 +455,7 @@ const addListener = () => {
                         if (res.audio) {
                             dialogue.audio = res.audio;
                         }else{
-                            ElMessage.error('生成对话音频失败');
+                            ElMessage.error(t('storyboard.genDialogueAudioFail'));
                         }
                         dialogue.voice_state = 0;
                     }
@@ -469,7 +471,7 @@ const addListener = () => {
             if (res.image) {
                 findItem.headimg = res.image;
             }else{
-                ElMessage.error('生成演员形象失败');
+                ElMessage.error(t('storyboard.genActorImageFail'));
             }
         }
     })
@@ -481,7 +483,7 @@ const addListener = () => {
             if (res.image) {
                 findItem.three_view_image = res.image;
             }else{
-                ElMessage.error('生成演员形象失败');
+                ElMessage.error(t('storyboard.genActorImageFail'));
             }
         }
     })
@@ -493,7 +495,7 @@ const addListener = () => {
             if (res.image) {
                 findItem.prop.image = res.image;
             }else{
-                ElMessage.error('生成物品失败');
+                ElMessage.error(t('storyboard.genPropFail'));
             }
         }
     })
@@ -505,7 +507,7 @@ const addListener = () => {
             if (res.image) {
                 findItem.prop.three_view_image = res.image;
             }else{
-                ElMessage.error('生成物品失败');
+                ElMessage.error(t('storyboard.genPropFail'));
             }
         }
     })
@@ -535,7 +537,7 @@ const handleInsertEmptyStoryboard = (item?: any) => {
             ElMessage.error(res.msg)
         }
     }).catch(() => {
-        ElMessage.error('插入失败')
+        ElMessage.error(t('storyboard.insertFailMsg'))
     })
 }
 const handleDeleteStoryboard = (item: any) => {
@@ -547,14 +549,14 @@ const handleDeleteStoryboard = (item: any) => {
     })
         .then((res: any) => {
             if (res.code === ResponseCode.SUCCESS) {
-                ElMessage.success('删除成功');
+                ElMessage.success(t('storyboard.deleteSuccessMsg'));
                 getStoryboardList();
             } else {
                 ElMessage.error(res.msg);
             }
         })
         .catch(() => {
-            ElMessage.error('删除失败');
+            ElMessage.error(t('common.deleteFail'));
         })
 };
 const handleChangeStoryboard = (row: any, newSort?: number) => {
@@ -604,7 +606,7 @@ const handleChangeStoryboard = (row: any, newSort?: number) => {
                 storyboardList.value = originalList;
             }
         }).catch(() => {
-            ElMessage.error('更新分镜失败');
+            ElMessage.error(t('storyboard.updateStoryboardFail'));
             storyboardList.value = originalList;
         });
 };
@@ -620,13 +622,13 @@ const handleCopyStoryboard = (row: any) => {
             if (res.code === ResponseCode.SUCCESS) {
                 // 服务端会返回新生成的 id
                 getStoryboardList();
-                ElMessage.success('复制成功');
+                ElMessage.success(t('storyboard.copySuccessMsg'));
             } else {
                 ElMessage.error(res.msg);
             }
         })
         .catch(() => {
-            ElMessage.error('复制失败');
+            ElMessage.error(t('storyboard.copyFail'));
         })
 };
 const currentStoryboardUploadImageRef = ref<any>(null);
@@ -645,7 +647,7 @@ const handleUploadSuccess = (response: any) => {
                 }).then((res: any) => {
                     if (res.code === ResponseCode.SUCCESS) {
                         getStoryboardList();
-                        ElMessage.success('保存成功');
+                        ElMessage.success(t('common.saveSuccess'));
                     } else {
                         ElMessage.error(res.msg);
                     }
@@ -661,7 +663,7 @@ const handleUploadSuccess = (response: any) => {
                 }).then((res: any) => {
                     if (res.code === ResponseCode.SUCCESS) {
                         getStoryboardList();
-                        ElMessage.success('保存成功');
+                        ElMessage.success(t('common.saveSuccess'));
                     } else {
                         ElMessage.error(res.msg);
                     }
@@ -720,7 +722,7 @@ const handleDeleteProp = (prop: any) => {
             ElMessage.error(res.msg);
         }
     }).catch(() => {
-        ElMessage.error('删除物品失败');
+        ElMessage.error(t('storyboard.deletePropFail'));
     })
 }
 const propButtonRef = ref();
@@ -772,7 +774,7 @@ const handleCharacterLookSelect = (item: any) => {
             currentActor.value.character_look_state = 0;
         }
     }).catch(() => {
-        ElMessage.error('应用形象失败');
+        ElMessage.error(t('storyboard.applyLookFail'));
         currentActor.value.character_look_state = 0;
     })
 }
@@ -789,7 +791,7 @@ const handleDeleteActor = (actor: any) => {
             ElMessage.error(res.msg);
         }
     }).catch(() => {
-        ElMessage.error('删除演员失败');
+        ElMessage.error(t('storyboard.deleteActorFail'));
     })
 }
 const handleSceneSelect = (scene: any) => {
@@ -804,7 +806,7 @@ const handleSceneSelect = (scene: any) => {
             currentStoryboard.value = res.data;
         }
     }).catch(() => {
-        ElMessage.error('更新分镜失败');
+        ElMessage.error(t('storyboard.updateStoryboardFail'));
     })
 }
 const firstImageButtonRef = ref();
@@ -840,7 +842,7 @@ const getDialogues = () => {
             handleCurrentDialogue(dialogues.value[0]);
         }
     }).catch(() => {
-        ElMessage.error('获取对话失败');
+        ElMessage.error(t('storyboard.getDialogueFail'));
     }).finally(() => {
         dialoguesLoading.value = false;
     })
@@ -888,13 +890,13 @@ const handleDialogueVoiceSuccess = (data: any, options?: any) => {
             ElMessage.error(res.msg);
         }
     }).catch(() => {
-        ElMessage.error('设置对话音色失败');
+        ElMessage.error(t('storyboard.setDialogueVoiceFail'));
     })
 }
 const handleDeleteDialogue = () => {
-    ElMessageBox.confirm('确定删除该对话吗？', '提示', {
-        title: '提示',
-        message: '确定删除该对话吗？',
+    ElMessageBox.confirm(t('storyboard.deleteDialogueConfirm'), t('common.tips'), {
+        title: t('common.tips'),
+        message: t('storyboard.deleteDialogueConfirm'),
         beforeClose: (action: any, instance: any, done: () => void) => {
             if (action === 'confirm') {
                 instance.confirmButtonLoading = true;
@@ -905,14 +907,14 @@ const handleDeleteDialogue = () => {
                     dialogue_id: currentDialogue.value.id,
                 }).then((res: any) => {
                     if (res.code === ResponseCode.SUCCESS) {
-                        ElMessage.success('删除成功');
+                        ElMessage.success(t('storyboard.deleteSuccessMsg'));
                         getDialogues();
                         done();
                     } else {
                         ElMessage.error(res.msg);
                     }
                 }).catch(() => {
-                    ElMessage.error('删除失败');
+                    ElMessage.error(t('common.deleteFail'));
                 }).finally(() => {
                     instance.confirmButtonLoading = false;
                     instance.cancelButtonLoading = false;
@@ -943,7 +945,7 @@ const handleGenerateDialogue = () => {
             ElMessage.error(res.msg);
         }
     }).catch(() => {
-        ElMessage.error('生成旁白失败');
+        ElMessage.error(t('storyboard.genNarrationFail'));
     }).finally(() => {
         generateDialogueLoading.value = false;
     })
@@ -975,24 +977,24 @@ const BatchGenerateDialogue = async () => {
         return;
     }
     if (batchGenerateDialogueList.value.length === 0) {
-        ElMessage.info('本集分镜已全部生成对话配音');
+        ElMessage.info(t('storyboard.allDialogueGenerated'));
         return;
     }
     const contents = [
         h('span', {
             class: 'h10',
-        }, `本次将生成`),
+        }, t('storyboard.batchWillGen')),
         h('span', {
             class: 'h10 text-success',
         }, batchGenerateDialogueList.value.length),
         h('span', {
             class: 'h10',
-        }, '条对话配音。'),
+        }, t('storyboard.dialogueAudioUnit')),
     ];
     contents.push(
         h('span', {
             class: 'h10',
-        }, '生成中'),
+        }, t('storyboard.inProgress')),
         h('span', {
             class: 'h10 text-success',
         }, voice_state),
@@ -1003,7 +1005,7 @@ const BatchGenerateDialogue = async () => {
     contents.push(
         h('span', {
             class: 'h10',
-        }, '无音色'),
+        }, t('storyboard.noVoice')),
         h('span', {
             class: 'h10 text-success',
         }, no_voice),
@@ -1014,7 +1016,7 @@ const BatchGenerateDialogue = async () => {
     contents.push(
         h('span', {
             class: 'h10',
-        }, '已生成'),
+        }, t('storyboard.alreadyGenerated')),
         h('span', {
             class: 'h10 text-success',
         }, voice_audio),
@@ -1025,14 +1027,14 @@ const BatchGenerateDialogue = async () => {
     contents.push(
         h('span', {
             class: 'h10',
-        }, '是否继续？'),
+        }, t('storyboard.continueConfirm')),
     );
     const options: ElMessageBoxOptions = {
-        title: '确定批量生成对话配音吗？',
+        title: t('storyboard.batchGenDialogueTitle'),
         message: () => h('div', {
             class: 'flex grid-gap-2 flex-wrap',
         }, contents),
-        confirmButtonText: '确定',
+        confirmButtonText: t('common.confirm'),
         confirmButtonClass: 'el-button--success',
         beforeClose: (action, instance, done) => {
             if (instance.confirmButtonLoading) return;
@@ -1047,7 +1049,7 @@ const BatchGenerateDialogue = async () => {
                 })).then(() => {
                     done();
                 }).catch(() => {
-                    ElMessage.error('批量生成对话配音失败');
+                    ElMessage.error(t('storyboard.batchGenDialogueFail'));
                 }).finally(() => {
                     instance.confirmButtonLoading = false;
                 });
@@ -1079,7 +1081,7 @@ const handleNarrationVoiceSuccess = (data: any) => {
         }
     }).catch((error) => {
         console.error('handleVoiceSuccess error', error);
-        ElMessage.error('设置旁白配音失败');
+        ElMessage.error(t('storyboard.setNarrationVoiceFail'));
     })
 }
 const generateNarrationLoading = ref(false);
@@ -1101,7 +1103,7 @@ const handleGenerateNarration = () => {
             ElMessage.error(res.msg);
         }
     }).catch(() => {
-        ElMessage.error('生成旁白失败');
+        ElMessage.error(t('storyboard.genNarrationFail'));
     }).finally(() => {
         generateNarrationLoading.value = false;
     })
@@ -1109,32 +1111,32 @@ const handleGenerateNarration = () => {
 const batchGenerateNarrationList = ref<any[]>([]);
 const BatchGenerateNarration = () => {
     if (!dramaInfo.value.voice) {
-        ElMessage.info('当前剧本尚未选择旁白音色，请先选择');
+        ElMessage.info(t('storyboard.noNarrationVoice'));
         activeName.value = 'narration';
         return narrationVoiceDialogRef.value?.open({ modelScene: 'storyboard_narration_voice', voice: dramaInfo.value.voice });
     }
     batchGenerateNarrationList.value = storyboardList.value.filter((item: any) => item.narration && !item.narration_audio && !item.narration_state);
     if (batchGenerateNarrationList.value.length === 0) {
-        ElMessage.info('本集分镜已全部生成旁白');
+        ElMessage.info(t('storyboard.allNarrationGenerated'));
         return;
     }
     const contents = [
         h('span', {
             class: 'h10',
-        }, `本次将生成`),
+        }, t('storyboard.batchWillGen')),
         h('span', {
             class: 'h10 text-success',
         }, batchGenerateNarrationList.value.length),
         h('span', {
             class: 'h10',
-        }, '条旁白，是否继续？'),
+        }, t('storyboard.narrationUnit')),
     ];
     const options: ElMessageBoxOptions = {
-        title: '确定批量生成旁白吗？',
+        title: t('storyboard.batchGenNarrationTitle'),
         message: () => h('div', {
             class: 'flex grid-gap-2',
         }, contents),
-        confirmButtonText: '确定',
+        confirmButtonText: t('common.confirm'),
         confirmButtonClass: 'el-button--success',
         beforeClose: (action, instance, done) => {
             if (instance.confirmButtonLoading) return;
@@ -1148,7 +1150,7 @@ const BatchGenerateNarration = () => {
                 })).then(() => {
                     done();
                 }).catch(() => {
-                    ElMessage.error('批量生成旁白失败');
+                    ElMessage.error(t('storyboard.batchGenNarrationFail'));
                 }).finally(() => {
                     instance.confirmButtonLoading = false;
                 });
@@ -1164,19 +1166,19 @@ const BatchGenerateNarration = () => {
 }
 const speedFormatTooltip = (value: number) => {
     if (value === 1) {
-        return '正常';
+        return t('storyboard.normal');
     }
-    return `${value}x倍速`;
+    return t('storyboard.speedFormat', { value });
 }
 const volumeFormatTooltip = (value: number) => {
     if (value === 0) {
-        return '静音';
+        return t('storyboard.mute');
     }
     if (value === 100) {
-        return '最大';
+        return t('storyboard.max');
     }
     if (value === 50) {
-        return '正常';
+        return t('storyboard.normal');
     }
     if (value < 50) {
         return `-${value}%`;
@@ -1224,42 +1226,42 @@ const handlePlayAudio = (audio: string) => {
 }
 
 const xlLoading = useLoading({
-    title: '正在合成',
-    tips: '请勿退出页面，否则合成会中断',
+    title: t('storyboard.compositeTitle'),
+    tips: t('storyboard.compositeTips'),
     list: [
         {
-            title: '获取分镜中...'
+            title: t('storyboard.compositeStep1')
         },
         {
-            title: '选择保存位置...'
+            title: t('storyboard.compositeStep2')
         },
         {
-            title: '正在准备素材...'
+            title: t('storyboard.compositeStep3')
         },
         {
-            title: '正在解析视频素材...'
+            title: t('storyboard.compositeStep4')
         },
         {
-            title: '正在解析对话素材...'
+            title: t('storyboard.compositeStep5')
         },
         {
-            title: '正在解析对话音频素材...'
+            title: t('storyboard.compositeStep6')
         },
         {
-            title: '正在解析旁白素材...'
+            title: t('storyboard.compositeStep7')
         },
         {
-            title: '正在解析旁白音频素材...'
+            title: t('storyboard.compositeStep8')
         },
         {
-            title: '正在合成中...'
+            title: t('storyboard.compositeStep9')
         },
         {
-            title: '正在上传视频...'
+            title: t('storyboard.compositeStep10')
         },
     ],
     showCancelButton: true,
-    cancelButtonText: '取消合成',
+    cancelButtonText: t('storyboard.cancelComposite'),
     cancelButtonClick: () => {
         video.cancel();
         xlLoading.close();
@@ -1322,10 +1324,10 @@ video.on(COMPSITE_EVENTS.UPLOAD_VIDEO, (p: number) => {
 video.on(COMPSITE_EVENTS.COMPLETE, (state: boolean) => {
     if (state === true) {
         xlLoading.close();
-        ElMessage.success('合成成功');
+        ElMessage.success(t('storyboard.compositeSuccess'));
     } else {
         xlLoading.close();
-        ElMessage.error('合成失败');
+        ElMessage.error(t('storyboard.compositeFail'));
     }
 })
 const compsite = async () => {
@@ -1347,7 +1349,7 @@ const compsite = async () => {
     }
 }
 const downloadPackage = () => {
-    ElMessage.info('打包下载功能暂未开放，敬请期待');
+    ElMessage.info(t('storyboard.packDownloadNotAvailable'));
     console.log('downloadPackage');
 }
 onMounted(() => {
@@ -1365,7 +1367,7 @@ defineExpose({
     BatchVideo: BatchGenerateVideo,
     BatchAudio: BatchGenerateDialogue,
     BatchSFX: () => {
-        ElMessage.info('音效生成功能暂未开放，敬请期待');
+        ElMessage.info(t('storyboard.soundEffectNotAvailable'));
     },
     BatchNarration: BatchGenerateNarration,
     compsite: compsite,
@@ -1382,7 +1384,7 @@ defineExpose({
                     <span class="text-success">#{{ currentStoryboard?.sort }}</span>
                     <div class="flex-1"></div>
                     <template v-if="currentStoryboardForm.storyboard_id && activeName === 'image'">
-                        <el-upload ref="uploadImageRef" :data="{ dir_name: 'storyboard/image', dir_title: '分镜图' }"
+                        <el-upload ref="uploadImageRef" :data="{ dir_name: 'storyboard/image', dir_title: t('storyboard.storyboardImage') }"
                             :action="$http.getCompleteUrl('app/shortplay/api/Uploads/upload')"
                             :headers="$http.getHeaders()" accept="image/jpeg,image/png" :limit="1" type="cover"
                             :disabled="currentStoryboardUploadLoading"
@@ -1391,12 +1393,12 @@ defineExpose({
                             :on-error="() => { currentStoryboardUploadLoading = false; handleUploadError() }">
                             <el-button size="small" bg text icon="UploadFilled"
                                 :loading="currentStoryboardUploadLoading">
-                                <span>本地上传</span>
+                                <span>{{ t('storyboard.localUpload') }}</span>
                             </el-button>
                         </el-upload>
                     </template>
                     <template v-if="currentStoryboardForm.storyboard_id && activeName === 'video'">
-                        <el-upload ref="uploadImageRef" :data="{ dir_name: 'storyboard/video', dir_title: '分镜视频' }"
+                        <el-upload ref="uploadImageRef" :data="{ dir_name: 'storyboard/video', dir_title: t('storyboard.storyboardVideo') }"
                             :action="$http.getCompleteUrl('app/shortplay/api/Uploads/upload')"
                             :headers="$http.getHeaders()" accept="video/mp4,video/webm" :limit="1" type="cover"
                             :disabled="currentStoryboardUploadLoading"
@@ -1405,7 +1407,7 @@ defineExpose({
                             :on-error="() => { currentStoryboardUploadLoading = false; handleUploadError() }">
                             <el-button size="small" bg text icon="UploadFilled"
                                 :loading="currentStoryboardUploadLoading">
-                                <span>本地上传</span>
+                                <span>{{ t('storyboard.localUpload') }}</span>
                             </el-button>
                         </el-upload>
                     </template>
@@ -1434,7 +1436,7 @@ defineExpose({
                                     <el-icon>
                                         <IconReplaceSvg />
                                     </el-icon>
-                                    <span>替换</span>
+                                    <span>{{ t('storyboard.replaceLabel') }}</span>
                                 </el-button>
                                 <el-button bg text tag="a"
                                     :href="currentTask.result[currentTask.scene === 'storyboard_image' ? 'image_path' : 'video_path']"
@@ -1442,13 +1444,13 @@ defineExpose({
                                     <el-icon>
                                         <Download />
                                     </el-icon>
-                                    <span>下载</span>
+                                    <span>{{ t('storyboard.downloadLabel') }}</span>
                                 </el-button>
                                 <el-button bg text @click="currentTask = null">
                                     <el-icon>
                                         <Close />
                                     </el-icon>
-                                    <span>关闭</span>
+                                    <span>{{ t('storyboard.closeLabel') }}</span>
                                 </el-button>
                             </div>
                         </div>
@@ -1507,8 +1509,8 @@ defineExpose({
                                             <ArrowRightBold />
                                         </el-icon>
                                     </div>
-                                    <span class="h10 flex-1">场景{{ item.scene_id }} - #{{ item.sort }}</span>
-                                    <el-popconfirm title="确定删除该分镜吗？" placement="bottom-end" confirm-button-type="danger"
+                                    <span class="h10 flex-1">{{ t('storyboard.scenePrefix') }}{{ item.scene_id }} - #{{ item.sort }}</span>
+                                    <el-popconfirm :title="t('storyboard.deleteConfirm')" placement="bottom-end" confirm-button-type="danger"
                                         :teleported="false" width="fit-content" @confirm="handleDeleteStoryboard(item)">
                                         <template #reference>
                                             <el-icon class="icon-button hover-show">
@@ -1527,7 +1529,7 @@ defineExpose({
                                                 <el-icon size="20">
                                                     <Loading class="circular" />
                                                 </el-icon>
-                                                <span class="h10">生成中...</span>
+                                                <span class="h10">{{ t('common.generating') }}</span>
                                             </span>
                                         </div>
                                     </div>
@@ -1538,7 +1540,7 @@ defineExpose({
                                         <el-icon>
                                             <Microphone />
                                         </el-icon>
-                                        <span class="h10">配音</span>
+                                        <span class="h10">{{ t('storyboard.dubbingLabel') }}</span>
                                     </span>
                                     <div class="flex-1"></div>
                                     <span class="h10">{{ formatDuration(item.duration) }}</span>
@@ -1562,21 +1564,21 @@ defineExpose({
                                             <el-icon>
                                                 <IconTransitionSvg />
                                             </el-icon>
-                                            <span class="h10">复制分镜</span>
+                                            <span class="h10">{{ t('storyboard.copyStoryboard') }}</span>
                                         </span>
                                         <span class="flex flex-center grid-gap-2 p-2 pointer"
                                             @click.stop="handleInsertEmptyStoryboard(item)">
                                             <el-icon>
                                                 <IconStoryboardSvg />
                                             </el-icon>
-                                            <span class="h10">添加分镜</span>
+                                            <span class="h10">{{ t('storyboard.addStoryboard') }}</span>
                                         </span>
                                     </div>
                                 </el-popover>
                             </div>
                         </div>
                         <div class="bg-overlay rounded-4 p-4">
-                            背景音乐
+                            {{ t('storyboard.bgm') }}
                         </div>
                     </el-scrollbar>
                 </div>
@@ -1588,23 +1590,23 @@ defineExpose({
                             <el-icon size="16">
                                 <IconImageSvg />
                             </el-icon>
-                            <span>分镜图</span>
+                            <span>{{ t('storyboard.storyboardImage') }}</span>
                         </template>
                         <div v-if="currentStoryboardForm.storyboard_id"
                             class="storyboard-form flex flex-column grid-gap-4 p-4" v-loading="dialoguesLoading">
                             <div class="flex flex-column grid-gap-2">
-                                <span>分镜#{{ currentStoryboard.sort }} 描述</span>
+                                <span>{{ t('storyboard.storyboardDescLabel', { sort: currentStoryboard.sort }) }}</span>
                                 <span class="h10 text-info">{{ currentStoryboard.description }}</span>
                             </div>
                             <div class="flex flex-column grid-gap-2">
-                                <span>首帧提示词</span>
+                                <span>{{ t('storyboard.firstFrameLabel') }}</span>
                                 <div class="bg rounded-4 p-4 border">
-                                    <el-input v-model="currentStoryboardForm.image_prompt" placeholder="请输入首帧提示词"
+                                    <el-input v-model="currentStoryboardForm.image_prompt" :placeholder="t('storyboard.firstFramePromptPlaceholder')"
                                         size="small" class="storyboard-form-textarea" type="textarea"
                                         :autosize="{ minRows: 6, maxRows: 20 }" />
                                     <div class="flex flex-y-center grid-gap-2">
                                         <div class="bg-overlay rounded-round p-3 flex flex-center grid-gap-2 pointer hover-bg-hover"
-                                            ref="modelButtonRef" title="选择使用AI生成图">
+                                            ref="modelButtonRef" :title="t('actor.aiGenImage')">
                                             <template v-if="model.id">
                                                 <el-avatar :src="model.icon" :alt="model.name" shape="square"
                                                     :size="16"></el-avatar>
@@ -1636,7 +1638,7 @@ defineExpose({
                             </div>
                             <div class="flex grid-gap-2">
                                 <div class="flex flex-column grid-gap-2">
-                                    <span>场景</span>
+                                    <span>{{ t('storyboard.sceneLabel') }}</span>
                                     <el-popover placement="bottom" :teleported="false" popper-class="episode-popover"
                                         width="fit-content">
                                         <template #reference>
@@ -1654,7 +1656,7 @@ defineExpose({
                                     </el-popover>
                                 </div>
                                 <div class="flex flex-column grid-gap-2">
-                                    <span>引用分镜</span>
+                                    <span>{{ t('storyboard.quoteStoryboard') }}</span>
                                     <div class="flex grid-gap-2 flex-wrap">
                                         <div v-for="(s, index) in quoteStoryboards" :key="s.id" class="actor-item">
                                             <el-avatar :src="s.image" fit="contain" :size="100"
@@ -1673,7 +1675,7 @@ defineExpose({
                                 </div>
                             </div>
                             <div class="flex flex-column grid-gap-2">
-                                <span>出镜演员</span>
+                                <span>{{ t('storyboard.castActorLabel') }}</span>
                                 <div class="flex grid-gap-2 flex-wrap">
                                     <div v-for="actor in actorsList" :key="actor.id" class="actor-item">
                                         <el-avatar :src="actor.headimg" fit="contain" :size="100" shape="square"
@@ -1709,7 +1711,7 @@ defineExpose({
                                 </div>
                             </div>
                             <div class="flex flex-column grid-gap-2">
-                                <span>出镜物品</span>
+                                <span>{{ t('storyboard.propLabel') }}</span>
                                 <div class="flex grid-gap-2 flex-wrap">
                                     <div v-for="prop in currentStoryboard.props" :key="prop.id" class="actor-item">
                                         <el-avatar :src="prop.prop.image" fit="contain" :size="100" shape="square"
@@ -1745,13 +1747,13 @@ defineExpose({
                             <el-popover ref="actorPopoverRef" :virtual-ref="actorButtonRef" virtual-triggering
                                 placement="bottom-start" width="min(100vw,880px)" trigger="click">
                                 <xl-actor @select="handleActorSelect"
-                                    :types="[{ label: '本集', value: 'episode' }, { label: '本剧', value: 'drama' }]"
+                                    :types="[{ label: t('storyboard.thisEpisode'), value: 'episode' }, { label: t('storyboard.thisDrama'), value: 'drama' }]"
                                     :query="{ drama_id: drama_id, episode_id: episode_id }" />
                             </el-popover>
                             <el-popover ref="propPopoverRef" :virtual-ref="propButtonRef" virtual-triggering
                                 placement="bottom-start" width="min(100vw,880px)" trigger="click">
                                 <xl-prop @select="handlePropSelect"
-                                    :types="[{ label: '本集', value: 'episode' }, { label: '本剧', value: 'drama' }]"
+                                    :types="[{ label: t('storyboard.thisEpisode'), value: 'episode' }, { label: t('storyboard.thisDrama'), value: 'drama' }]"
                                     :query="{ drama_id: drama_id, episode_id: episode_id }" />
                             </el-popover>
                             <el-popover ref="storyboardPopoverRef" :virtual-ref="storyboardButtonRef" virtual-triggering
@@ -1769,13 +1771,13 @@ defineExpose({
                             <el-icon size="16">
                                 <IconVideoSvg />
                             </el-icon>
-                            <span>分镜视频</span>
+                            <span>{{ t('storyboard.storyboardVideo') }}</span>
                         </template>
 
                         <div v-if="currentStoryboardForm.storyboard_id"
                             class="storyboard-form flex flex-column grid-gap-4 p-4">
                             <div class="flex flex-column grid-gap-2 flex-y-flex-start">
-                                <span>分镜#{{ currentStoryboard.sort }} 描述</span>
+                                <span>{{ t('storyboard.storyboardDescLabel', { sort: currentStoryboard.sort }) }}</span>
                                 <span class="h10 text-info">{{ currentStoryboard.description }}</span>
                                 <div class="flex flex-center grid-gap-2 mt-4">
                                     <el-avatar :src="currentStoryboardForm.first_image" fit="contain" :size="100"
@@ -1789,20 +1791,20 @@ defineExpose({
                                             <el-icon color="var(--el-text-color-primary)" size="16">
                                                 <Plus />
                                             </el-icon>
-                                            <span class="h10 text-text-primary">尾帧</span>
+                                            <span class="h10 text-text-primary">{{ t('storyboard.lastFrame') }}</span>
                                         </div>
                                     </el-avatar>
                                 </div>
                             </div>
                             <div class="flex flex-column grid-gap-2">
-                                <span>视频提示词</span>
+                                <span>{{ t('storyboard.videoPromptLabel') }}</span>
                                 <div class="bg rounded-4 p-4 border">
-                                    <el-input v-model="currentStoryboardForm.video_prompt" placeholder="请输入视频提示词"
+                                    <el-input v-model="currentStoryboardForm.video_prompt" :placeholder="t('storyboard.genVideoPromptPlaceholder')"
                                         size="small" class="storyboard-form-textarea" type="textarea"
                                         :autosize="{ minRows: 6, maxRows: 20 }" />
                                     <div class="flex flex-y-center grid-gap-2">
                                         <div class="bg-overlay rounded-round p-3 flex flex-center grid-gap-2 pointer hover-bg-hover"
-                                            ref="videoModelButtonRef" title="选择使用AI生成视频">
+                                            ref="videoModelButtonRef" :title="t('storyboard.videoPromptLabel')">
                                             <template v-if="videoModel.id">
                                                 <el-avatar :src="videoModel.icon" :alt="videoModel.name" shape="square"
                                                     :size="16"></el-avatar>
@@ -1821,7 +1823,7 @@ defineExpose({
                                             </template>
                                         </div>
                                         <div class="bg-overlay rounded-round p-3 flex flex-center grid-gap-2 pointer hover-bg-hover"
-                                            ref="durationButtonRef" title="选择视频时长">
+                                            ref="durationButtonRef" :title="t('storyboard.duration')">
                                             <el-icon size="16">
                                                 <Clock />
                                             </el-icon>
@@ -1885,7 +1887,7 @@ defineExpose({
                             <el-icon size="16">
                                 <IconDubbingSvg />
                             </el-icon>
-                            <span>对话配音</span>
+                            <span>{{ t('storyboard.dialogueDubbing') }}</span>
                         </template>
 
                         <div v-if="currentStoryboardForm.storyboard_id"
@@ -1901,22 +1903,21 @@ defineExpose({
                                     </el-icon>
                                     <span class="flex-1 border h10 p-2 rounded-2 text-wrap"
                                         :class="{ 'border-success text-success': currentDialogue?.id === dialogue.id }">
-                                        {{ dialogue.actor.name }}{{ dialogue.inner_monologue ? '(内心OS)' : '' }}:{{
-                                            dialogue.content }}
+                                        {{ dialogue.actor.name }}{{ dialogue.inner_monologue ? t('storyboard.innerOS') : '' }}:{{ dialogue.content }}
                                     </span>
                                 </div>
                             </div>
-                            <el-empty v-else description="暂无对话">
+                            <el-empty v-else :description="t('storyboard.noDialogue')">
                                 <el-button type="success" size="large" bg text @click.stop="handleAddDialogue()">
-                                    <span>新增对话</span>
+                                    <span>{{ t('storyboard.addDialogue') }}</span>
                                 </el-button>
                             </el-empty>
 
                             <template v-if="currentDialogue?.id">
                                 <div class="flex flex-column grid-gap-2">
-                                    <span>台词</span>
+                                    <span>{{ t('storyboard.lines') }}</span>
                                     <div class="bg rounded-4 p-4 border">
-                                        <el-input v-model="currentDialogue.content" placeholder="台词" size="small"
+                                        <el-input v-model="currentDialogue.content" :placeholder="t('storyboard.lines')" size="small"
                                             class="storyboard-form-textarea" type="textarea" :maxlength="200"
                                             show-word-limit :autosize="{ minRows: 6, maxRows: 20 }" />
                                         <div class="flex flex-y-center grid-gap-2">
@@ -1927,13 +1928,13 @@ defineExpose({
                                                     <Loading class="circular" v-if="currentDialogue.voice_state" />
                                                     <Headset v-else />
                                                 </el-icon>
-                                                <span class="h10">播放</span>
+                                                <span class="h10">{{ t('common.play') }}</span>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="flex flex-column grid-gap-2">
-                                    <span>音色情绪</span>
+                                    <span>{{ t('storyboard.voiceEmotion') }}</span>
                                     <div class="bg rounded-4 p-4 border">
                                         <template v-if="currentDialogue.voice">
                                             <div class="flex flex-center grid-gap-2">
@@ -1942,7 +1943,7 @@ defineExpose({
                                                     }}</el-avatar>
                                                 <div class="flex-1 flex flex-column grid-gap-2">
                                                     <span v-if="currentDialogue.voice.name">{{ currentDialogue.voice.name }}</span>
-                                                    <span v-else>未命名</span>
+                                                    <span v-else>{{ t('voice.unnamed') }}</span>
                                                     <div class="flex grid-gap-2" v-if="currentDialogue.voice.gender_enum && currentDialogue.voice.age_enum">
                                                         <span class="bg-overlay h10 rounded-2 py-1 px-2" v-if="currentDialogue.voice.gender_enum?.label">{{
                                                             currentDialogue.voice.gender_enum?.label }}</span>
@@ -1965,7 +1966,7 @@ defineExpose({
                                                         <template #reference>
                                                             <div
                                                                 class="flex-1 flex flex-center mt-6 pointer grid-gap-2">
-                                                                <span>情绪：</span>
+                                                                <span>{{ t('storyboard.emotionLabel') }}</span>
                                                                 <span class="flex-1 text-info">{{
                                                                     currentDialogue.voice.selected_emotion?.label
                                                                     }}</span>
@@ -1990,7 +1991,7 @@ defineExpose({
                                                         <template #reference>
                                                             <div
                                                                 class="flex-1 flex flex-center mt-6 pointer grid-gap-2">
-                                                                <span>语言：</span>
+                                                                <span>{{ t('storyboard.languageLabel') }}</span>
                                                                 <span class="flex-1 text-info">{{
                                                                     currentDialogue.voice.selected_language?.label
                                                                     }}</span>
@@ -2015,7 +2016,7 @@ defineExpose({
                                             <div class="flex flex-center grid-gap-2">
                                                 <el-avatar fit="contain" :size="40" shape="square"></el-avatar>
                                                 <div class="flex-1 flex flex-column grid-gap-2">
-                                                    <span class="text-info">选择音色</span>
+                                                    <span class="text-info">{{ t('storyboard.selectVoice') }}</span>
                                                 </div>
                                                 <el-icon color="var(--el-color-info)" size="24" class="pointer" @click="dialogueVoiceDialogRef?.open({
                                                     modelScene: 'dialogue_voice',
@@ -2028,18 +2029,18 @@ defineExpose({
                                     </div>
                                 </div>
                                 <div class="flex flex-column grid-gap-2">
-                                    <span>音量</span>
+                                    <span>{{ t('storyboard.volumeLabel') }}</span>
                                     <div class="px-4 pb-4 flex flex-center grid-gap-4">
                                         <el-slider v-model="currentDialogue.prosody_volume" :step="1" :min="0"
                                             :max="100" class="storyboard-form-slider flex-1"
                                             :format-tooltip="volumeFormatTooltip"
-                                            :marks="{ 0: '静音', 100: '最大', 50: '正常' }" />
+                                            :marks="{ 0: t('storyboard.mute'), 100: t('storyboard.max'), 50: t('storyboard.normal') }" />
                                         <span class="h10 text-info text-nowrap text-right" style="width: 60px;">{{
                                             volumeFormatTooltip(currentDialogue.prosody_volume) }}</span>
                                     </div>
                                 </div>
                                 <div class="flex flex-column grid-gap-2">
-                                    <span>语速</span>
+                                    <span>{{ t('storyboard.speedLabel') }}</span>
                                     <div class="px-4 flex flex-center grid-gap-10">
                                         <el-slider v-model="currentDialogue.prosody_speed" :step="0.1" show-stops
                                             :min="0.5" :max="2" :format-tooltip="speedFormatTooltip"
@@ -2060,42 +2061,42 @@ defineExpose({
                                         </template>
                                         <div class="flex flex-column grid-gap-4">
                                             <span class="pointer hover-bg-hover rounded-4 p-2"
-                                                @click="handleAddDialogue()">新增对话</span>
+                                                @click="handleAddDialogue()">{{ t('storyboard.addDialogue') }}</span>
                                             <span class="pointer hover-bg-hover rounded-4 p-2"
-                                                @click="handleEditDialogue()">编辑当前对话</span>
+                                                @click="handleEditDialogue()">{{ t('storyboard.editCurrentDialogue') }}</span>
                                             <span class="pointer hover-bg-hover rounded-4 p-2"
-                                                @click="handleDeleteDialogue()">删除当前对话</span>
+                                                @click="handleDeleteDialogue()">{{ t('storyboard.deleteCurrentDialogue') }}</span>
                                             <span class="pointer hover-bg-hover rounded-4 p-2"
                                                 :class="{ 'text-info': currentDialogue.voice_level === 'storyboard', 'pointer': currentDialogue.voice_level !== 'storyboard' }"
                                                 @click="handleDialogueVoiceSuccess(currentDialogue.voice, { apply_scope: 'storyboard' })">
                                                 <span
-                                                    v-if="currentDialogue.voice_level === 'storyboard'">音色已应用到当前分镜</span>
-                                                <span v-else>将所选音色应用到当前分镜</span>
+                                                    v-if="currentDialogue.voice_level === 'storyboard'">{{ t('storyboard.voiceAppliedStoryboard') }}</span>
+                                                <span v-else>{{ t('storyboard.applyVoiceStoryboard') }}</span>
                                             </span>
                                             <span class="pointer hover-bg-hover rounded-4 p-2"
-                                                @click="handleDialogueVoiceSuccess(currentDialogue.voice, { apply_scope: 'scene' })">将所选音色应用到当前场景</span>
+                                                @click="handleDialogueVoiceSuccess(currentDialogue.voice, { apply_scope: 'scene' })">{{ t('storyboard.applyVoiceScene') }}</span>
                                             <span class="hover-bg-hover rounded-4 p-2"
                                                 :class="{ 'text-info': currentDialogue.voice_level === 'episode', 'pointer': currentDialogue.voice_level !== 'episode' }"
                                                 @click="handleDialogueVoiceSuccess(currentDialogue.voice, { apply_scope: 'episode' })">
-                                                <span v-if="currentDialogue.voice_level === 'episode'">音色已应用到当前分集</span>
-                                                <span v-else>将所选音色应用到当前分集</span>
+                                                <span v-if="currentDialogue.voice_level === 'episode'">{{ t('storyboard.voiceAppliedEpisode') }}</span>
+                                                <span v-else>{{ t('storyboard.applyVoiceEpisode') }}</span>
                                             </span>
                                             <span class="pointer hover-bg-hover rounded-4 p-2"
                                                 :class="{ 'text-info': currentDialogue.voice_level === 'drama', 'pointer': currentDialogue.voice_level !== 'drama' }"
                                                 @click="handleDialogueVoiceSuccess(currentDialogue.voice, { apply_scope: 'drama' })">
-                                                <span v-if="currentDialogue.voice_level === 'drama'">音色已应用到当前剧本</span>
-                                                <span v-else>将所选音色应用到当前剧本</span>
+                                                <span v-if="currentDialogue.voice_level === 'drama'">{{ t('storyboard.voiceAppliedDrama') }}</span>
+                                                <span v-else>{{ t('storyboard.applyVoiceDrama') }}</span>
                                             </span>
                                             <span class="hover-bg-hover rounded-4 p-2 text-info"
-                                                v-if="currentDialogue.voice_level === 'actor'">将所选音色应用到当前角色</span>
+                                                v-if="currentDialogue.voice_level === 'actor'">{{ t('storyboard.applyVoiceActor') }}</span>
                                         </div>
                                     </el-popover>
                                     <el-button type="success" size="large" class="flex-1"
                                         @click="handleGenerateDialogue"
                                         :loading="generateDialogueLoading || !!currentDialogue.voice_state">
-                                        <span>确认修改</span>
-                                        <span class="ml-1" v-if="dialoguePoints != '免费'">{{ dialoguePoints }}</span>
-                                        <span v-if="dialoguePoints != '免费'">积分/次</span>
+                                        <span>{{ t('storyboard.confirmModify') }}</span>
+                                        <span class="ml-1" v-if="dialoguePoints != t('common.free')">{{ dialoguePoints }}</span>
+                                        <span v-if="dialoguePoints != t('common.free')">{{ t('common.pointsPerTime') }}</span>
                                     </el-button>
                                 </div>
                             </template>
@@ -2108,7 +2109,7 @@ defineExpose({
                             <el-icon size="16">
                                 <IconDubbingSvg />
                             </el-icon>
-                            <span>旁白配音</span>
+                            <span>{{ t('storyboard.narrationDubbing') }}</span>
                         </template>
 
 
@@ -2116,9 +2117,9 @@ defineExpose({
                             class="storyboard-form flex flex-column grid-gap-4 p-4">
 
                             <div class="flex flex-column grid-gap-2">
-                                <span>旁白台词</span>
+                                <span>{{ t('storyboard.narrationLines') }}</span>
                                 <div class="bg rounded-4 p-4 border">
-                                    <el-input v-model="currentStoryboardForm.narration" placeholder="旁白台词" size="small"
+                                    <el-input v-model="currentStoryboardForm.narration" :placeholder="t('storyboard.narrationLines')" size="small"
                                         class="storyboard-form-textarea" type="textarea" :maxlength="200"
                                         show-word-limit :autosize="{ minRows: 6, maxRows: 20 }" />
                                     <div class="flex flex-y-center grid-gap-2">
@@ -2143,7 +2144,7 @@ defineExpose({
                                                 shape="square">{{ truncate(dramaInfo.voice.name, 1) }}</el-avatar>
                                             <div class="flex-1 flex flex-column grid-gap-2">
                                                 <span v-if="dramaInfo.voice.name">{{ dramaInfo.voice.name }}</span>
-                                                <span v-else>未命名</span>
+                                                <span v-else>{{ t('voice.unnamed') }}</span>
                                                 <div class="flex grid-gap-2" v-if="dramaInfo.voice.gender_enum && dramaInfo.voice.age_enum">
                                                     <span class="bg-overlay h10 rounded-2 py-1 px-2" v-if="dramaInfo.voice.gender_enum?.label">{{
                                                         dramaInfo.voice.gender_enum?.label }}</span>
@@ -2212,7 +2213,7 @@ defineExpose({
                                         <div class="flex flex-center grid-gap-2">
                                             <el-avatar fit="contain" :size="40" shape="square"></el-avatar>
                                             <div class="flex-1 flex flex-column grid-gap-2">
-                                                <span class="text-info">选择音色</span>
+                                                <span class="text-info">{{ t('storyboard.selectVoice') }}</span>
                                             </div>
                                             <el-icon color="var(--el-color-info)" size="24" class="pointer" @click="narrationVoiceDialogRef?.open({
                                                 modelScene: 'storyboard_narration_voice',
@@ -2246,9 +2247,9 @@ defineExpose({
                             <div class="flex-1"></div>
                             <el-button type="success" size="large" @click="handleGenerateNarration"
                                 :loading="generateNarrationLoading || !!currentStoryboard.narration_state">
-                                <span>确认修改</span>
-                                <span class="ml-1" v-if="narrationPoints != '免费'">{{ narrationPoints }}</span>
-                                <span v-if="narrationPoints != '免费'">积分/次</span>
+                                <span>{{ t('storyboard.confirmModify') }}</span>
+                                <span class="ml-1" v-if="narrationPoints != t('common.free')">{{ narrationPoints }}</span>
+                                <span v-if="narrationPoints != t('common.free')">{{ t('common.pointsPerTime') }}</span>
                             </el-button>
                             <xl-voice ref="narrationVoiceDialogRef" @success="handleNarrationVoiceSuccess" />
                         </div>
@@ -2258,31 +2259,31 @@ defineExpose({
         </div>
         <el-dialog v-model="batchGenerateDialogVisible" class="generate-storyboard-dialog" draggable width="800px">
             <template #header>
-                <span class="font-weight-600">批量生成分镜</span>
+                <span class="font-weight-600">{{ t('storyboard.batchGenStoryboardTitle') }}</span>
             </template>
-            <xl-models title="模型" v-model="currentStoryboardForm.model_id" @select="handleModelSelect" no-init
+            <xl-models :title="t('common.model')" v-model="currentStoryboardForm.model_id" @select="handleModelSelect" no-init
                 class="flex-1 bg-overlay rounded-4 p-4" scene="storyboard_image" />
             <template #footer>
                 <el-button type="info" @click="batchGenerateDialogVisible = false"
-                    :disabled="batchGenerateLoading">取消</el-button>
+                    :disabled="batchGenerateLoading">{{ t('common.cancel') }}</el-button>
                 <div class="flex-1"></div>
                 <el-button type="success" icon="Check" @click="submitBatchGenerateImage"
-                    :disabled="!currentStoryboardForm.model_id" :loading="batchGenerateLoading">生成</el-button>
+                    :disabled="!currentStoryboardForm.model_id" :loading="batchGenerateLoading">{{ t('common.generate') }}</el-button>
             </template>
         </el-dialog>
         <el-dialog v-model="batchGenerateVideoDialogVisible" class="generate-storyboard-dialog" draggable width="800px">
             <template #header>
-                <span class="font-weight-600">批量生成视频</span>
+                <span class="font-weight-600">{{ t('storyboard.batchGenVideoTitle') }}</span>
             </template>
-            <xl-models title="模型" v-model="currentStoryboardForm.video_model_id" @select="handleVideoModelSelect"
+            <xl-models :title="t('common.model')" v-model="currentStoryboardForm.video_model_id" @select="handleVideoModelSelect"
                 no-init class="flex-1 bg-overlay rounded-4 p-4" scene="storyboard_video" />
             <template #footer>
                 <el-button type="info" @click="batchGenerateVideoDialogVisible = false"
-                    :disabled="batchGenerateVideoLoading">取消</el-button>
+                    :disabled="batchGenerateVideoLoading">{{ t('common.cancel') }}</el-button>
                 <div class="flex-1"></div>
                 <el-button type="success" icon="Check" @click="submitBatchGenerateVideo"
                     :disabled="!currentStoryboardForm.video_model_id"
-                    :loading="batchGenerateVideoLoading">生成</el-button>
+                    :loading="batchGenerateVideoLoading">{{ t('common.generate') }}</el-button>
             </template>
         </el-dialog>
         <el-image-viewer v-if="previewImageVisible" :url-list="imageList" show-progress :initial-index="initialIndex"

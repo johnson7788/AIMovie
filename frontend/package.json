@@ -1,9 +1,9 @@
 {
   "name": "short-play",
   "private": true,
-  "version": "0.0.40",
+  "version": "0.0.45",
   "type": "module",
-    "scripts": {
+  "scripts": {
     "dev": "vite --mode development --host",
     "build": "node build-version.mjs && vue-tsc --noEmit && vite build --mode production",
     "preview": "vite preview",

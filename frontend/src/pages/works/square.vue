@@ -5,7 +5,7 @@
                 <div class="column" v-for="(col, colIndex) in columns" :key="colIndex">
                     <div class="item" v-for="item in col.list" :key="item.id" @click="handleItemClick(item)">
                         <img :src="item.drama.cover" />
-                        <span class="h10 font-weight-600 episode_num">共 {{ item.episode_num }} 集</span>
+                        <span class="h10 font-weight-600 episode_num">{{ $t('works.totalEpisodes', { num: item.episode_num }) }}</span>
                         <div
                             class="flex p-4 flex-y-center grid-gap-2 flex-x-space-between position-absolute bottom-0 left-0 right-0">
                             <div class="flex flex-y-center grid-gap-2">
@@ -25,7 +25,7 @@
             </div>
         </el-scrollbar>
         <div class="flex flex-center" v-else>
-            <el-empty description="暂无数据" />
+            <el-empty :description="$t('common.noData')" />
         </div>
     </div>
 </template>
@@ -36,8 +36,10 @@ import { $http } from '@/common/http'
 import { ResponseCode } from '@/common/const'
 import router from '@/routers'
 import { useUserStore } from '@/stores'
+import { useI18n } from 'vue-i18n'
 
 /* ================== 常量 ================== */
+const { t } = useI18n()
 const COLUMN_COUNT = 4
 const GAP = 16
 
@@ -174,7 +176,7 @@ const handleLike = (item: any) => {
             ElMessage.error(res.msg);
         }
     }).catch(() => {
-        ElMessage.error('点赞失败');
+        ElMessage.error(t('works.likeFail'));
     })
 }
 onMounted(getList)

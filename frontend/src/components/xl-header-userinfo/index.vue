@@ -4,7 +4,9 @@ import { useLogin } from '@/composables/useLogin';
 import { useRefs, useUserStore } from '@/stores';
 // import LanguageSvg from '@/svg/icon/language.vue';
 import router from '@/routers';
+import { useI18n } from 'vue-i18n';
 
+useI18n();
 const login = useLogin();
 const userStore = useUserStore();
 const { USERINFO } = useRefs(userStore);
@@ -35,7 +37,7 @@ const xlInvitationCodeRef = ref<any>(null);
                     <el-icon color="#fff" size="20">
                         <Present />
                     </el-icon>
-                    <span class="h8">邀请好友</span>
+                    <span class="h8">{{ $t('user.inviteFriends') }}</span>
                     <div class="num">{{ USERINFO?.invitation_code_count || 0 }}</div>
                 </div>
                 <!-- <div class="flex flex-y-center grid-gap-2 mt-8">
@@ -54,14 +56,14 @@ const xlInvitationCodeRef = ref<any>(null);
                     <el-icon color="#fff" size="20">
                         <Setting />
                     </el-icon>
-                    <span class=" h8">设置中心</span>
+                    <span class=" h8">{{ $t('user.settings') }}</span>
                 </div>
             </div>
         </template>
     </el-popover>
     <div class="xl-header-userinfo" v-else>
         <div class="xl-header-userinfo-button" @click="login.open()">
-            <span>登录</span>
+            <span>{{ $t('user.login') }}</span>
         </div>
     </div>
     <xl-userinfo ref="xlUserinfoRef" />

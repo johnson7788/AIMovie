@@ -1,5 +1,5 @@
 <template>
-    <el-dialog v-model="visible" title="设置中心" width="700px" align-center>
+    <el-dialog v-model="visible" :title="$t('user.settings')" width="700px" align-center>
         <div class="flex  grid-gap-10">
             <div class="flex flex-column grid-gap-1">
                 <div v-for="item in options" class="flex flex-y-center grid-gap-2 menu-item"
@@ -13,7 +13,7 @@
                         <AboutSvg v-if="item.value === 'about'" />
                         <LogoutSvg v-if="item.value === 'logout'" />
                     </el-icon>
-                    <span>{{ item.name }}</span>
+                    <span>{{ $t(item.name) }}</span>
                 </div>
             </div>
             <div class="flex-1 h-p-100 box">
@@ -25,7 +25,7 @@
             <div class="dialog-footer">
                 <el-button color="var(--el-fill-color-lighter)" size="large" v-if="activeValue === 'account'"
                     @click="handleSave">
-                    保存
+                    {{ $t('common.save') }}
                 </el-button>
             </div>
         </template>
@@ -43,15 +43,18 @@ import BookSvg from '@/svg/icon/icon-book.vue';
 import DunpaiSvg from '@/svg/icon/icon-dunpai.vue';
 import AboutSvg from '@/svg/icon/icon-about.vue';
 import LogoutSvg from '@/svg/icon/icon-logout.vue';
+import { useI18n } from 'vue-i18n';
+
+const { t } = useI18n();
 const html = ref(null);
 const activeValue = ref('account');
 const options = reactive([
-    { name: '账户', icon: 'UserSvg', value: 'account' },
-    { name: '帮助中心', icon: 'HelpSvg', value: 'help' },
-    { name: '使用条款', icon: 'BookSvg', value: 'terms' },
-    { name: '隐私协议', icon: 'DunpaiSvg', value: 'privacy' },
-    { name: '关于我们', icon: 'AboutSvg', value: 'about' },
-    { name: '退出登录', icon: 'LogoutSvg', value: 'logout' },
+    { name: 'user.account', icon: 'UserSvg', value: 'account' },
+    { name: 'user.help', icon: 'HelpSvg', value: 'help' },
+    { name: 'user.terms', icon: 'BookSvg', value: 'terms' },
+    { name: 'user.privacy', icon: 'DunpaiSvg', value: 'privacy' },
+    { name: 'user.about', icon: 'AboutSvg', value: 'about' },
+    { name: 'user.logout', icon: 'LogoutSvg', value: 'logout' },
 ])
 const visible = ref(false);
 const userRef = ref<InstanceType<typeof User> | null>(null);
@@ -68,15 +71,15 @@ const onChange = (value: string) => {
         getArticle(value);
     }
     if (value === 'logout') {
-        ElMessageBox.confirm('确定退出登录吗？', '提示', {
-            confirmButtonText: '确定',
-            cancelButtonText: '取消',
+        ElMessageBox.confirm(t('user.logoutConfirm'), t('common.tips'), {
+            confirmButtonText: t('common.confirm'),
+            cancelButtonText: t('common.cancel'),
             type: 'warning',
         }).then(() => {
             userStore.clearUserInfo();
             router.push('/');
             visible.value = false;
-            ElMessage.success('退出登录成功');
+            ElMessage.success(t('user.logoutSuccess'));
         });
         return ;
     }

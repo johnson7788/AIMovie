@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
+
+const { t } = useI18n();
 
 interface EpisodeOption {
     value: number;
@@ -29,7 +32,7 @@ const episodeOptions = computed<EpisodeOption[]>(() => {
 });
 
 const displayLabel = computed(() => {
-    if (props.modelValue <= 0) return '自动';
+    if (props.modelValue <= 0) return t('episode.auto');
     return String(props.modelValue);
 });
 
@@ -49,13 +52,13 @@ const handleCustomInput = () => {
         <template #reference>
             <slot>
                 <div class="flex flex-center grid-gap-2 input-button input-button-selected px-6">
-                    <span v-if="props.modelValue > 0">全</span>
+                    <span v-if="props.modelValue > 0">{{ $t('episode.all') }}</span>
                     <span class="h10 font-weight-600 text-episode-sum">{{ displayLabel }}</span>
-                    <span v-if="props.modelValue > 0">集</span>
+                    <span v-if="props.modelValue > 0">{{ $t('episode.unit') }}</span>
                 </div>
             </slot>
         </template>
-        <span class="h10">选择集数</span>
+        <span class="h10">{{ $t('episode.selectSum') }}</span>
         <div class="grid-columns-4 grid-gap-4 text-center mt-4">
             <div class="grid-column-2 btn rounded-4 p-4" v-for="item in episodeOptions" :key="item.value"
                 :class="{ 'active': props.modelValue === item.value }" @click.stop="handleSelect(item.value)">
@@ -63,17 +66,17 @@ const handleCustomInput = () => {
             </div>
         </div>
         <div v-if="allowInput" class="custom-input-area mt-4 pt-3" style="border-top: 1px solid rgba(255, 255, 255, 0.06);">
-            <span class="h10">自定义集数</span>
+            <span class="h10">{{ $t('episode.customSum') }}</span>
             <div class="flex grid-gap-2 mt-2">
                 <input
                     v-model.number="customValue"
                     type="number"
                     min="1"
-                    placeholder="输入集数"
+                    :placeholder="t('episode.inputSum')"
                     class="custom-episode-input"
                     @keyup.enter="handleCustomInput"
                 />
-                <button class="btn rounded-4 px-6" @click.stop="handleCustomInput">确定</button>
+                <button class="btn rounded-4 px-6" @click.stop="handleCustomInput">{{ $t('common.confirm') }}</button>
             </div>
         </div>
     </el-popover>

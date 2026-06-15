@@ -17,11 +17,11 @@
             </div>
         </div>
         <div class="flex flex-center flex-column" v-else>
-            <el-empty description="暂无消息" />
+            <el-empty :description="$t('notice.noMessage')" />
         </div>
     </el-scrollbar>
 
-    <el-dialog v-model="dialogVisible"  append-to-body title="消息详情" width="600px" :close-on-click-modal="false">
+    <el-dialog v-model="dialogVisible"  append-to-body :title="$t('notice.detail')" width="600px" :close-on-click-modal="false">
         <div v-loading="detailLoading" class="detail-content">
             <div v-if="detailData" class="flex flex-column grid-gap-4">
                 <div class="detail-header">
@@ -34,11 +34,11 @@
                     <div class="detail-text" v-html="detailData.content.content || detailData.subtitle"></div>
                 </div>
             </div>
-            <el-empty v-else description="暂无详情" />
+            <el-empty v-else :description="$t('notice.noDetail')" />
         </div>
         <template #footer>
             <div class="flex flex-center ">
-                <el-button color="var(--el-color-success)" @click="dialogVisible = false">我知道了</el-button>
+                <el-button color="var(--el-color-success)" @click="dialogVisible = false">{{ $t('notice.gotIt') }}</el-button>
             </div>
         </template>
     </el-dialog>
@@ -46,6 +46,9 @@
 <script setup lang="ts">
 import { $http } from '@/common/http'
 import { ResponseCode } from '@/common/const'
+import { useI18n } from 'vue-i18n';
+
+useI18n();
 const list = ref<any[]>([])
 const query = ref({
     page: 1,

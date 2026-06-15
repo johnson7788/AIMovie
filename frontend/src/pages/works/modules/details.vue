@@ -5,6 +5,8 @@ import { useUserStore } from '@/stores';
 import { ElMessage } from 'element-plus';
 import IconStyleSvg from '@/svg/icon/icon-style.vue'
 import IconUploadImageSvg from '@/svg/icon/icon-upload-image.vue';
+import { useI18n } from 'vue-i18n';
+const { t } = useI18n();
 const userStore = useUserStore();
 const props = withDefaults(defineProps<{
     find: any
@@ -54,12 +56,12 @@ const handleUploadSuccess = (response: any) => {
                     cover: response.data.url,
                 }).then((res: any) => {
                     if (res.code === ResponseCode.SUCCESS) {
-                        ElMessage.success('上传封面成功');
+                        ElMessage.success(t('works.uploadCoverSuccess'));
                     } else {
                         ElMessage.info(res.msg);
                     }
                 }).catch(() => {
-                    ElMessage.error('上传封面失败');
+                    ElMessage.error(t('works.uploadCoverFail'));
                 }).finally(() => {
                     uploadCoverDialogVisible.value = false;
                     uploadCoverLoading.value = false;
@@ -96,7 +98,7 @@ const handleModelSelect = (item: any) => {
             ElMessage.error(res.msg);
         }
     }).catch(() => {
-        ElMessage.error('生成封面失败');
+        ElMessage.error(t('works.genCoverFail'));
     }).finally(() => {
         modelLoading.value = false;
         modelPopoverRef.value?.hide();
@@ -136,14 +138,14 @@ const handleSave = () => {
     loading.value = true;
     $http.post('/app/shortplay/api/Drama/update', form).then((res: any) => {
         if (res.code === ResponseCode.SUCCESS) {
-            ElMessage.success('保存成功');
+            ElMessage.success(t('common.saveSuccess'));
             viewAction.value = 'view';
             emit('update');
         } else {
             ElMessage.error(res.msg);
         }
     }).catch(() => {
-        ElMessage.error('保存失败');
+        ElMessage.error(t('common.saveFail'));
     }).finally(() => {
         loading.value = false;
     });
@@ -175,7 +177,7 @@ onMounted(() => {
                             <el-icon size="40">
                                 <Loading class="circular" />
                             </el-icon>
-                            <span class="h10 font-weight-600 text-success">AI正在生成封面...</span>
+                            <span class="h10 font-weight-600 text-success">{{ $t('works.aiGenCovering') }}</span>
                         </div>
                         <div class="flex flex-column grid-gap-1" v-else>
                             <span>{{ find.title }}</span>
@@ -185,11 +187,11 @@ onMounted(() => {
             </el-image>
             <div class="drama-image-action flex flex-center">
                 <div class="h10 flex grid-gap-2 action-cover" v-if="!modelLoading">
-                    <el-button type="success" @click.stop="openGenerateCover($event)" size="small">AI生成</el-button>
-                    <el-button type="info" @click.stop="openUploadCoverDialog()" size="small">上传</el-button>
+                    <el-button type="success" @click.stop="openGenerateCover($event)" size="small">{{ $t('works.aiGenerate') }}</el-button>
+                    <el-button type="info" @click.stop="openUploadCoverDialog()" size="small">{{ $t('common.upload') }}</el-button>
                 </div>
                 <div class="h10 flex grid-gap-2 action-cover" v-else-if="modelLoading">
-                    <span class="text-success">提交中...</span>
+                    <span class="text-success">{{ $t('works.submitting') }}</span>
                 </div>
             </div>
         </div>
@@ -198,78 +200,77 @@ onMounted(() => {
             <el-icon>
                 <Edit />
             </el-icon>
-            <span>编辑</span>
+            <span>{{ $t('common.edit') }}</span>
         </div>
         <div class="flex flex-column grid-gap-4 flex-1" v-if="viewAction === 'view'">
             <div class="flex grid-gap-1 rounded-4 p-4 hover-bg-page">
-                <span class="font-weight-600 text-nowrap">剧名：</span>
+                <span class="font-weight-600 text-nowrap">{{ $t('works.dramaTitle') }}</span>
                 <span>{{ find.title }}</span>
             </div>
             <div class="flex grid-gap-1 rounded-4 p-4 hover-bg-page">
-                <span class="font-weight-600 text-nowrap">集数：</span>
-                <span>全 {{ find.episode_sum }} 集，</span>
-                <span>更新至 {{ find.episode_num }} 集</span>
+                <span class="font-weight-600 text-nowrap">{{ $t('works.episodeCount') }}</span>
+                <span>{{ $t('works.episodeProgress', { sum: find.episode_sum, num: find.episode_num }) }}</span>
             </div>
             <div class="flex grid-gap-1 rounded-4 p-4 hover-bg-page">
-                <span class="font-weight-600 text-nowrap">时长：</span>
-                <span>每集 {{ find.episode_duration }} 秒</span>
+                <span class="font-weight-600 text-nowrap">{{ $t('works.durationLabel') }}</span>
+                <span>{{ $t('works.episodeDurationFormat', { seconds: find.episode_duration }) }}</span>
             </div>
             <div class="flex grid-gap-1 rounded-4 p-4 hover-bg-page flex-y-center">
-                <span class="font-weight-600 text-nowrap">画面：</span>
+                <span class="font-weight-600 text-nowrap">{{ $t('works.aspectRatioLabel') }}</span>
                 <span class="icon-aspect-ratio" :view="find.aspect_ratio"></span>
                 <el-tag type="success" size="small">{{ find.aspect_ratio }}</el-tag>
             </div>
             <div class="flex grid-gap-1 rounded-4 p-4 hover-bg-page">
-                <span class="font-weight-600 text-nowrap">画风：</span>
+                <span class="font-weight-600 text-nowrap">{{ $t('works.styleLabel') }}</span>
                 <el-tag type="warning" size="small">{{ find.style.name }}</el-tag>
             </div>
             <div class="flex grid-gap-1 rounded-4 p-4 hover-bg-page">
-                <span class="font-weight-600 text-nowrap">创建：</span>
+                <span class="font-weight-600 text-nowrap">{{ $t('works.createdAt') }}</span>
                 <span class="text-secondary">{{ find.create_time }}</span>
             </div>
             <div class="flex grid-gap-1 rounded-4 p-4 hover-bg-page">
-                <span class="font-weight-600 text-nowrap">卖点：</span>
+                <span class="font-weight-600 text-nowrap">{{ $t('works.sellingPoint') }}</span>
                 <span class="text-info text-pre">{{ find.overall_hook }}</span>
             </div>
             <div class="flex grid-gap-1 rounded-4 p-4 hover-bg-page">
-                <span class="font-weight-600 text-nowrap">爽点：</span>
+                <span class="font-weight-600 text-nowrap">{{ $t('works.thrillPoint') }}</span>
                 <span class="text-info text-pre">{{ find.core_catharsis_mechanism }}</span>
             </div>
             <div class="flex grid-gap-1 rounded-4 p-4 hover-bg-page">
-                <span class="font-weight-600 text-nowrap">主线：</span>
+                <span class="font-weight-600 text-nowrap">{{ $t('works.mainPlot') }}</span>
                 <span class="text-info text-pre">{{ find.main_conflict }}</span>
             </div>
             <div class="flex grid-gap-1 rounded-4 p-4 hover-bg-page">
-                <span class="font-weight-600 text-nowrap">关系：</span>
+                <span class="font-weight-600 text-nowrap">{{ $t('works.relationship') }}</span>
                 <span class="text-info text-pre">{{ find.relationship_mainline }}</span>
             </div>
             <div class="flex grid-gap-1 rounded-4 p-4 hover-bg-page">
-                <span class="font-weight-600 text-nowrap">描述：</span>
+                <span class="font-weight-600 text-nowrap">{{ $t('works.descLabel') }}</span>
                 <span class="text-info text-pre">{{ find.description }}</span>
             </div>
             <div class="flex grid-gap-1 rounded-4 p-4 hover-bg-page">
-                <span class="font-weight-600 text-nowrap">背景：</span>
+                <span class="font-weight-600 text-nowrap">{{ $t('works.backgroundLabel') }}</span>
                 <span class="text-info text-pre">{{ find.background_description }}</span>
             </div>
             <div class="flex grid-gap-1 rounded-4 p-4 hover-bg-page">
-                <span class="font-weight-600 text-nowrap">大纲：</span>
+                <span class="font-weight-600 text-nowrap">{{ $t('works.outlineLabel') }}</span>
                 <span class="text-secondary text-pre">{{ find.outline }}</span>
             </div>
         </div>
         <el-form v-else size="large" class="flex-1" :model="form" :disabled="loading">
-            <el-form-item label="剧名">
+            <el-form-item :label="$t('works.dramaTitleShort')">
                 <el-input v-model="form.title" class="input-textarea" />
             </el-form-item>
-            <el-form-item label="画面">
+            <el-form-item :label="$t('works.aspectRatioShort')">
                 <xl-aspect-ratio v-model="form.aspect_ratio" />
             </el-form-item>
-            <el-form-item label="画风">
+            <el-form-item :label="$t('works.styleShort')">
                 <div class="flex flex-center grid-gap-2 input-button rounded-4 py-2 px-6" ref="styleButtonRef">
                     <template v-if="!styleFind.id">
-                        <el-icon alt="风格" class="icon-style">
+                        <el-icon :alt="$t('works.styleAlt')" class="icon-style">
                             <IconStyleSvg />
                         </el-icon>
-                        <span class="h10">风格</span>
+                        <span class="h10">{{ $t('works.styleAlt') }}</span>
                     </template>
                     <template v-else>
                         <el-avatar :src="styleFind.image" :alt="styleFind.name" class="icon-style"></el-avatar>
@@ -277,37 +278,37 @@ onMounted(() => {
                     </template>
                 </div>
             </el-form-item>
-            <el-form-item label="卖点">
+            <el-form-item :label="$t('works.sellingPointShort')">
                 <el-input v-model="form.overall_hook" type="textarea" :autosize="{ minRows: 4, maxRows: 20 }"
                     class="input-textarea" />
             </el-form-item>
-            <el-form-item label="爽点">
+            <el-form-item :label="$t('works.thrillPointShort')">
                 <el-input v-model="form.core_catharsis_mechanism" type="textarea" :autosize="{ minRows: 4, maxRows: 20 }"
                     class="input-textarea" />
             </el-form-item>
-            <el-form-item label="主线">
+            <el-form-item :label="$t('works.mainPlotShort')">
                 <el-input v-model="form.main_conflict" type="textarea" :autosize="{ minRows: 4, maxRows: 20 }"
                     class="input-textarea" />
             </el-form-item>
-            <el-form-item label="关系">
+            <el-form-item :label="$t('works.relationshipShort')">
                 <el-input v-model="form.relationship_mainline" type="textarea" :autosize="{ minRows: 4, maxRows: 20 }"
                     class="input-textarea" />
             </el-form-item>
-            <el-form-item label="描述">
+            <el-form-item :label="$t('works.descShort')">
                 <el-input v-model="form.description" type="textarea" :autosize="{ minRows: 4, maxRows: 20 }"
                     class="input-textarea" />
             </el-form-item>
-            <el-form-item label="背景">
+            <el-form-item :label="$t('works.backgroundShort')">
                 <el-input v-model="form.background_description" type="textarea" :autosize="{ minRows: 4, maxRows: 20 }"
                     class="input-textarea" />
             </el-form-item>
-            <el-form-item label="大纲">
+            <el-form-item :label="$t('works.outlineShort')">
                 <el-input v-model="form.outline" type="textarea" :autosize="{ minRows: 10, maxRows: 50 }"
                     class="input-textarea" />
             </el-form-item>
             <div class="flex flex-x-flex-end flex-y-center grid-gap-4">
-                <el-button type="info" bg text @click="viewAction = 'view'" :disabled="loading">取消</el-button>
-                <el-button type="success" bg text @click="handleSave" :loading="loading">保存</el-button>
+                <el-button type="info" bg text @click="viewAction = 'view'" :disabled="loading">{{ $t('common.cancel') }}</el-button>
+                <el-button type="success" bg text @click="handleSave" :loading="loading">{{ $t('common.save') }}</el-button>
             </div>
         </el-form>
         <el-popover ref="stylePopoverRef" :virtual-ref="styleButtonRef" virtual-triggering placement="bottom-start"
@@ -316,10 +317,10 @@ onMounted(() => {
         </el-popover>
         <el-dialog v-model="uploadCoverDialogVisible" class="drama-dialog" draggable>
             <template #header>
-                <span class="font-weight-600">《{{ find.title }}》上传封面</span>
+                <span class="font-weight-600">{{ $t('works.uploadCoverTitle', { title: find.title }) }}</span>
             </template>
             <el-upload ref="uploadCoverRef" class="input-upload flex-1" drag v-loading="uploadCoverLoading"
-                :data="{ dir_name: 'drama/cover', dir_title: '剧本封面' }"
+                :data="{ dir_name: 'drama/cover', dir_title: $t('works.scriptCoverTitle') }"
                 :action="$http.getCompleteUrl('app/shortplay/api/Uploads/upload')" :before-upload="beforeUpload"
                 :headers="$http.getHeaders()" accept="image/jpeg,image/png" :limit="1" type="cover"
                 :on-success="handleUploadSuccess" :show-file-list="false" :on-error="handleUploadError">
@@ -328,15 +329,15 @@ onMounted(() => {
                         <IconUploadImageSvg />
                     </el-icon>
                     <div class="el-upload__text">
-                        <span class="h10">拖拽剧本封面到此处或</span>
-                        <span class="h10">点击上传</span>
+                        <span class="h10">{{ $t('home.dragCover') }}</span>
+                        <span class="h10">{{ $t('home.clickUpload') }}</span>
                     </div>
                     <div class="el-upload__text">
-                        <span class="h10">支持上传格式：</span>
+                        <span class="h10">{{ $t('home.supportFormat') }}</span>
                         <span class="h10">PNG, JPG, JPEG</span>
                     </div>
                     <div class="el-upload__text">
-                        <span class="h10">封面比例：</span>
+                        <span class="h10">{{ $t('home.coverRatio') }}</span>
                         <span class="h10">4:3</span>
                     </div>
                 </template>

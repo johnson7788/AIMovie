@@ -3,9 +3,9 @@
         <div class="stars small" ref="smallStars"></div>
         <div class="stars big" ref="bigStars"></div>
 
-        <div class="h1 font-weight-bold">填写邀请码</div>
+        <div class="h1 font-weight-bold">{{ t('invitation.inputCode') }}</div>
         <div class="mt-7">
-            <span>请输入邀请码</span>
+            <span>{{ t('invitation.codePlaceholder') }}</span>
         </div>
         <div class="grid-columns-6 grid-gap-6 mt-10 content" @click="handleContainerClick" @paste="handlePaste">
             <div v-for="(char, index) in codeArray" :key="index" class="flex flex-center flex-column item"
@@ -19,7 +19,7 @@
         </div>
         <el-button class="btn" round color="var(--el-color-success)" size="large" :loading="loading"
             :disabled="!isCodeComplete" @click="handleSubmit">
-            确定
+            {{ t('common.confirm') }}
         </el-button>
     </div>
 </template>
@@ -30,7 +30,9 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { $http } from '@/common/http'
 import { ResponseCode } from '@/common/const'
-import { useUserStore } from '@/stores' 
+import { useUserStore } from '@/stores'
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 const router = useRouter()
 const bigStars = ref<HTMLDivElement | null>(null)
 const smallStars = ref<HTMLDivElement | null>(null)
@@ -210,7 +212,7 @@ const handleBlur = () => {
 
 const handleSubmit = async () => {
     if (!isCodeComplete.value) {
-        ElMessage.warning('请输入完整的邀请码')
+        ElMessage.warning(t('invitation.codeIncomplete'))
         return
     }
 
@@ -220,7 +222,7 @@ const handleSubmit = async () => {
     try {
         const res: any = await $http.post('/app/user/api/User/bindInvitationCode', { code })
         if (res.code === ResponseCode.SUCCESS) {
-            ElMessage.success(res.msg || '邀请码使用成功');
+            ElMessage.success(res.msg || t('invitation.codeSuccess'));
             $http.get('/app/user/api/User/info').then((res: any) => {
                 if (res.code === ResponseCode.SUCCESS) {
                     const userStore = useUserStore();
@@ -233,10 +235,10 @@ const handleSubmit = async () => {
                 router.replace('/')
             }, 500)
         } else {
-            ElMessage.error(res.msg || '邀请码使用失败')
+            ElMessage.error(res.msg || t('invitation.codeFail'))
         }
     } catch (error: any) {
-        ElMessage.error(error?.msg || '邀请码使用失败，请稍后重试')
+        ElMessage.error(error?.msg || t('invitation.codeRetry'))
     } finally {
         loading.value = false
     }

@@ -4,20 +4,19 @@ import { useUserStore, useRefs, useWebConfigStore } from '@/stores';
 import { useNotify } from '@/composables/useNotify';
 import IconEmailSvg from '@/svg/icon/icon-email.vue';
 import { usePush } from '@/composables/usePush';
-import IconWechatSvg from '@/svg/icon/icon-wechat.vue';
+import { useI18n } from 'vue-i18n';
 import router from '@/routers';
 import { throttle } from '@/common/functions';
 import { $http } from '@/common/http';
 import { ResponseCode } from '@/common/const';
-import { useLogin } from '@/composables/useLogin'
-const login = useLogin()
+const { locale } = useI18n();
 const props = withDefaults(defineProps<{
     showMenu?: any[]
 }>(), {
     showMenu: () => ([]),
 });
 const showMenu = computed(() => {
-    return props.showMenu?.length > 0 ? props.showMenu : ['invitation', 'language', 'helper', 'userinfo', 'wechat'];
+    return props.showMenu?.length > 0 ? props.showMenu : ['invitation', 'language', 'helper', 'userinfo'];
 });
 const userStore = useUserStore();
 const { USERINFO } = useRefs(userStore);
@@ -25,7 +24,10 @@ const webConfigStore = useWebConfigStore();
 const { WEBCONFIG } = useRefs(webConfigStore);
 const notify = useNotify();
 const { subscribe, unsubscribe, unsubscribeAll } = usePush();
-const wechatGroupDialogVisible = ref(false);
+const toggleLanguage = () => {
+    locale.value = locale.value === 'zh-CN' ? 'en' : 'zh-CN';
+    localStorage.setItem('locale', locale.value);
+};
 const getUserInfo = throttle(() => {
     $http.get('/app/user/api/User/info').then((res: any) => {
         if (res.code === ResponseCode.SUCCESS) {
@@ -57,10 +59,6 @@ watch(USERINFO, (newVal, oldVal) => {
 });
 const xlInvitationCodeRef = ref<any>(null);
 
-// 打开微信群二维码对话框
-const openWechatGroupDialog = () => {
-    wechatGroupDialogVisible.value = true;
-};
 //跳转链接
 const toUse = () => {
     const url = WEBCONFIG.value.guide_url
@@ -84,31 +82,21 @@ onUnmounted(() => {
             <el-icon :size="16">
                 <IconEmailSvg />
             </el-icon>
-            <span class="h10">邀请好友得积分</span>
+            <span class="h10">{{ $t('header.invitation') }}</span>
         </div>
         <div class="x-header-tool" v-if="showMenu?.includes('helper')" @click="toUse">
             <el-icon alt="帮助" :size="26" class="x-header-tool-img"  color="rgba(255, 255, 255, 0.3)">
                 <HelperSvg />
             </el-icon>
         </div>
-        <div class="x-header-tool" v-if="showMenu?.includes('wechat')" @click="openWechatGroupDialog">
-            <el-icon alt="微信群" :size="26" class="x-header-tool-img" color="rgba(255, 255, 255, 0.3)">
-                <IconWechatSvg />
-            </el-icon>
+        <div class="x-header-tool lang-toggle" v-if="showMenu?.includes('language')" @click="toggleLanguage" :title="locale === 'zh-CN' ? 'Switch to English' : '切换为中文'">
+            <span class="lang-label" :class="{ active: locale === 'zh-CN' }">中</span>
+            <span class="lang-divider">/</span>
+            <span class="lang-label" :class="{ active: locale !== 'zh-CN' }">EN</span>
         </div>
         <xl-header-userinfo v-if="showMenu?.includes('userinfo')" />
         <xl-invitation-code ref="xlInvitationCodeRef" />
     </div>
-
-    <!-- 微信群二维码对话框 -->
-    <el-dialog v-model="wechatGroupDialogVisible" title="加入官方微信群" width="512px" align-center>
-        <div class="flex flex-column flex-y-center grid-gap-4 py-8" v-if="WEBCONFIG?.wechat_group_qrcode_url">
-            <el-image :src="WEBCONFIG.wechat_group_qrcode_url" style="width: 230px; height: 230px;" fit="contain"
-                :preview-src-list="[WEBCONFIG.wechat_group_qrcode_url]" preview-teleported />
-            <p class="text-center">请使用微信扫描下方二维码加入群聊</p>
-        </div>
-        <p v-else class="text-center text-secondary">二维码暂未配置</p>
-    </el-dialog>
 </template>
 <style scoped lang="scss">
 .x-header-tools {
@@ -148,6 +136,28 @@ onUnmounted(() => {
             font-size: 30px;
             width: 50%;
             height: 50%;
+        }
+
+        &.lang-toggle {
+            width: auto;
+            padding: 0 10px;
+            gap: 4px;
+            font-size: 14px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.3);
+
+            .lang-label {
+                transition: color 0.2s ease;
+
+                &.active {
+                    color: rgba(255, 255, 255, 0.9);
+                }
+            }
+
+            .lang-divider {
+                color: rgba(255, 255, 255, 0.15);
+                font-weight: 400;
+            }
         }
     }
 }

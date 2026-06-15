@@ -2,6 +2,8 @@
 import { ResponseCode } from '@/common/const';
 import { $http } from '@/common/http';
 import { truncate } from '@/common/functions';
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 const voiceForm = ref<any>({
     model_id: '',
     voice_id: '',
@@ -51,7 +53,7 @@ const getVoiceList = () => {
             voiceList.value = res.data;
         }
     }).catch(() => {
-        ElMessage.error('获取配音列表失败');
+        ElMessage.error(t('voice.getListFail'));
     }).finally(() => {
         loading.value = false;
     });
@@ -91,7 +93,7 @@ defineExpose({
             append-to-body destroy-on-close :close-on-click-modal="false" :before-close="handleBeforeClose"
             width="min(100%,1000px)">
             <template #header>
-                <span class="font-weight-600">配音</span>
+                <span class="font-weight-600">{{ $t('voice.dubbing') }}</span>
             </template>
             <div class="flex grid-gap-4">
                 <div class="flex flex-column grid-gap-4" style="width: 300px;">
@@ -100,8 +102,8 @@ defineExpose({
                 </div>
                 <div class="flex-1 flex flex-column grid-gap-4">
                     <xl-tabs v-model="voiceForm.voice_channel" class="text-info" @change="getVoiceList">
-                        <xl-tabs-item value="yidevs" class="pb-2">公共音色</xl-tabs-item>
-                        <xl-tabs-item value="self" class="pb-2">我的音色</xl-tabs-item>
+                        <xl-tabs-item value="yidevs" class="pb-2">{{ $t('voice.publicVoice') }}</xl-tabs-item>
+                        <xl-tabs-item value="self" class="pb-2">{{ $t('voice.myVoice') }}</xl-tabs-item>
                     </xl-tabs>
                     <el-scrollbar v-loading="loading" height="max(450px,50vh)">
                         <div class="grid-columns-3 grid-gap-4" v-if="voiceList.length > 0">
@@ -114,7 +116,7 @@ defineExpose({
                                     </el-avatar>
                                     <div class="flex-1 flex flex-column grid-gap-2">
                                         <span v-if="item.name">{{ item.name }}</span>
-                                        <span v-else>未命名</span>
+                                        <span v-else>{{ $t('voice.unnamed') }}</span>
                                         <div class="flex grid-gap-2" v-if="item.gender_enum && item.age_enum">
                                             <span class="bg h10 rounded-2 py-1 px-2" v-if="item.gender_enum?.label">{{
                                                 item.gender_enum?.label
@@ -126,7 +128,7 @@ defineExpose({
                                 </div>
                                 <div class="flex-1 flex flex-column grid-gap-2"
                                     v-if="voiceForm.voice_channel === 'yidevs'">
-                                    <span>支持语言：</span>
+                                    <span>{{ $t('voice.supportLang') }}</span>
                                     <div class="flex grid-gap-2 flex-wrap">
                                         <span v-for="lang in item.language_enum" :key="lang.value"
                                             class="bg h10 rounded-2 py-1 px-2 flex grid-gap-2 flex-center"
@@ -137,25 +139,25 @@ defineExpose({
                                             <span>{{ lang.label }}</span>
                                         </span>
                                     </div>
-                                    <span>支持情绪：</span>
+                                    <span>{{ $t('voice.supportEmotion') }}</span>
                                     <div class="flex grid-gap-2 flex-wrap" v-if="item.emotions_enum.length > 0">
                                         <span v-for="emotion in item.emotions_enum" :key="emotion.value"
                                             class="bg h10 rounded-2 py-1 px-2">
                                             {{ emotion.label }}
                                         </span>
                                     </div>
-                                    <span class="text-secondary h10" v-else>暂无支持情绪</span>
+                                    <span class="text-secondary h10" v-else>{{ $t('voice.noEmotion') }}</span>
                                 </div>
                             </div>
                         </div>
-                        <el-empty v-else description="暂无音色数据" />
+                        <el-empty v-else :description="$t('voice.noVoice')" />
                     </el-scrollbar>
                 </div>
             </div>
             <template #footer>
-                <el-button bg text @click="closeVoiceDialog" :disabled="submitVoiceDialogLoading">取消</el-button>
+                <el-button bg text @click="closeVoiceDialog" :disabled="submitVoiceDialogLoading">{{ $t('common.cancel') }}</el-button>
                 <div class="flex-1"></div>
-                <el-button type="success" @click="submitVoiceDialog" :loading="submitVoiceDialogLoading">确定</el-button>
+                <el-button type="success" @click="submitVoiceDialog" :loading="submitVoiceDialogLoading">{{ $t('common.confirm') }}</el-button>
             </template>
         </el-dialog>
     </div>

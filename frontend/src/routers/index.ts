@@ -5,6 +5,7 @@ import { useRefs, useUserStore, useWebConfigStore } from "@/stores";
 import { createRouter, createWebHashHistory } from "vue-router";
 import { ElMessageBox } from "element-plus";
 import { useStorage } from "@/composables/useStorage";
+import { i18n } from "@/locale";
 const router = createRouter({
     history: createWebHashHistory(),
     routes: [
@@ -13,7 +14,7 @@ const router = createRouter({
             name: 'main',
             component: () => import("@/layouts/control.vue"),
             meta: {
-                title: '主页',
+                title: i18n.global.t('menu.home'),
             },
             redirect: '/',
             children: [
@@ -22,7 +23,7 @@ const router = createRouter({
                     name: 'index',
                     component: () => import("@/pages/index/index.vue"),
                     meta: {
-                        title: '首页',
+                        title: i18n.global.t('menu.home'),
                         menu: 'index',
                     }
                 },
@@ -31,7 +32,7 @@ const router = createRouter({
                     name: 'creative',
                     component: () => import("@/pages/creative/index.vue"),
                     meta: {
-                        title: '创意圈',
+                        title: i18n.global.t('menu.square'),
                         menu: 'creative',
                     }
                 },
@@ -40,7 +41,7 @@ const router = createRouter({
                     name: 'actor',
                     component: () => import("@/pages/actor/index.vue"),
                     meta: {
-                        title: '演员库',
+                        title: i18n.global.t('actor.library'),
                         menu: 'actor',
                     }
                 },
@@ -49,7 +50,7 @@ const router = createRouter({
                     name: 'voice',
                     component: () => import("@/pages/voice/index.vue"),
                     meta: {
-                        title: '声音库',
+                        title: i18n.global.t('voice.library'),
                         menu: 'voice',
                     }
                 },
@@ -58,7 +59,7 @@ const router = createRouter({
                     name: 'user',
                     component: () => import("@/pages/user/index.vue"),
                     meta: {
-                        title: '个人中心',
+                        title: i18n.global.t('menu.user'),
                         menu: 'user',
                     }
                 },
@@ -67,7 +68,7 @@ const router = createRouter({
                     name: 'square',
                     component: () => import("@/pages/works/square.vue"),
                     meta: {
-                        title: '广场',
+                        title: i18n.global.t('menu.square'),
                         menu: 'square',
                     }
                 },
@@ -76,7 +77,7 @@ const router = createRouter({
                     name: 'works-detail',
                     component: () => import("@/pages/works/drama.vue"),
                     meta: {
-                        title: '短剧详情',
+                        title: i18n.global.t('works.details'),
                         menu: 'works',
                     },
                     beforeEnter: (to, _from, next) => {
@@ -93,7 +94,7 @@ const router = createRouter({
                     name: 'play-detail',
                     component: () => import("@/pages/play/index.vue"),
                     meta: {
-                        title: '短剧播放',
+                        title: i18n.global.t('menu.play'),
                     },
                     beforeEnter: (to, _from, next) => {
                         if (to.params.drama_id && to.params.episode_id) {
@@ -108,7 +109,7 @@ const router = createRouter({
                     name: 'voice-create',
                     component: () => import("@/pages/voice/create.vue"),
                     meta: {
-                        title: '创建声音',
+                        title: i18n.global.t('voice.create'),
                     }
                 }
             ]
@@ -118,7 +119,7 @@ const router = createRouter({
             name: 'user-code',
             component: () => import("@/pages/user/code.vue"),
             meta: {
-                title: '邀请码',
+                title: i18n.global.t('invitation.inputCode'),
                 menu: 'user',
             }
         },
@@ -127,7 +128,7 @@ const router = createRouter({
             name: 'article',
             component: () => import("@/pages/article/content.vue"),
             meta: {
-                title: '文章详情',
+                title: i18n.global.t('menu.article'),
                 menu: 'article',
             }
         },
@@ -136,7 +137,7 @@ const router = createRouter({
             name: 'progress',
             component: () => import("@/pages/generate/progress/index.vue"),
             meta: {
-                title: '生成进度',
+                title: i18n.global.t('generate.progress'),
             }
         },
         {
@@ -144,7 +145,7 @@ const router = createRouter({
             name: 'generate',
             component: () => import("@/pages/generate/index.vue"),
             meta: {
-                title: '生成剧本',
+                title: i18n.global.t('generate.script'),
             },
             redirect: (to) => {
                 return to.params.drama_id && to.params.episode_id ? `/generate/drama/${to.params.drama_id}/${to.params.episode_id}` : '/';
@@ -155,7 +156,7 @@ const router = createRouter({
                     name: 'generate-drama',
                     component: () => import("@/pages/generate/drama/index.vue"),
                     meta: {
-                        title: '剧本调整',
+                        title: i18n.global.t('generate.scriptAdjust'),
                     },
                     beforeEnter: (to, _from, next) => {
                         const userStore = useUserStore();
@@ -171,7 +172,7 @@ const router = createRouter({
                     name: 'generate-actors',
                     component: () => import("@/pages/generate/actors/index.vue"),
                     meta: {
-                        title: '剧本调整',
+                        title: i18n.global.t('generate.scriptAdjust'),
                     },
                     beforeEnter: (to, _from, next) => {
                         const userStore = useUserStore();
@@ -187,7 +188,7 @@ const router = createRouter({
                     name: 'generate-props',
                     component: () => import("@/pages/generate/props/index.vue"),
                     meta: {
-                        title: '剧本调整',
+                        title: i18n.global.t('generate.scriptAdjust'),
                     },
                     beforeEnter: (to, _from, next) => {
                         const userStore = useUserStore();
@@ -203,7 +204,7 @@ const router = createRouter({
                     name: 'generate-scene',
                     component: () => import("@/pages/generate/scene/index.vue"),
                     meta: {
-                        title: '剧本调整',
+                        title: i18n.global.t('generate.scriptAdjust'),
                     },
                     beforeEnter: (to, _from, next) => {
                         const userStore = useUserStore();
@@ -219,7 +220,7 @@ const router = createRouter({
                     name: 'generate-storyboard',
                     component: () => import("@/pages/generate/storyboard/index.vue"),
                     meta: {
-                        title: '剧本调整',
+                        title: i18n.global.t('generate.scriptAdjust'),
                     },
                     beforeEnter: (to, _from, next) => {
                         const userStore = useUserStore();
@@ -263,7 +264,7 @@ const checkInvitationCode = async (code: string): Promise<boolean> => {
         }
     } catch (error: any) {
         // 如果接口返回错误，说明邀请码已被使用或无效
-        const errorMsg = error?.response?.data?.msg || error?.msg || '邀请码验证失败';
+        const errorMsg = error?.response?.data?.msg || error?.msg || i18n.global.t('invitation.validateFail');
         // 如果错误信息明确表示邀请码已被使用或无效，返回 false
         if (errorMsg.includes('已被使用') || errorMsg.includes('无效') || errorMsg.includes('不存在')) {
             return false;
@@ -291,16 +292,16 @@ const handleInvitationCode = async (to: any, from: any) => {
             } else {
                 // 邀请码已被使用或无效，提示用户
                 ElMessageBox({
-                    title: '温馨提示',
-                    message: '邀请码无效或已被使用',
+                    title: i18n.global.t('message.title'),
+                    message: i18n.global.t('invitation.invalidOrUsed'),
                     type: 'warning',
                 });
             }
         } catch (error) {
             // 验证失败，提示用户
             ElMessageBox({
-                title: '温馨提示',
-                message: '邀请码验证失败',
+                title: i18n.global.t('message.title'),
+                message: i18n.global.t('invitation.validateFail'),
                 type: 'error',
             });
         }

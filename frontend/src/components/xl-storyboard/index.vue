@@ -2,6 +2,8 @@
 import { ResponseCode } from '@/common/const';
 import { $http } from '@/common/http';
 import { ElMessage } from 'element-plus';
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 const props = withDefaults(defineProps<{
     query?: any
     types?: any[]
@@ -29,7 +31,7 @@ const getStoryboardList = () => {
     })
 }
 const handleStoryboardItemClick = (item: any) => {
-    if (!item.image) return ElMessage.info('该分镜还未生成图片');
+    if (!item.image) return ElMessage.info(t('storyboard.noImage'));
     emit('select', item);
 }
 defineExpose({
@@ -41,13 +43,13 @@ defineExpose({
         <el-form class="flex flex-center grid-gap-4" @submit.prevent="getStoryboardList">
             <el-form-item class="mb-0">
                 <xl-tabs v-model="StoryboardSearch.type" class="text-info" @change="getStoryboardList">
-                    <xl-tabs-item value="episode">本集</xl-tabs-item>
-                    <xl-tabs-item value="all">全部</xl-tabs-item>
+                    <xl-tabs-item value="episode">{{ $t('storyboard.thisEpisode') }}</xl-tabs-item>
+                    <xl-tabs-item value="all">{{ $t('common.all') }}</xl-tabs-item>
                 </xl-tabs>
             </el-form-item>
             <div class="flex-1"></div>
             <el-form-item class="mb-0">
-                <el-input v-model="StoryboardSearch.description" placeholder="搜索分镜" clearable
+                <el-input v-model="StoryboardSearch.description" :placeholder="t('storyboard.search')" clearable
                     @change="getStoryboardList">
                     <template #suffix>
                         <el-icon>
@@ -69,7 +71,7 @@ defineExpose({
                 </div>
             </div>
         </el-scrollbar>
-        <el-empty v-else description="暂无分镜"></el-empty>
+        <el-empty v-else :description="$t('storyboard.noStoryboard')"></el-empty>
     </div>
 </template>
 <style lang="scss" scoped>

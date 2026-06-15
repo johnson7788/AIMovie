@@ -4,6 +4,8 @@ import { $http } from '@/common/http';
 import router from '@/routers';
 import { Action, ElMessage, ElMessageBox, MessageBoxState } from 'element-plus';
 import IconPlaySvg from '@/svg/icon/icon-play.vue';
+import { useI18n } from 'vue-i18n';
+const { t } = useI18n();
 const props = withDefaults(defineProps<{
     find: any
 }>(), {
@@ -44,8 +46,8 @@ const createEpisodeForm = reactive({
     episode_sum: 1,
 });
 const createEpisodeFormRules = {
-    title: [{ required: true, message: '请输入分集标题', trigger: 'blur' }],
-    content: [{ required: true, message: '请输入分集内容', trigger: 'blur' }],
+    title: [{ required: true, message: () => t('works.episodeTitlePlaceholder'), trigger: 'blur' }],
+    content: [{ required: true, message: () => t('works.episodeContentPlaceholder'), trigger: 'blur' }],
 };
 const createEpisodeFormRef = ref<any>(null);
 const createEpisodeDialogVisible = ref(false);
@@ -90,7 +92,7 @@ const cancelCreateEpisode = () => {
 const submitCreateEpisode = () => {
     if (createEpisodeAction.value === 'ai') {
         if (!createEpisodeForm.model_id) {
-            ElMessage.error('请选择AI模型');
+            ElMessage.error(t('works.selectAiModel'));
             return;
         }
         continueEpisode();
@@ -112,7 +114,7 @@ const submitCreateEpisode = () => {
                     ElMessage.error(res.msg);
                 }
             }).catch(() => {
-                ElMessage.error('创建分集失败');
+                ElMessage.error(t('works.createEpisodeFail'));
             }).finally(() => {
                 createEpisodeLoading.value = false;
             })
@@ -120,9 +122,9 @@ const submitCreateEpisode = () => {
     })
 }
 const handleDeleteEpisode = (item: any) => {
-    ElMessageBox.confirm(`确定删除第${item.episode_no}集【${item.title}】吗？`, '提示', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
+    ElMessageBox.confirm(t('works.deleteEpisodeConfirm', { no: item.episode_no, title: item.title }), t('common.tips'), {
+        confirmButtonText: t('common.confirm'),
+        cancelButtonText: t('common.cancel'),
         type: 'warning',
         beforeClose: (action: Action, instance: MessageBoxState, done: () => void) => {
             if (action === 'confirm') {
@@ -138,7 +140,7 @@ const handleDeleteEpisode = (item: any) => {
                         ElMessage.error(res.msg);
                     }
                 }).catch(() => {
-                    ElMessage.error('删除分集失败');
+                    ElMessage.error(t('works.deleteEpisodeFail'));
                 }).finally(() => {
                     instance.confirmButtonLoading = false;
                 });
@@ -174,7 +176,7 @@ const handleDownloadEpisode = (item: any) => {
                 </el-icon>
             </div>
             <div class="flex grid-gap-2 p-4 flex-center episode-title">
-                <span class="font-weight-600">第 {{ item.episode_no }} 集</span>
+                <span class="font-weight-600">{{ $t('works.episode', { no: item.episode_no }) }}</span>
             </div>
             <el-popover placement="bottom-end" popper-class="episode-popover" width="100px" :teleported="false"
                 @click.stop>
@@ -184,11 +186,11 @@ const handleDownloadEpisode = (item: any) => {
                     </el-icon>
                 </template>
                 <div class="flex flex-column grid-gap-2 h10" @click.stop>
-                    <span class="text-center py-2 pointer" @click.stop="handleItemClick(item)">工程</span>
-                    <span class="text-center py-2 pointer" @click.stop="handleEditEpisode(item, index)">编辑</span>
+                    <span class="text-center py-2 pointer" @click.stop="handleItemClick(item)">{{ $t('works.project') }}</span>
+                    <span class="text-center py-2 pointer" @click.stop="handleEditEpisode(item, index)">{{ $t('common.edit') }}</span>
                     <span class="text-center py-2 pointer" v-if="item.video_path"
-                        @click.stop="handleDownloadEpisode(item)">下载</span>
-                    <span class="text-center py-2 pointer" @click.stop="handleDeleteEpisode(item)">删除</span>
+                        @click.stop="handleDownloadEpisode(item)">{{ $t('works.download') }}</span>
+                    <span class="text-center py-2 pointer" @click.stop="handleDeleteEpisode(item)">{{ $t('common.delete') }}</span>
                 </div>
             </el-popover>
         </div>
@@ -199,8 +201,8 @@ const handleDownloadEpisode = (item: any) => {
                     <el-icon size="36">
                         <Plus />
                     </el-icon>
-                    <span class="h10 text-info">添加第{{ find.episode_num + 1 }}集</span>
-                    <span class="h10 text-info">全 {{ find.episode_sum }} 集，更新至 {{ find.episode_num }} 集</span>
+                    <span class="h10 text-info">{{ $t('works.addEpisode', { no: find.episode_num + 1 }) }}</span>
+                    <span class="h10 text-info">{{ $t('works.episodeProgressInfo', { sum: find.episode_sum, num: find.episode_num }) }}</span>
                 </div>
             </div>
             <div class="grid-column-1 input-button rounded-4 flex flex-column episode-item" v-else>
@@ -208,7 +210,7 @@ const handleDownloadEpisode = (item: any) => {
                     <el-icon size="36">
                         <Loading class="circular" />
                     </el-icon>
-                    <span class="h10 text-info">续写分集中...</span>
+                    <span class="h10 text-info">{{ $t('works.continuingEpisodes') }}</span>
                 </div>
             </div>
         </template>
@@ -216,51 +218,50 @@ const handleDownloadEpisode = (item: any) => {
     <el-dialog v-model="createEpisodeDialogVisible" class="generate-scene-dialog" draggable width="min(100%,800px)"
         @close="cancelCreateEpisode">
         <template #header>
-            <span class="font-weight-600" v-if="!createEpisodeForm.id">创建分集</span>
-            <span class="font-weight-600" v-else>编辑第{{ createEpisodeForm.episode_no }}集</span>
+            <span class="font-weight-600" v-if="!createEpisodeForm.id">{{ $t('works.createEpisode') }}</span>
+            <span class="font-weight-600" v-else>{{ $t('works.editEpisode', { no: createEpisodeForm.episode_no }) }}</span>
         </template>
         <el-segmented v-model="createEpisodeAction" :disabled="createEpisodeLoading"
-            :options="[{ label: '填写分集', value: 'form' }, { label: 'AI续写', value: 'ai' }]" class="tabs-segmented border"
+            :options="[{ label: $t('works.fillEpisode'), value: 'form' }, { label: $t('works.aiContinue'), value: 'ai' }]" class="tabs-segmented border"
             v-if="!createEpisodeForm.id" />
         <el-form v-if="createEpisodeAction === 'form'" label-position="top" :model="createEpisodeForm"
             :rules="createEpisodeFormRules" ref="createEpisodeFormRef">
-            <el-form-item label="分集标题" prop="title">
-                <el-input v-model="createEpisodeForm.title" placeholder="请输入分集标题" />
+            <el-form-item :label="$t('works.episodeTitle')" prop="title">
+                <el-input v-model="createEpisodeForm.title" :placeholder="$t('works.episodeTitlePlaceholder')" />
             </el-form-item>
-            <el-form-item label="分集内容" prop="content">
+            <el-form-item :label="$t('works.episodeContent')" prop="content">
                 <el-input v-model="createEpisodeForm.content" type="textarea" :autosize="{ minRows: 10, maxRows: 30 }"
-                    placeholder="请输入分集内容" />
+                    :placeholder="$t('works.episodeContentPlaceholder')" />
             </el-form-item>
         </el-form>
         <div class="flex flex-column grid-gap-4" v-if="createEpisodeAction === 'ai'">
-            <el-alert title="灵感缺乏？使用AI续写" type="success" :closable="false" />
+            <el-alert :title="$t('works.aiContinueHint')" type="success" :closable="false" />
             <xl-models v-model="createEpisodeForm.model_id" scene="creative_episode" no-init
                 v-loading="createEpisodeLoading" />
         </div>
         <template #footer>
             <div class="flex flex-center grid-gap-2 w-100">
-                <el-button type="info" @click="cancelCreateEpisode" :disabled="createEpisodeLoading">取消</el-button>
+                <el-button type="info" @click="cancelCreateEpisode" :disabled="createEpisodeLoading">{{ $t('common.cancel') }}</el-button>
                 <div class="flex-1"></div>
                 <el-button type="primary" @click="prevEpisode"
                     :disabled="createEpisodeLoading || createEpisodeIndex <= 0"
-                    v-if="createEpisodeForm.id">上一集</el-button>
+                    v-if="createEpisodeForm.id">{{ $t('works.prevEpisode') }}</el-button>
                 <el-button type="primary" @click="nextEpisode"
                     :disabled="createEpisodeLoading || createEpisodeIndex >= find.episodes.length - 1"
-                    v-if="createEpisodeForm.id">下一集</el-button>
+                    v-if="createEpisodeForm.id">{{ $t('works.nextEpisode') }}</el-button>
                 <template v-if="!createEpisodeForm.id && createEpisodeAction === 'ai'">
                     <el-input-number v-model="createEpisodeForm.episode_sum" :min="1"
                         :max="find.episode_sum - find.episode_num" :disabled="createEpisodeLoading"
                         v-if="!createEpisodeForm.id && createEpisodeAction === 'ai'">
                         <template #prefix>
-                            <span>集数</span>
+                            <span>{{ $t('works.episodeSum') }}</span>
                         </template>
                     </el-input-number>
-                    <el-button type="success" @click="submitCreateEpisode" :disabled="createEpisodeLoading">生成{{
-                        createEpisodeForm.episode_sum }}集</el-button>
+                    <el-button type="success" @click="submitCreateEpisode" :disabled="createEpisodeLoading">{{ $t('works.generateEpisodes', { count: createEpisodeForm.episode_sum }) }}</el-button>
                 </template>
                 <template v-else>
                     <el-button type="success" @click="submitCreateEpisode"
-                        :disabled="createEpisodeLoading">提交</el-button>
+                        :disabled="createEpisodeLoading">{{ $t('common.submit') }}</el-button>
                 </template>
             </div>
         </template>
@@ -312,7 +313,7 @@ const handleDownloadEpisode = (item: any) => {
 
             &::before,
             &::after {
-                content: '“';
+                content: '"';
                 color: var(--el-color-success);
                 line-height: 1;
                 font-size: 2em;
@@ -320,7 +321,7 @@ const handleDownloadEpisode = (item: any) => {
             }
 
             &::after {
-                content: '”';
+                content: '"';
             }
         }
     }

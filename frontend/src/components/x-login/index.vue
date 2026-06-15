@@ -3,7 +3,9 @@ import { ResponseCode } from '@/common/const';
 import { $http } from '@/common/http';
 import { useUserStore } from '@/stores';
 import { ElMessage } from 'element-plus';
+import { useI18n } from 'vue-i18n';
 
+const { t } = useI18n();
 const userStore = useUserStore()
 const emit = defineEmits(['success', 'close'])
 
@@ -12,10 +14,10 @@ const close = () => {
 }
 
 const activeTabs = ref<'login' | 'register'>('login')
-const tabs = [
-    { label: '登录', value: 'login' },
-    { label: '注册', value: 'register' },
-]
+const tabs = computed(() => [
+    { label: t('login.login'), value: 'login' },
+    { label: t('login.register'), value: 'register' },
+])
 
 const loginForm = reactive({
     username: '',
@@ -41,11 +43,11 @@ const submitDisabled = computed(() => {
 })
 
 const handleLoginSuccess = (data: any) => {
-    ElMessage.success('登录成功')
+    ElMessage.success(t('login.loginSuccess'))
     userStore.setUserInfo(data).then(() => {
         emit('success', { code: ResponseCode.SUCCESS, data })
     }).catch(() => {
-        ElMessage.error('登录失败')
+        ElMessage.error(t('login.loginFail'))
     })
 }
 
@@ -58,7 +60,7 @@ const login = () => {
         if (res.code === ResponseCode.SUCCESS) {
             handleLoginSuccess(res.data)
         } else {
-            ElMessage.error(res.msg || '登录失败')
+            ElMessage.error(res.msg || t('login.loginFail'))
         }
     }).finally(() => {
         loading.value = false
@@ -73,10 +75,10 @@ const registerSubmit = () => {
         vpassword: registerForm.vpassword,
     }).then((res: any) => {
         if (res.code === ResponseCode.SUCCESS) {
-            ElMessage.success('注册成功')
+            ElMessage.success(t('login.registerSuccess'))
             handleLoginSuccess(res.data)
         } else {
-            ElMessage.error(res.msg || '注册失败')
+            ElMessage.error(res.msg || t('login.registerFail'))
         }
     }).finally(() => {
         loading.value = false
@@ -104,7 +106,7 @@ const handleSubmit = () => {
                 <template v-if="activeTabs === 'login'">
                     <el-input
                         v-model="loginForm.username"
-                        placeholder="请输入账号"
+                        :placeholder="t('login.accountPlaceholder')"
                         @keyup.enter="login"
                     >
                         <template #prepend>
@@ -116,7 +118,7 @@ const handleSubmit = () => {
                     <el-input
                         type="password"
                         v-model="loginForm.password"
-                        placeholder="请输入密码"
+                        :placeholder="t('login.passwordPlaceholder')"
                         show-password
                         @keyup.enter="login"
                     >
@@ -130,7 +132,7 @@ const handleSubmit = () => {
                 <template v-else>
                     <el-input
                         v-model="registerForm.username"
-                        placeholder="请输入用户名（4-30位字母数字或下划线）"
+                        :placeholder="t('login.usernamePlaceholder')"
                         @keyup.enter="registerSubmit"
                     >
                         <template #prepend>
@@ -142,7 +144,7 @@ const handleSubmit = () => {
                     <el-input
                         type="password"
                         v-model="registerForm.password"
-                        placeholder="请输入密码（5-30位）"
+                        :placeholder="t('login.passwordRule')"
                         show-password
                         @keyup.enter="registerSubmit"
                     >
@@ -155,7 +157,7 @@ const handleSubmit = () => {
                     <el-input
                         type="password"
                         v-model="registerForm.vpassword"
-                        placeholder="请确认密码"
+                        :placeholder="t('login.confirmPassword')"
                         show-password
                         @keyup.enter="registerSubmit"
                     >
@@ -173,14 +175,14 @@ const handleSubmit = () => {
                     :disabled="submitDisabled"
                     :loading="loading"
                 >
-                    <span>{{ activeTabs === 'register' ? '确认注册' : '确认登录' }}</span>
+                    <span>{{ activeTabs === 'register' ? $t('login.confirmRegister') : $t('login.confirmLogin') }}</span>
                 </el-button>
             </div>
             <div class="x-login-form-agreement">
-                <span>登录即代表阅读并同意</span>
-                <el-link href="/#/article/user" type="success" target="_blank" underline="never">《用户协议》</el-link>
-                <span>和</span>
-                <el-link href="/#/article/privacy" type="success" target="_blank" underline="never">《隐私政策》</el-link>
+                <span>{{ $t('login.agreePrefix') }}</span>
+                <el-link href="/#/article/user" type="success" target="_blank" underline="never">{{ $t('login.userAgreement') }}</el-link>
+                <span>{{ $t('login.and') }}</span>
+                <el-link href="/#/article/privacy" type="success" target="_blank" underline="never">{{ $t('login.privacyPolicy') }}</el-link>
             </div>
         </div>
     </div>

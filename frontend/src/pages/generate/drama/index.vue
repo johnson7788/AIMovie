@@ -12,6 +12,8 @@ import IconBatchSvg from '@/svg/icon/icon-batch.vue';
 import { useStorage } from '@/composables/useStorage';
 import { useUserStore, useRefs } from '@/stores';
 import { usePush } from '@/composables/usePush';
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 const userStore = useUserStore();
 const { USERINFO } = useRefs(userStore);
 const emit = defineEmits(['update:drama']);
@@ -55,7 +57,7 @@ const getDramaInfo = () => {
             ElMessage.error(res.msg);
         }
     }).catch(() => {
-        ElMessage.error('获取短剧详情失败');
+        ElMessage.error(t('common.loadFail'));
     })
 }
 const getEpisodeInfo = () => {
@@ -93,9 +95,9 @@ const nextStep = () => {
     router.push(`/generate/actors/${drama_id.value}/${episode_id.value}`)
 }
 const handleClearScene = () => {
-    ElMessageBox.confirm('提示', {
-        title: '提示',
-        message: '确定清空本集场景吗？',
+    ElMessageBox.confirm(t('scene.clearConfirm'), {
+        title: t('common.tips'),
+        message: t('scene.clearConfirm'),
         beforeClose(action, instance, done) {
             if (action === 'confirm') {
                 instance.confirmButtonLoading = true;
@@ -112,7 +114,7 @@ const handleClearScene = () => {
                         ElMessage.error(res.msg);
                     }
                 }).catch(() => {
-                    ElMessage.error('清空场景失败');
+                    ElMessage.error(t('scene.clearFail'));
                 }).finally(() => {
                     instance.cancelButtonLoading = true;
                     instance.confirmButtonLoading = false;
@@ -125,9 +127,9 @@ const handleClearScene = () => {
     })
 }
 const handleClearStoryboard = () => {
-    ElMessageBox.confirm('提示', {
-        title: '提示',
-        message: '确定清空本集分镜吗？',
+    ElMessageBox.confirm(t('scene.clearStoryboardConfirm'), {
+        title: t('common.tips'),
+        message: t('scene.clearStoryboardConfirm'),
         beforeClose(action, instance, done) {
             if (action === 'confirm') {
                 instance.confirmButtonLoading = true;
@@ -144,7 +146,7 @@ const handleClearStoryboard = () => {
                         ElMessage.error(res.msg);
                     }
                 }).catch(() => {
-                    ElMessage.error('清空场景失败');
+                    ElMessage.error(t('storyboard.clearFail'));
                 }).finally(() => {
                     instance.cancelButtonLoading = true;
                     instance.confirmButtonLoading = false;
@@ -206,21 +208,21 @@ onUnmounted(() => {
             <el-splitter class="flex-1 w-100 overflow-hidden" style="--el-border-color-light:transparent">
                 <el-splitter-panel v-model:size="splitterForm.episode" :min="100"
                     class="overflow-hidden flex flex-column">
-                    <span class="font-weight-600 p-4">#续集列表</span>
+                    <span class="font-weight-600 p-4">{{ t('scene.sequelList') }}</span>
                     <episode v-model="currentEpisodeId" :episode-list="dramaInfo.episodes" :drama_id="drama_id"
                         :episode_id="episode_id" v-if="dramaInfo.episodes?.length > 0" :loading="loading"
-                        loading-text="加载中..." />
+                        :loading-text="t('common.loading')" />
                 </el-splitter-panel>
                 <el-splitter-panel v-model:size="splitterForm.scene" :min="100"
                     class="overflow-hidden flex flex-column position-relative">
                     <div class="flex flex-center pr-4">
-                        <span class="font-weight-600 p-4">#场景</span>
+                        <span class="font-weight-600 p-4">{{ t('scene.sceneList') }}</span>
                         <div class="flex-1"></div>
                         <div class="flex flex-center grid-gap-2">
                             <el-button type="danger" icon="Delete" size="small" bg text
-                                @click="handleClearScene()">一键清空本集场景</el-button>
+                                @click="handleClearScene()">{{ t('scene.oneKeyClear') }}</el-button>
                             <el-button type="success" icon="Plus" size="small" bg text
-                                @click="sceneRef?.openCreateScene?.()">新增</el-button>
+                                @click="sceneRef?.openCreateScene?.()">{{ t('common.add') }}</el-button>
                         </div>
                     </div>
                     <scene ref="sceneRef" v-model="currentSceneId" v-model:scene="sceneList" :drama_id="drama_id"
@@ -228,13 +230,13 @@ onUnmounted(() => {
                 </el-splitter-panel>
                 <el-splitter-panel class="overflow-hidden flex flex-column position-relative" :min="100">
                     <div class="flex flex-center pr-4">
-                        <span class="font-weight-600 p-4">#分镜</span>
+                        <span class="font-weight-600 p-4">{{ t('scene.storyboardList') }}</span>
                         <div class="flex-1"></div>
                         <div class="flex flex-center grid-gap-2">
                             <el-button type="danger" bg text size="small" @click="handleClearStoryboard()"
-                                v-if="storyboardList.length > 0">一键清空分镜</el-button>
+                                v-if="storyboardList.length > 0">{{ t('scene.clearStoryboard') }}</el-button>
                             <el-button type="success" icon="Plus" size="small" bg text v-if="sceneList.length > 0"
-                                @click="storyboardRef?.openCreateStoryboard?.()">新增</el-button>
+                                @click="storyboardRef?.openCreateStoryboard?.()">{{ t('common.add') }}</el-button>
                         </div>
                     </div>
                     <storyboard ref="storyboardRef" v-model="currentStoryboardId" v-model:storyboard="storyboardList"
@@ -246,14 +248,14 @@ onUnmounted(() => {
         <div class="p-4 w-100 flex grid-gap-4 flex-center">
             <el-button type="success" size="large" @click="sceneRef?.openGenerateSceneDialog?.()" :loading="!!episodeInfo.init_scene_state"
                 v-if="sceneList.length <= 0" :icon="IconBatchSvg">
-                <span>初始化场景</span>
+                <span>{{ t('scene.initScene') }}</span>
             </el-button>
             <el-button type="success" size="large" @click="storyboardRef?.openGenerateStoryboard?.()" :loading="!!episodeInfo.init_storyboard_state"
                 :disabled="storyboardList.length <= 0" :icon="IconBatchSvg">
-                <span>批量生成分镜</span>
+                <span>{{ t('scene.batchStoryboard') }}</span>
             </el-button>
             <el-button type="success" size="large" @click="nextStep">
-                <span>下一步</span>
+                <span>{{ t('common.next') }}</span>
                 <el-icon size="16" class="ml-2">
                     <IconNextStepSvg />
                 </el-icon>

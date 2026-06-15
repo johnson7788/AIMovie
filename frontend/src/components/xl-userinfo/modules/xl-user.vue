@@ -13,7 +13,7 @@
             <div class="flex flex-y-center  grid-gap-7 flex-1" v-else>
                 <div class="position-relative">
                     <el-upload ref="uploadImageRef" class="avatar-uploader"
-                        :data="{ dir_name: 'user/headimg', dir_title: '用户头像' }"
+                        :data="{ dir_name: 'user/headimg', dir_title: t('userinfo.avatar') }"
                         :action="$http.getCompleteUrl('app/shortplay/api/Uploads/upload')"
                         :headers="$http.getHeaders()" accept="image/jpeg,image/png" :limit="1" type="cover"
                         :disabled="uploadHeadimgLoading"
@@ -38,21 +38,21 @@
                     </el-upload>
                 </div>
                 <div class="flex flex-column flex-x-start">
-                    <el-input v-model="form.nickname" placeholder="请输入昵称" maxlength="20" show-word-limit />
+                    <el-input v-model="form.nickname" :placeholder="t('userinfo.nickname')" maxlength="20" show-word-limit />
                 </div>
             </div>
             <el-button color="var(--el-fill-color-lighter)" @click="toggleEditStatus" >
-                {{ editStatus ? '取消' : '编辑信息' }}
+                {{ editStatus ? t('common.cancel') : t('userinfo.editInfo') }}
             </el-button>
         </div>
         <el-divider />
 
         <div class="flex flex-x-space-between">
-            <span>手机号</span>
+            <span>{{ t('userinfo.phone') }}</span>
             <div class="flex flex-y-center grid-gap-4">
-                <el-input v-if="editMobile" v-model="form.mobile" placeholder="请输入手机号" maxlength="11"
+                <el-input v-if="editMobile" v-model="form.mobile" :placeholder="t('userinfo.phonePlaceholder')" maxlength="11"
                     @blur="validateMobile" />
-                <span v-else>{{ USERINFO?.mobile || '未绑定' }}</span>
+                <span v-else>{{ USERINFO?.mobile || t('userinfo.notBound') }}</span>
                 <el-icon :size="16" class="pointer" @click="toggleMobileEdit" v-if="!editStatus">
                     <Edit />
                 </el-icon>
@@ -62,18 +62,18 @@
             </div>
         </div>
         <div class="flex flex-x-space-between mt-10">
-            <span>微信</span>
+            <span>{{ t('userinfo.wechat') }}</span>
             <div class="flex flex-y-center grid-gap-4">
-                <span>{{ isWechatBound ? '已绑定' : '未绑定' }}</span>
+                <span>{{ isWechatBound ? t('userinfo.bound') : t('userinfo.notBound') }}</span>
                 <el-icon :size="16" class="pointer" @click="openWechatBindDialog" v-if="!isWechatBound">
                     <Edit />
                 </el-icon>
             </div>
         </div>
         <div class="flex flex-x-space-between mt-10">
-            <span>密码</span>
+            <span>{{ t('userinfo.password') }}</span>
             <div class="flex flex-y-center grid-gap-4 pointer"  @click="openPasswordDialog">
-                <span>{{ USERINFO?.password==1 ? '修改' : '设置' }}</span>
+                <span>{{ USERINFO?.password==1 ? t('userinfo.change') : t('userinfo.set') }}</span>
                 <el-icon :size="16" >
                     <Edit />
                 </el-icon>
@@ -82,23 +82,23 @@
     </div>
 
     <!-- 绑定微信二维码对话框 -->
-    <el-dialog v-model="wechatBindDialogVisible" title="绑定微信" width="400px" align-center @close="closeWechatBindDialog">
+    <el-dialog v-model="wechatBindDialogVisible" :title="t('userinfo.bindWechat')" width="400px" align-center @close="closeWechatBindDialog">
         <div class="flex flex-column flex-y-center grid-gap-4">
-            <p class="text-center">请使用微信扫描下方二维码完成绑定</p>
-            <xl-qrcode-view 
+            <p class="text-center">{{ t('userinfo.bindWechatDesc') }}</p>
+            <xl-qrcode-view
                 v-if="wechatBindDialogVisible"
-                url="/app/user/api/Login/qrcode" 
+                url="/app/user/api/Login/qrcode"
                 check="/app/user/api/Login/checkBind"
                 @success="handleWechatBindSuccess" />
         </div>
     </el-dialog>
 
     <!-- 修改密码对话框 -->
-    <el-dialog v-model="passwordDialogVisible" title="修改密码" width="400px" align-center @close="closePasswordDialog">
+    <el-dialog v-model="passwordDialogVisible" :title="t('userinfo.changePassword')" width="400px" align-center @close="closePasswordDialog">
         <div class="flex flex-column grid-gap-4">
-            <el-input v-model="passwordForm.password" type="password" placeholder="请输入新密码" show-password />
-            <el-input v-model="passwordForm.confirmPassword" type="password" placeholder="请确认新密码" show-password />
-            <el-input v-model="passwordForm.vcode" placeholder="请输入短信验证码" maxlength="6">
+            <el-input v-model="passwordForm.password" type="password" :placeholder="t('userinfo.newPassword')" show-password />
+            <el-input v-model="passwordForm.confirmPassword" type="password" :placeholder="t('userinfo.confirmPassword')" show-password />
+            <el-input v-model="passwordForm.vcode" :placeholder="t('userinfo.smsCode')" maxlength="6">
                 <template #append>
                     <el-button type="primary" :disabled="passwordVcode.btnDisabled.value" @click="getPasswordVcode">
                         {{ passwordVcode.btnText.value }}
@@ -108,8 +108,8 @@
         </div>
         <template #footer>
             <div class="dialog-footer">
-                <el-button @click="closePasswordDialog">取消</el-button>
-                <el-button  color="var(--el-color-success)" :loading="passwordLoading" @click="handleSetPassword">确认</el-button>
+                <el-button @click="closePasswordDialog">{{ t('common.cancel') }}</el-button>
+                <el-button  color="var(--el-color-success)" :loading="passwordLoading" @click="handleSetPassword">{{ t('common.confirm') }}</el-button>
             </div>
         </template>
     </el-dialog>
@@ -122,7 +122,9 @@ import { ResponseCode } from '@/common/const';
 import { useVcode } from '@/composables/useVcode';
 import IconEdit from '@/svg/icon/icon-edit.vue';
 import { Edit, Close, Loading } from '@element-plus/icons-vue';
+import { useI18n } from 'vue-i18n';
 
+const { t } = useI18n();
 const userStore = useUserStore();
 const { USERINFO } = useRefs(userStore);
 const editMobile = ref(false);
@@ -194,9 +196,9 @@ const closeWechatBindDialog = () => {
 // 微信绑定成功回调
 const handleWechatBindSuccess = async (response: any) => {
     if (response.code === ResponseCode.SUCCESS) {
-        ElMessage.success('微信绑定成功');
+        ElMessage.success(t('userinfo.wechatBindSuccess'));
         wechatBindDialogVisible.value = false;
-        
+
         // 刷新用户信息
         try {
             const infoRes: any = await $http.get('/app/user/api/User/info');
@@ -204,7 +206,7 @@ const handleWechatBindSuccess = async (response: any) => {
                 await userStore.setUserInfo(infoRes.data as UserInfoInterface);
             }
         } catch (error: any) {
-            ElMessage.error('刷新用户信息失败，请稍后重试');
+            ElMessage.error(t('userinfo.refreshFail'));
         }
     }
 };
@@ -230,7 +232,7 @@ const closePasswordDialog = () => {
 // 获取修改密码验证码
 const getPasswordVcode = () => {
     if (!USERINFO.value?.mobile) {
-        ElMessage.warning('请先绑定手机号');
+        ElMessage.warning(t('userinfo.bindPhoneFirst'));
         return;
     }
     passwordVcode.open({
@@ -249,19 +251,19 @@ const getPasswordVcode = () => {
 // 验证密码格式
 const validatePassword = () => {
     if (!passwordForm.password || passwordForm.password.trim() === '') {
-        ElMessage.warning('请输入新密码');
+        ElMessage.warning(t('userinfo.newPassword'));
         return false;
     }
     if (passwordForm.password.length < 6) {
-        ElMessage.warning('密码长度不能少于6位');
+        ElMessage.warning(t('userinfo.passwordMinLength'));
         return false;
     }
     if (passwordForm.password !== passwordForm.confirmPassword) {
-        ElMessage.warning('两次输入的密码不一致');
+        ElMessage.warning(t('userinfo.passwordMismatch'));
         return false;
     }
     if (!passwordForm.vcode || passwordForm.vcode.trim() === '') {
-        ElMessage.warning('请输入短信验证码');
+        ElMessage.warning(t('userinfo.smsCode'));
         return false;
     }
     return true;
@@ -286,13 +288,13 @@ const handleSetPassword = async () => {
         });
 
         if (res.code === ResponseCode.SUCCESS || res.code === ResponseCode.SUCCESS_EVENT_PUSH) {
-            ElMessage.success(res.msg || '密码修改成功');
+            ElMessage.success(res.msg || t('userinfo.passwordChangeSuccess'));
             closePasswordDialog();
         } else {
-            ElMessage.error(res.msg || '密码修改失败');
+            ElMessage.error(res.msg || t('userinfo.passwordChangeFail'));
         }
     } catch (error: any) {
-        ElMessage.error(error?.msg || '密码修改失败，请稍后重试');
+        ElMessage.error(error?.msg || t('userinfo.passwordChangeFailRetry'));
     } finally {
         passwordLoading.value = false;
     }
@@ -339,7 +341,7 @@ const cancelMobileEdit = () => {
 // 验证手机号格式
 const validateMobile = () => {
     if (form.mobile && !/^1[3-9]\d{9}$/.test(form.mobile)) {
-        ElMessage.warning('请输入正确的手机号');
+        ElMessage.warning(t('userinfo.inputCorrectPhone'));
         return false;
     }
     return true;
@@ -351,10 +353,10 @@ const handleUploadSuccess = (response: any) => {
         uploadHeadimgLoading.value = false;
         form.headimg = response.data.url;
         uploadImageRef.value?.clearFiles();
-        ElMessage.success('头像上传成功');
+        ElMessage.success(t('userinfo.avatarUploadSuccess'));
     } else {
         uploadHeadimgLoading.value = false;
-        ElMessage.error(response.msg || '头像上传失败');
+        ElMessage.error(response.msg || t('userinfo.avatarUploadFail'));
     }
 };
 
@@ -362,7 +364,7 @@ const handleUploadSuccess = (response: any) => {
 const handleUploadError = () => {
     uploadHeadimgLoading.value = false;
     uploadImageRef.value?.clearFiles();
-    ElMessage.error('头像上传失败，请重试');
+    ElMessage.error(t('userinfo.avatarUploadFailRetry'));
 };
 
 // 触发文件选择
@@ -378,7 +380,7 @@ const saveUserInfo = async () => {
 
     // 验证昵称
     if (!form.nickname || form.nickname.trim() === '') {
-        ElMessage.warning('请输入昵称');
+        ElMessage.warning(t('userinfo.nickname'));
         return;
     }
 
@@ -404,7 +406,7 @@ const saveUserInfo = async () => {
 
         // 如果没有需要更新的字段
         if (Object.keys(updateData).length === 0) {
-            ElMessage.info('没有需要保存的更改');
+            ElMessage.info(t('userinfo.noChanges'));
             saving.value = false;
             return;
         }
@@ -413,7 +415,7 @@ const saveUserInfo = async () => {
         const res: any = await $http.post('/app/user/api/User/update', updateData);
         console.log(res);
         if (res.code === ResponseCode.SUCCESS_EVENT_PUSH||res.code === ResponseCode.SUCCESS) {
-            ElMessage.success(res.msg || '保存成功');
+            ElMessage.success(res.msg || t('userinfo.saveSuccessMsg'));
 
             // 刷新用户信息
             const infoRes: any = await $http.get('/app/user/api/User/info');
@@ -426,10 +428,10 @@ const saveUserInfo = async () => {
             editStatus.value = false;
             editMobile.value = false;
         } else {
-            ElMessage.error(res.msg || '保存失败');
+            ElMessage.error(res.msg || t('userinfo.saveFailMsg'));
         }
     } catch (error: any) {
-        ElMessage.error(error?.msg || '保存失败，请稍后重试');
+        ElMessage.error(error?.msg || t('userinfo.saveFailRetry'));
     } finally {
         saving.value = false;
     }
@@ -479,12 +481,12 @@ defineExpose({
     z-index: 10;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
     transition: all 0.2s;
-    
+
     &:hover {
         background-color: var(--el-fill-color-light);
         transform: scale(1.1);
     }
-    
+
     .is-loading {
         animation: rotating 2s linear infinite;
     }

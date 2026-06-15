@@ -8,8 +8,10 @@ import IconActorSvg from '@/svg/icon/icon-actor.vue';
 import IconActorThreeViewSvg from '@/svg/icon/icon-actor-three-view.vue';
 import IconImageSvg from '@/svg/icon/icon-image.vue';
 import IconUploadImageSvg from '@/svg/icon/icon-upload-image.vue';
+import { useI18n } from 'vue-i18n';
 const webConfigStore = useWebConfigStore();
 const { WEBCONFIG } = useRefs(webConfigStore);
+const { t } = useI18n();
 const emit = defineEmits(['success']);
 const actorDialogVisible = ref(false);
 const actorForm = reactive<any>({
@@ -20,7 +22,7 @@ const actorForm = reactive<any>({
     image_model_id: '',
     three_view_image_state: false,
     three_view_model_id: '',
-    status_enum: { value: 'initializing', label: '待初始化' },
+    status_enum: { value: 'initializing', label: t('actor.pendingInitializing') },
     name: '',
     headimg: '',
     three_view_image: '',
@@ -38,12 +40,12 @@ const actorForm = reactive<any>({
 const actorFormRef = ref<any>(null);
 const actorLoading = ref(false);
 const actorFormRules = reactive({
-    image_model_id: [{ required: true, message: '请选择图片模型', trigger: 'change' }],
-    three_view_model_id: [{ required: true, message: '请选择三维模型', trigger: 'change' }],
-    species_type: [{ required: true, message: '请选择物种', trigger: 'change' }],
-    gender: [{ required: true, message: '请选择性别', trigger: 'change' }],
-    age: [{ required: true, message: '请选择年龄', trigger: 'change' }],
-    remarks: [{ required: true, message: '请输入备注', trigger: 'change' }],
+    image_model_id: [{ required: true, message: t('actor.selectImageModel'), trigger: 'change' }],
+    three_view_model_id: [{ required: true, message: t('actor.selectThreeViewModel'), trigger: 'change' }],
+    species_type: [{ required: true, message: t('actor.selectSpecies'), trigger: 'change' }],
+    gender: [{ required: true, message: t('actor.selectGender'), trigger: 'change' }],
+    age: [{ required: true, message: t('actor.selectAge'), trigger: 'change' }],
+    remarks: [{ required: true, message: t('actor.inputRemarks'), trigger: 'change' }],
 })
 const showForm=ref(false);
 const openActorCreateDialog = (actor?: any, drama_id?: string | number, episode_id?: string | number) => {
@@ -111,7 +113,7 @@ const cancelActorDialog = () => {
     actorForm.image_model_id = '';
     actorForm.three_view_model_state = false;
     actorForm.three_view_model_id = '';
-    actorForm.status_enum = { value: 'initializing', label: '待初始化' };
+    actorForm.status_enum = { value: 'initializing', label: t('actor.pendingInitializing') };
     actorForm.headimg = '';
     actorForm.three_view_image = '';
     actorForm.drama_id = '';
@@ -136,7 +138,7 @@ const submitActorDialog = (callback?: () => void) => {
             ElMessage.error(res.msg);
         }
     }).catch(() => {
-        ElMessage.error('更新失败');
+        ElMessage.error(t('actor.updateFail'));
     })
 }
 const uploadImageRef = ref<any>(null);
@@ -217,7 +219,7 @@ const handleGenerateImage = () => {
             ElMessage.error(res.msg);
         }
     }).catch(() => {
-        ElMessage.error('生成图片失败');
+        ElMessage.error(t('actor.genImageFail'));
     }).finally(() => {
         generateImageLoading.value = false;
     })
@@ -264,57 +266,57 @@ defineExpose({
         <el-dialog v-model="actorDialogVisible" class="generate-scene-dialog" draggable :width="showForm ? 'min(100%,840px)' : 'min(100%,420px)'" append-to-body
             @close="cancelActorDialog">
             <template #header>
-                <span class="font-weight-600" v-if="!showForm">上传演员</span>
-                <span class="font-weight-600" v-else-if="!actorForm.id">创建演员</span>
-                <span class="font-weight-600" v-else>编辑演员</span>
+                <span class="font-weight-600" v-if="!showForm">{{ t('actor.uploadActor') }}</span>
+                <span class="font-weight-600" v-else-if="!actorForm.id">{{ t('actor.createActor') }}</span>
+                <span class="font-weight-600" v-else>{{ t('actor.editActor') }}</span>
             </template>
             <el-form label-position="top" :model="actorForm" :rules="actorFormRules" ref="actorFormRef"
                 class="actor-form" :disabled="actorForm.status_enum.value !== 'initializing'">
                 <div class="flex grid-gap-4 flex-y-flex-start">
                     <div class="flex-1 grid-columns-6 grid-gap-4" v-if="showForm">
-                        <el-form-item label="演员名称" prop="title" class="grid-column-3">
-                            <el-input v-model="actorForm.name" placeholder="请输入演员名称"
+                        <el-form-item :label="t('actor.actorName')" prop="title" class="grid-column-3">
+                            <el-input v-model="actorForm.name" :placeholder="t('actor.actorNamePlaceholder')"
                                 class="actor-form-input bg-overlay" />
                         </el-form-item>
-                        <el-form-item label="演员音色" prop="title" class="grid-column-3">
+                        <el-form-item :label="t('actor.actorVoiceLabel')" prop="title" class="grid-column-3">
                             <el-button text bg @click="voiceDialogRef?.open?.({ modelScene:'dialogue_voice',actor: actorForm })">
-                                <span v-if="actorForm.voice_name">音色:{{ actorForm.voice_name }}</span>
-                                <span v-else>点击选择音色</span>
+                                <span v-if="actorForm.voice_name">{{ t('actor.voiceLabel') }}{{ actorForm.voice_name }}</span>
+                                <span v-else>{{ t('actor.clickSelectVoice') }}</span>
                             </el-button>
                         </el-form-item>
-                        <el-form-item label="物种" prop="title" class="grid-column-2">
-                            <el-select v-model="actorForm.species_type" placeholder="请选择物种" :teleported="false"
+                        <el-form-item :label="t('actor.species')" prop="title" class="grid-column-2">
+                            <el-select v-model="actorForm.species_type" :placeholder="t('actor.selectSpecies')" :teleported="false"
                                 class="actor-form-select">
                                 <el-option v-for="item in WEBCONFIG?.enum?.actor_species_type" :key="item.value"
                                     :label="item.label" :value="item.value" />
                             </el-select>
                         </el-form-item>
-                        <el-form-item label="性别" prop="title" class="grid-column-2">
-                            <el-select v-model="actorForm.gender" placeholder="请选择性别" :teleported="false"
+                        <el-form-item :label="t('actor.gender')" prop="title" class="grid-column-2">
+                            <el-select v-model="actorForm.gender" :placeholder="t('actor.selectGender')" :teleported="false"
                                 class="actor-form-select">
                                 <el-option v-for="item in WEBCONFIG?.enum?.actor_gender" :key="item.value"
                                     :label="item.label" :value="item.value" />
                             </el-select>
                         </el-form-item>
-                        <el-form-item label="年龄" prop="title" class="grid-column-2">
-                            <el-select v-model="actorForm.age" placeholder="请选择年龄" :teleported="false"
+                        <el-form-item :label="t('actor.age')" prop="title" class="grid-column-2">
+                            <el-select v-model="actorForm.age" :placeholder="t('actor.selectAge')" :teleported="false"
                                 class="actor-form-select">
                                 <el-option v-for="item in WEBCONFIG?.enum?.actor_age" :key="item.value"
                                     :label="item.label" :value="item.value" />
                             </el-select>
                         </el-form-item>
-                        <el-form-item label="演员形象" class="grid-column-6">
+                        <el-form-item :label="t('actor.actorImage')" class="grid-column-6">
                             <div class="flex flex-column grid-gap-4 w-100">
                                 <el-segmented v-model="actorImageModel" class="tabs-segmented"
-                                    :options="[{ label: '文本生成', value: 'remarks' }, { label: '本地上传', value: 'upload' }]" />
+                                    :options="[{ label: t('actor.textGen'), value: 'remarks' }, { label: t('actor.localUpload'), value: 'upload' }]" />
                                 <div class="bg-overlay rounded-4 p-4 w-100">
-                                    <el-input v-model="actorForm.remarks" placeholder="请输入角色描述" size="small"
+                                    <el-input v-model="actorForm.remarks" :placeholder="t('actor.roleDescPlaceholder')" size="small"
                                         class="actor-form-textarea" type="textarea"
                                         :autosize="{ minRows: 6, maxRows: 20 }" />
                                     <div class="flex flex-y-center grid-gap-2 line-height-1 mt-4"
                                         v-if="actorImageModel === 'remarks'">
                                         <div class="bg rounded-round p-3 flex flex-center grid-gap-2 pointer hover-bg-hover"
-                                            ref="actorHeadimgButtonRef" title="选择使用AI生成形象图">
+                                            ref="actorHeadimgButtonRef" :title="t('actor.aiGenImage')">
                                             <template v-if="actorHeadimgModel.id">
                                                 <el-avatar :src="actorHeadimgModel.icon" :alt="actorHeadimgModel.name"
                                                     shape="square" :size="16"></el-avatar>
@@ -331,14 +333,14 @@ defineExpose({
                                                     <IconModelSvg />
                                                 </el-icon>
                                                 <span class="h10 overflow-hidden text-nowrap"
-                                                    style="max-width: 60px;">形象图</span>
+                                                    style="max-width: 60px;">{{ t('actor.portraitImage') }}</span>
                                                 <el-icon size="16">
                                                     <ArrowDown />
                                                 </el-icon>
                                             </template>
                                         </div>
                                         <div class="bg rounded-round p-3 flex flex-center grid-gap-2 pointer hover-bg-hover"
-                                            ref="actorThreeViewModelButtonRef" title="选择使用AI生成三视图">
+                                            ref="actorThreeViewModelButtonRef" :title="t('actor.aiGenThreeView')">
                                             <template v-if="actorImageThreeViewModel.id">
                                                 <el-avatar :src="actorImageThreeViewModel.icon"
                                                     :alt="actorImageThreeViewModel.name" shape="square"
@@ -355,14 +357,14 @@ defineExpose({
                                                     <IconModelSvg />
                                                 </el-icon>
                                                 <span class="h10 overflow-hidden text-nowrap"
-                                                    style="max-width: 60px;">三视图</span>
+                                                    style="max-width: 60px;">{{ t('actor.threeView') }}</span>
                                                 <el-icon size="16">
                                                     <ArrowDown />
                                                 </el-icon>
                                             </template>
                                         </div>
-                                        <el-upload ref="uploadReferenceImageRef" title="添加参考图"
-                                            :data="{ dir_name: 'actor/reference', dir_title: '演员形象参考照片' }"
+                                        <el-upload ref="uploadReferenceImageRef" :title="t('actor.addRefImage')"
+                                            :data="{ dir_name: 'actor/reference', dir_title: t('actor.actorRefPhoto') }"
                                             :action="$http.getCompleteUrl('app/shortplay/api/Uploads/upload')"
                                             :headers="$http.getHeaders()" accept="image/jpeg,image/png" :limit="1"
                                             type="cover" :disabled="uploadLoading"
@@ -412,16 +414,16 @@ defineExpose({
                                     <Loading class="circular" v-if="generateImageLoading" />
                                     <IconImageSvg v-else />
                                 </el-icon>
-                                <span class="h10">填写左侧表单，使用AI生成演员形象图</span>
+                                <span class="h10">{{ t('actor.genPortraitHint') }}</span>
                                 <div class="flex flex-center grid-gap-2 h10">
-                                    <span>点击“</span>
+                                    <span>{{ t('actor.clickButtonHintPrefix') }}</span>
                                     <div class="rounded-round p-1 flex flex-center grid-gap-2"
                                         style="background-color: #FFFFFF;color:#141414;">
                                         <el-icon size="14">
                                             <Top />
                                         </el-icon>
                                     </div>
-                                    <span>”按钮生成</span>
+                                    <span>{{ t('actor.clickButtonHintSuffix') }}</span>
                                 </div>
                             </div>
                             <div class="flex flex-column flex-center grid-gap-2"
@@ -429,7 +431,7 @@ defineExpose({
                                 <el-icon size="64">
                                     <Loading class="circular" />
                                 </el-icon>
-                                <span class="h10">生成中...</span>
+                                <span class="h10">{{ t('common.generating') }}</span>
                             </div>
                         </el-avatar>
                     </div>
@@ -437,7 +439,7 @@ defineExpose({
                         <div>
                             <el-upload v-if="uploadImageModel === 'headimg'" ref="uploadImageRef"
                                 class="input-upload rounded-4" drag
-                                :data="{ dir_name: 'actor/image', dir_title: '演员形象照片' }"
+                                :data="{ dir_name: 'actor/image', dir_title: t('actor.actorPhoto') }"
                                 :action="$http.getCompleteUrl('app/shortplay/api/Uploads/upload')"
                                 :headers="$http.getHeaders()" accept="image/jpeg,image/png" :limit="1" type="cover"
                                 :disabled="uploadHeadimgLoading"
@@ -449,15 +451,15 @@ defineExpose({
                                         <IconUploadImageSvg />
                                     </el-icon>
                                     <div class="el-upload__text">
-                                        <span class="h10">拖拽演员形象照片到此处或</span>
-                                        <span class="h10">点击上传</span>
+                                        <span class="h10">{{ t('actor.dragActorPhoto') }}</span>
+                                        <span class="h10">{{ t('home.clickUpload') }}</span>
                                     </div>
                                     <div class="el-upload__text">
-                                        <span class="h10">支持上传格式：</span>
+                                        <span class="h10">{{ t('home.supportFormat') }}</span>
                                         <span class="h10">PNG, JPG, JPEG</span>
                                     </div>
                                     <div class="el-upload__text">
-                                        <span class="h10">形象照片建议比例：</span>
+                                        <span class="h10">{{ t('actor.photoRatio') }}</span>
                                         <span class="h10">1:1</span>
                                     </div>
                                 </template>
@@ -467,7 +469,7 @@ defineExpose({
                             </el-upload>
                             <el-upload v-else-if="uploadImageModel === 'three_view'" ref="uploadImageRef"
                                 class="input-upload rounded-4" drag
-                                :data="{ dir_name: 'actor/three_view', dir_title: '演员三视图' }"
+                                :data="{ dir_name: 'actor/three_view', dir_title: t('actor.actorThreeViewPhoto') }"
                                 :action="$http.getCompleteUrl('app/shortplay/api/Uploads/upload')"
                                 :headers="$http.getHeaders()" accept="image/jpeg,image/png" :limit="1" type="cover"
                                 :disabled="uploadThreeViewLoading"
@@ -479,15 +481,15 @@ defineExpose({
                                         <IconUploadImageSvg />
                                     </el-icon>
                                     <div class="el-upload__text">
-                                        <span class="h10">拖拽演员三视图到此处或</span>
-                                        <span class="h10">点击上传</span>
+                                        <span class="h10">{{ t('actor.dragThreeViewPhoto') }}</span>
+                                        <span class="h10">{{ t('home.clickUpload') }}</span>
                                     </div>
                                     <div class="el-upload__text">
-                                        <span class="h10">支持上传格式：</span>
+                                        <span class="h10">{{ t('home.supportFormat') }}</span>
                                         <span class="h10">PNG, JPG, JPEG</span>
                                     </div>
                                     <div class="el-upload__text">
-                                        <span class="h10">形象照片建议比例：</span>
+                                        <span class="h10">{{ t('actor.photoRatio') }}</span>
                                         <span class="h10">1:1</span>
                                     </div>
                                 </template>
@@ -506,7 +508,7 @@ defineExpose({
                                         <Loading class="circular" v-if="uploadHeadimgLoading" />
                                         <IconActorSvg v-else />
                                     </el-icon>
-                                    <span class="h10">形象图</span>
+                                    <span class="h10">{{ t('actor.portraitImage') }}</span>
                                 </div>
                             </el-avatar>
                             <el-avatar :src="actorForm.three_view_image" shape="square" :size="60" class="pointer"
@@ -517,7 +519,7 @@ defineExpose({
                                         <Loading class="circular" v-if="uploadThreeViewLoading" />
                                         <IconActorThreeViewSvg v-else />
                                     </el-icon>
-                                    <span class="h10">三视图</span>
+                                    <span class="h10">{{ t('actor.threeView') }}</span>
                                 </div>
                             </el-avatar>
                         </div>
@@ -526,10 +528,10 @@ defineExpose({
             </el-form>
             <template #footer>
                 <div class="flex flex-center grid-gap-2 w-100">
-                    <el-button type="info" @click="cancelActorDialog" :disabled="actorLoading">取消</el-button>
+                    <el-button type="info" @click="cancelActorDialog" :disabled="actorLoading">{{ t('common.cancel') }}</el-button>
                     <div class="flex-1"></div>
                     <el-button type="success" @click="submitActorDialog()" :disabled="actorLoading"
-                        :loading="actorLoading">提交</el-button>
+                        :loading="actorLoading">{{ t('common.submit') }}</el-button>
                 </div>
             </template>
         </el-dialog>

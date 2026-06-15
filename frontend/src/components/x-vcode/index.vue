@@ -2,6 +2,8 @@
 import { ResponseCode } from '@/common/const';
 import { $http } from '@/common/http';
 import { ElMessage } from 'element-plus';
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 
 const props = withDefaults(defineProps<{
     data: any
@@ -53,17 +55,17 @@ onMounted(() => {
 <template>
     <div class="x-vcode">
         <div class="x-vcode-form">
-            <span>发送至：{{ data.countryCode }} {{ data.username }}</span>
-            <el-input v-model="form.captcha" placeholder="请输入图形验证码" @keyup.enter="sendCode" :disabled="loading">
+            <span>{{ $t('vcode.sendTo') }}{{ data.countryCode }} {{ data.username }}</span>
+            <el-input v-model="form.captcha" :placeholder="t('vcode.enterCaptcha')" @keyup.enter="sendCode" :disabled="loading">
                 <template #append>
-                    <el-image :src="captcha" class="x-login-form-captcha-img" alt="验证码" title="点击更换验证码"
+                    <el-image :src="captcha" class="x-login-form-captcha-img" :alt="$t('vcode.captcha')" :title="$t('vcode.clickToRefresh')"
                         @click="getCaptcha" />
                 </template>
             </el-input>
         </div>
         <div>
-            <el-button @click="close" :disabled="loading">取消</el-button>
-            <el-button type="primary" @click="sendCode" :loading="loading">获取验证码</el-button>
+            <el-button @click="close" :disabled="loading">{{ $t('common.cancel') }}</el-button>
+            <el-button type="primary" @click="sendCode" :loading="loading">{{ $t('vcode.getCode') }}</el-button>
         </div>
     </div>
 </template>

@@ -5,8 +5,10 @@ import router from '@/routers';
 import IconLike from '@/svg/icon/icon-like.vue'
 import { useUserStore } from '@/stores';
 import { Action, ElMessageBox, MessageBoxState } from 'element-plus';
+import { useI18n } from 'vue-i18n';
 import { LocationQueryValue, useRoute } from 'vue-router';
 const route = useRoute();
+const { t } = useI18n();
 const drama_id = ref<string>(route.params.drama_id as string);
 const episode_id = ref<string>(route.params.episode_id as string);
 const showView = ref<LocationQueryValue | LocationQueryValue[]>(route.query.view)
@@ -35,9 +37,9 @@ const getEpisode = () => {
         if (res.code === ResponseCode.SUCCESS) {
             episodeDetails.value = res.data;
         } else {
-            ElMessageBox.confirm(res.msg, '提示', {
-                confirmButtonText: '重新加载',
-                cancelButtonText: '返回',
+            ElMessageBox.confirm(res.msg, t('common.tips'), {
+                confirmButtonText: t('common.reload'),
+                cancelButtonText: t('common.back'),
                 type: 'warning',
             }).then(() => {
                 getEpisode();
@@ -46,9 +48,9 @@ const getEpisode = () => {
             });
         }
     }).catch(() => {
-        ElMessageBox.confirm('加载失败，请重新加载', '提示', {
-            confirmButtonText: '重新加载',
-            cancelButtonText: '返回',
+        ElMessageBox.confirm(t('common.loadFail'), t('common.tips'), {
+            confirmButtonText: t('common.reload'),
+            cancelButtonText: t('common.back'),
             type: 'warning',
         }).then(() => {
             getEpisode();
@@ -58,9 +60,9 @@ const getEpisode = () => {
     })
 }
 const handleShare = () => {
-    ElMessageBox.confirm('发布到广场后，其他用户可以查看并点赞，是否继续？', '提示', {
-        confirmButtonText: '继续发布',
-        cancelButtonText: '取消',
+    ElMessageBox.confirm(t('works.publishConfirm'), t('common.tips'), {
+        confirmButtonText: t('works.publishToSquare'),
+        cancelButtonText: t('common.cancel'),
         type: 'warning',
         beforeClose: (action: Action, instance: MessageBoxState, done: () => void) => {
             if (instance.confirmButtonLoading == true) return;
@@ -71,14 +73,14 @@ const handleShare = () => {
                     episode_id: episode_id.value
                 }).then((res: any) => {
                     if (res.code === ResponseCode.SUCCESS) {
-                        ElMessage.success('发布成功');
+                        ElMessage.success(t('works.publishSuccess'));
                         getEpisode();
                         done();
                     } else {
                         ElMessage.error(res.msg);
                     }
                 }).catch(() => {
-                    ElMessage.error('发布失败');
+                    ElMessage.error(t('works.publishFail'));
                 }).finally(() => {
                     instance.confirmButtonLoading = false;
                 });
@@ -103,9 +105,9 @@ const getShare = () => {
         if (res.code === ResponseCode.SUCCESS) {
             episodeDetails.value = res.data;
         } else {
-            ElMessageBox.confirm(res.msg, '提示', {
-                confirmButtonText: '重新加载',
-                cancelButtonText: '返回',
+            ElMessageBox.confirm(res.msg, t('common.tips'), {
+                confirmButtonText: t('common.reload'),
+                cancelButtonText: t('common.back'),
                 type: 'warning',
             }).then(() => {
                 getEpisode();
@@ -114,9 +116,9 @@ const getShare = () => {
             });
         }
     }).catch(() => {
-        ElMessageBox.confirm('加载失败，请重新加载', '提示', {
-            confirmButtonText: '重新加载',
-            cancelButtonText: '返回',
+        ElMessageBox.confirm(t('common.loadFail'), t('common.tips'), {
+            confirmButtonText: t('common.reload'),
+            cancelButtonText: t('common.back'),
             type: 'warning',
         }).then(() => {
             getEpisode();
@@ -151,7 +153,7 @@ const handleLike = () => {
             ElMessage.error(res.msg);
         }
     }).catch(() => {
-        ElMessage.error('点赞失败');
+        ElMessage.error(t('works.likeFail'));
     })
 }
 onMounted(() => {
@@ -180,7 +182,7 @@ onMounted(() => {
                             :key="index"
                             :class="[item.episode_id === episode_id ? 'bg-success text-white' : 'bg-overlay']"
                             @click="router.replace('/play/' + drama_id + '/' + item.episode_id)">
-                            <span class="font-weight-600">第 {{ item.episode_no }} 集</span>
+                            <span class="font-weight-600">{{ $t('works.episode', { no: item.episode_no }) }}</span>
                         </div>
                     </div>
                 </el-scrollbar>
@@ -203,14 +205,14 @@ onMounted(() => {
             </div>
             <span class="font-weight-600">{{ episodeDetails.drama.title }}</span>
             <div class="flex flex-column grid-gap-2">
-                <span>作品描述</span>
+                <span>{{ $t('works.workDesc') }}</span>
                 <span class="text-info">{{ episodeDetails.drama.description }}</span>
             </div>
             <div class="flex-1"></div>
             <template v-if="showView === 'share'">
                 <el-button type="success" icon="Position" size="large" disabled
-                    v-if="episodeDetails.is_share">已发布到广场</el-button>
-                <el-button type="success" icon="Position" size="large" v-else @click="handleShare">发布到广场</el-button>
+                    v-if="episodeDetails.is_share">{{ $t('works.published') }}</el-button>
+                <el-button type="success" icon="Position" size="large" v-else @click="handleShare">{{ $t('works.publishToSquare') }}</el-button>
             </template>
         </div>
     </div>

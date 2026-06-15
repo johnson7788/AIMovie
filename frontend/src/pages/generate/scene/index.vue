@@ -12,6 +12,8 @@ import { useRoute } from 'vue-router';
 import router from '@/routers';
 import { Loading } from '@element-plus/icons-vue';
 import { usePush } from '@/composables/usePush';
+import { useI18n } from 'vue-i18n';
+const { t } = useI18n();
 const route = useRoute();
 const userStore = useUserStore();
 const { USERINFO } = useRefs(userStore);
@@ -29,7 +31,7 @@ const getDramaInfo = () => {
             ElMessage.error(res.msg);
         }
     }).catch(() => {
-        ElMessage.error('获取短剧详情失败');
+        ElMessage.error(t('common.loadFail'));
     })
 }
 const SceneSearch = reactive({
@@ -164,7 +166,7 @@ const handleGenerateImage = () => {
             ElMessage.error(res.msg);
         }
     }).catch(() => {
-        ElMessage.error('生成图片失败');
+        ElMessage.error(t('scene.genImageFail'));
     }).finally(() => {
         generateImageLoading.value = false;
     })
@@ -202,7 +204,7 @@ const handleReplaceScene = (item: any) => {
             ElMessage.error(res.msg);
         }
     }).catch(() => {
-        ElMessage.error('替换场景失败');
+        ElMessage.error(t('scene.replaceFail'));
     }).finally(() => {
         replaceSceneLoading.value = false;
     })
@@ -289,7 +291,7 @@ const handleDeleteScene = (row: any) => {
     })
         .then((res: any) => {
             if (res.code === ResponseCode.SUCCESS) {
-                ElMessage.success('删除成功');
+                ElMessage.success(t('common.deleteSuccess'));
                 if (currentScene.value?.id == row.id) {
                     currentScene.value = undefined;
                 }
@@ -301,7 +303,7 @@ const handleDeleteScene = (row: any) => {
             }
         })
         .catch(() => {
-            ElMessage.error('删除失败');
+            ElMessage.error(t('common.deleteFail'));
 
             // ❗请求失败 → 回滚
             sceneList.value = backup;
@@ -334,7 +336,7 @@ const handleUploadSuccess = (response: any) => {
             image: response.data.url,
         }).then((res: any) => {
             if (res.code === ResponseCode.SUCCESS) {
-                ElMessage.success('保存成功');
+                ElMessage.success(t('common.saveSuccess'));
             } else {
                 ElMessage.error(res.msg);
             }
@@ -364,7 +366,7 @@ onUnmounted(() => {
             <div class="flex-1 flex flex-column grid-gap-10 overflow-hidden">
                 <div class="flex grid-gap-2">
                     <span>{{ currentScene?.title }}</span>
-                    <span class="text-success">场景{{ currentScene?.id }}</span>
+                    <span class="text-success">{{ t('scene.sceneLabel', { id: currentScene?.id }) }}</span>
                 </div>
                 <el-avatar :src="currentScene?.image_state ? '' : currentScene?.image" fit="contain" class="preview-image bg-mosaic"
                     shape="square">
@@ -372,26 +374,26 @@ onUnmounted(() => {
                         <el-icon size="64">
                             <Loading class="circular" />
                         </el-icon>
-                        <span>场景绘制中...</span>
+                        <span>{{ t('scene.drawing') }}</span>
                     </div>
                     <div v-else class="flex flex-center flex-column grid-gap-2 text-info">
                         <el-icon size="64">
                             <IconUploadImageSvg />
                         </el-icon>
-                        <span>在右侧让AI为你生成场景图</span>
+                        <span>{{ t('scene.aiGenerateHint') }}</span>
                         <div class="flex grid-gap-2">
-                            <span>或</span>
-                            <el-upload ref="uploadImageRef" :data="{ dir_name: 'scene/image', dir_title: '场景图照片' }"
+                            <span>{{ t('common.or') }}</span>
+                            <el-upload ref="uploadImageRef" :data="{ dir_name: 'scene/image', dir_title: t('scene.scenePhoto') }"
                                 :action="$http.getCompleteUrl('app/shortplay/api/Uploads/upload')"
                                 :headers="$http.getHeaders()" accept="image/jpeg,image/png" :limit="1" type="cover"
                                 :disabled="currentSceneUploadLoading"
                                 :before-upload="() => { currentSceneUploadLoading = true; return true; }"
                                 :on-success="handleUploadSuccess" :show-file-list="false"
                                 :on-error="() => { currentSceneUploadLoading = false; handleUploadError() }">
-                                <span class="text-text-primary">从本地上传素材</span>
+                                <span class="text-text-primary">{{ t('scene.uploadLocal') }}</span>
                             </el-upload>
                         </div>
-                        <span>图片：JPG/PNG，大于 300px，不超过 10MB</span>
+                        <span>{{ t('scene.uploadHint') }}</span>
                     </div>
                 </el-avatar>
 
@@ -402,9 +404,9 @@ onUnmounted(() => {
                             <div class="montage-storyboard-list-item rounded-4" v-for="item in sceneList" :key="item.id"
                                 :class="{ 'active': item.id === currentScene?.id }" @click="handleCurrentScene(item)">
                                 <div class="flex montage-storyboard-list-item-title grid-gap-2">
-                                    <span class="h10 flex-1 text-nowrap text-ellipsis-1">场景{{ item.id }} - {{ item.title
+                                    <span class="h10 flex-1 text-nowrap text-ellipsis-1">{{ t('scene.sceneLabel', { id: item.id }) }} - {{ item.title
                                         }}</span>
-                                    <el-popconfirm title="确定删除该分镜吗？" placement="bottom-end" confirm-button-type="danger"
+                                    <el-popconfirm :title="t('scene.deleteConfirm')" placement="bottom-end" confirm-button-type="danger"
                                         :teleported="false" width="fit-content" @confirm="handleDeleteScene(item)">
                                         <template #reference>
                                             <el-icon class="icon-button hover-show">
@@ -414,14 +416,14 @@ onUnmounted(() => {
                                     </el-popconfirm>
                                 </div>
                                 <el-avatar class="montage-storyboard-list-item-image bg-mosaic" :src="item.image" :fit="['9:16','16:9'].includes(dramaInfo.aspect_ratio) ? 'contain' : 'cover'"
-                                    v-loading="(item.image_state && item.image)" element-loading-text="图片生成中...">
+                                    v-loading="(item.image_state && item.image)" :element-loading-text="t('common.generating')">
                                     <div class="flex flex-column grid-gap-1 flex-center">
                                         <div class="flex">
                                             <span class="flex flex-center grid-gap-2" v-if="item.image_state">
                                                 <el-icon size="20">
                                                     <Loading class="circular" />
                                                 </el-icon>
-                                                <span class="h10">生成中...</span>
+                                                <span class="h10">{{ t('common.generating') }}</span>
                                             </span>
                                         </div>
                                     </div>
@@ -432,7 +434,7 @@ onUnmounted(() => {
                                 <el-icon size="20">
                                     <Plus />
                                 </el-icon>
-                                <span class="h10">新增场景</span>
+                                <span class="h10">{{ t('scene.addScene') }}</span>
                             </div>
                         </div>
                     </el-scrollbar>
@@ -441,36 +443,36 @@ onUnmounted(() => {
             <div class="scene-form-wrapper bg-overlay border rounded-4 scene-form flex flex-column grid-gap-4">
                 <template v-if="currentSceneForm.id">
                     <div class="border-bottom flex flex-center">
-                        <el-input v-model="currentSceneForm.title" placeholder="场景" size="large"
+                        <el-input v-model="currentSceneForm.title" :placeholder="t('scene.scene')" size="large"
                             class="scene-form-input flex-1">
                             <template #suffix>
                                 <el-button type="primary" bg text size="small"
-                                    @click="sceneCreateRef?.open?.({ scene: currentScene, drama_id: SceneSearch.drama_id, episode_id: SceneSearch.episode_id })">编辑</el-button>
+                                    @click="sceneCreateRef?.open?.({ scene: currentScene, drama_id: SceneSearch.drama_id, episode_id: SceneSearch.episode_id })">{{ t('scene.edit') }}</el-button>
                             </template>
                         </el-input>
                     </div>
 
                     <div class="flex flex-column grid-gap-2 px-4">
-                        <span>场景</span>
+                        <span>{{ t('scene.scene') }}</span>
                         <div class="grid-columns-4 grid-gap-2">
-                            <el-input v-model="currentSceneForm.scene_location" placeholder="地点"
+                            <el-input v-model="currentSceneForm.scene_location" :placeholder="t('scene.location')"
                                 class="grid-column-2 scene-form-input"></el-input>
-                            <el-input v-model="currentSceneForm.scene_space" placeholder="内景OR外景"
+                            <el-input v-model="currentSceneForm.scene_space" :placeholder="t('scene.space')"
                                 class="grid-column-2 scene-form-input"></el-input>
-                            <el-input v-model="currentSceneForm.scene_time" placeholder="大概时间"
+                            <el-input v-model="currentSceneForm.scene_time" :placeholder="t('scene.time')"
                                 class="grid-column-2 scene-form-input"></el-input>
-                            <el-input v-model="currentSceneForm.scene_weather" placeholder="天气"
+                            <el-input v-model="currentSceneForm.scene_weather" :placeholder="t('scene.weather')"
                                 class="grid-column-2 scene-form-input"></el-input>
                         </div>
                     </div>
                     <div class="flex flex-column grid-gap-2 px-4">
-                        <span>场景描述</span>
+                        <span>{{ t('scene.sceneDesc') }}</span>
                         <div class="bg rounded-4 p-4 border">
-                            <el-input v-model="currentSceneForm.description" placeholder="请输入场景描述" size="small"
+                            <el-input v-model="currentSceneForm.description" :placeholder="t('scene.inputSceneDesc')" size="small"
                                 class="scene-form-textarea" type="textarea" :autosize="{ minRows: 6, maxRows: 20 }" />
                             <div class="flex flex-y-center grid-gap-2">
                                 <div class="bg-overlay rounded-round p-3 flex flex-center grid-gap-2 pointer hover-bg-hover"
-                                    ref="modelButtonRef" title="选择使用AI生成图">
+                                    ref="modelButtonRef" :title="t('scene.selectAiImage')">
                                     <template v-if="model.id">
                                         <el-avatar :src="model.icon" :alt="model.name" shape="square"
                                             :size="16"></el-avatar>
@@ -484,14 +486,14 @@ onUnmounted(() => {
                                         <el-icon size="16">
                                             <IconModelSvg />
                                         </el-icon>
-                                        <span class="h10">场景图</span>
+                                        <span class="h10">{{ t('scene.sceneImage') }}</span>
                                         <el-icon size="16">
                                             <ArrowDown />
                                         </el-icon>
                                     </template>
                                 </div>
-                                <el-upload ref="uploadImageRef" title="添加参考图"
-                                    :data="{ dir_name: 'scene/reference', dir_title: '场景参考照片' }"
+                                <el-upload ref="uploadImageRef" :title="t('scene.addRefImage')"
+                                    :data="{ dir_name: 'scene/reference', dir_title: t('scene.refPhoto') }"
                                     :action="$http.getCompleteUrl('app/shortplay/api/Uploads/upload')"
                                     :headers="$http.getHeaders()" accept="image/jpeg,image/png" :limit="1" type="cover"
                                     :disabled="uploadLoading"
@@ -535,7 +537,7 @@ onUnmounted(() => {
                             scene="scene_image" />
                     </el-popover>
                     <div class="flex flex-column grid-gap-2 px-4 pt-4">
-                        <span>场景记录</span>
+                        <span>{{ t('scene.sceneRecord') }}</span>
                     </div>
                     <el-scrollbar class="flex-1">
                         <div class="grid-columns-2 grid-gap-4 p-4" v-if="taskList.length > 0">
@@ -549,14 +551,14 @@ onUnmounted(() => {
                                         <Loading class="circular" v-if="replaceSceneLoading" />
                                         <IconReplaceSvg v-else />
                                     </el-icon>
-                                    <span class="h10 text-nowrap">替换原始</span>
+                                    <span class="h10 text-nowrap">{{ t('scene.replaceOrigin') }}</span>
                                 </div>
                             </div>
                         </div>
-                        <el-empty v-else description="暂无原始记录" />
+                        <el-empty v-else :description="t('scene.noOriginRecord')" />
                     </el-scrollbar>
                 </template>
-                <el-empty v-else description="点击场景名称选择场景" />
+                <el-empty v-else :description="t('scene.clickToSelect')" />
             </div>
         </div>
         <div class="p-4 w-100 flex grid-gap-4 flex-center">
@@ -564,7 +566,7 @@ onUnmounted(() => {
                 <el-icon size="16">
                     <IconPrevStepSvg />
                 </el-icon>
-                <span>上一步</span>
+                <span>{{ t('common.prev') }}</span>
             </el-button>
             <el-button type="success" size="large"
                 :disabled="sceneList.filter((item: any) => item.status === 'initializing').length <= 0"
@@ -572,10 +574,10 @@ onUnmounted(() => {
                 <el-icon size="16">
                     <IconBatchSvg />
                 </el-icon>
-                <span>批量生成</span>
+                <span>{{ t('common.batchGenerate') }}</span>
             </el-button>
             <el-button type="success" size="large" @click="nextStep">
-                <span>下一步</span>
+                <span>{{ t('common.next') }}</span>
                 <el-icon size="16" class="ml-2">
                     <IconNextStepSvg />
                 </el-icon>
@@ -583,16 +585,16 @@ onUnmounted(() => {
         </div>
         <el-dialog v-model="batchGenerateDialogVisible" class="generate-storyboard-dialog" draggable width="800px">
             <template #header>
-                <span class="font-weight-600">批量生成场景</span>
+                <span class="font-weight-600">{{ t('scene.batchGenerate') }}</span>
             </template>
-            <xl-models title="模型" v-model="currentSceneForm.model_id" @select="handleModelSelect" no-init
+            <xl-models :title="t('scene.model')" v-model="currentSceneForm.model_id" @select="handleModelSelect" no-init
                 class="flex-1 bg-overlay rounded-4 p-4" scene="scene_image" />
             <template #footer>
                 <el-button type="info" @click="batchGenerateDialogVisible = false"
-                    :disabled="batchGenerateLoading">取消</el-button>
+                    :disabled="batchGenerateLoading">{{ t('common.cancel') }}</el-button>
                 <div class="flex-1"></div>
                 <el-button type="success" icon="Check" @click="submitBatchGenerate"
-                    :disabled="!currentSceneForm.model_id" :loading="batchGenerateLoading">生成</el-button>
+                    :disabled="!currentSceneForm.model_id" :loading="batchGenerateLoading">{{ t('common.generate') }}</el-button>
             </template>
         </el-dialog>
         <xl-scene-create ref="sceneCreateRef" @success="handleCreateSceneSuccess" />

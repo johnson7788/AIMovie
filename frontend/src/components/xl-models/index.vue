@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { truncate } from '@/common/functions';
 import { useModelStore } from '@/stores';
+import { useI18n } from 'vue-i18n';
+
+const { t } = useI18n();
 const modelStore = useModelStore();
 const props = withDefaults(defineProps<{
     modelValue?: string | number
@@ -11,13 +14,14 @@ const props = withDefaults(defineProps<{
     title?: string
 }>(), {
     modelValue: '',
-    title: '选择模型',
+    title: '',
     noInit: false,
     defaultModelId: '',
     scrollProps: {
         height: '30vh',
     },
 });
+const displayTitle = computed(() => props.title || t('common.selectModel'));
 const emit = defineEmits(['select', 'update:modelValue']);
 const ModelsSearch = reactive({
     classify: 'all',
@@ -45,10 +49,10 @@ onMounted(() => {
 <template>
     <div class="flex flex-column grid-gap-4" style="--el-color-primary:var(--el-color-success);">
         <el-form class="flex flex-center grid-gap-4" @submit.prevent="() => { }">
-            <span>{{ props.title }}</span>
+            <span>{{ displayTitle }}</span>
             <div class="flex-1"></div>
             <el-form-item class="mb-0">
-                <el-input v-model="ModelsSearch.name" placeholder="搜索模型" clearable>
+                <el-input v-model="ModelsSearch.name" :placeholder="t('common.search')" clearable>
                     <template #suffix>
                         <el-icon>
                             <Search />

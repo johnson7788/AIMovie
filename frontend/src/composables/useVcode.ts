@@ -1,9 +1,10 @@
 import { ElMessageBox } from "element-plus"
 import type { ElMessageBoxOptions } from "element-plus"
 import XVcode from "@/components/x-vcode/index.vue"
+import { i18n } from "@/locale"
 
 export const useVcode = () => {
-    const btnText = ref('获取验证码')
+    const btnText = ref(i18n.global.t('vcode.getCode'))
     const btnDisabled = ref(false)
     let timer: any;
     let timerCount = 60;
@@ -23,14 +24,14 @@ export const useVcode = () => {
                 message: () => h(XVcode, {
                     data: params,
                     onSuccess: (res: any) => {
-                        btnText.value = '重新获取'
+                        btnText.value = i18n.global.t('vcode.reacquire')
                         btnDisabled.value = true
                         timer = setInterval(() => {
-                            btnText.value = `重新获取(${timerCount--}s)`
+                            btnText.value = i18n.global.t('vcode.reacquireCountdown', { seconds: timerCount-- })
                             if (timerCount <= 0) {
                                 clearInterval(timer)
                                 timer = undefined
-                                btnText.value = '获取验证码'
+                                btnText.value = i18n.global.t('vcode.getCode')
                                 btnDisabled.value = false
                                 timerCount = 60
                             }

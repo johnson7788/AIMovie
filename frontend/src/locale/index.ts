@@ -2,9 +2,12 @@ import { createI18n } from 'vue-i18n';
 import { default as en } from './en'
 import { default as zhCn } from './zh-cn';
 import { App } from 'vue';
+
+const savedLocale = localStorage.getItem('locale') || 'zh-CN';
+
 export const i18n = createI18n({
 	legacy: false,
-	locale: 'zh-CN',
+	locale: savedLocale,
 	globalInjection: true,
 	messages: {
 		en,

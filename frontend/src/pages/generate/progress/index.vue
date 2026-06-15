@@ -3,9 +3,9 @@
         <!-- Header -->
         <div class="progress-header">
             <div class="header-left">
-                <el-button @click="goBack" :icon="'ArrowLeft'" text>返回</el-button>
+                <el-button @click="goBack" :icon="'ArrowLeft'" text>{{ $t('common.back') }}</el-button>
                 <div class="task-info">
-                    <h2>生成进度</h2>
+                    <h2>{{ $t('generate.progress') }}</h2>
                     <el-tag size="small" :type="statusTagType">{{ statusText }}</el-tag>
                     <span class="elapsed-time">{{ formattedElapsed }}</span>
                 </div>
@@ -21,13 +21,13 @@
         </div>
 
         <!-- Main Content -->
-        <div class="progress-content" v-loading="isConnecting && logs.length === 0" element-loading-text="正在连接...">
+        <div class="progress-content" v-loading="isConnecting && logs.length === 0" :element-loading-text="$t('generate.connecting')">
             <!-- Left: Stage Timeline + Logs -->
             <div class="left-panel">
                 <!-- Stage Timeline -->
                 <el-card shadow="never" class="stage-card" v-if="stages.length > 0">
                     <template #header>
-                        <span>阶段进度</span>
+                        <span>{{ $t('generate.stageProgress') }}</span>
                     </template>
                     <div class="stage-list">
                         <div v-for="stage in stages" :key="stage.name" class="stage-item" :class="stage.status">
@@ -47,15 +47,15 @@
                 <el-card shadow="never" class="log-card">
                     <template #header>
                         <div class="log-header">
-                            <span>生成日志</span>
+                            <span>{{ $t('generate.genLog') }}</span>
                             <el-button size="small" text @click="autoScroll = !autoScroll">
-                                {{ autoScroll ? '自动滚动: 开' : '自动滚动: 关' }}
+                                {{ autoScroll ? $t('generate.autoScrollOn') : $t('generate.autoScrollOff') }}
                             </el-button>
                         </div>
                     </template>
                     <div class="log-viewer" ref="logViewerRef">
                         <div v-if="logs.length === 0 && !isConnecting" class="log-empty">
-                            等待日志输出...
+                            {{ $t('generate.waitLog') }}
                         </div>
                         <div v-for="(log, idx) in logs" :key="idx" class="log-line" :class="`log-${log.level?.toLowerCase()}`">
                             <span class="log-time">{{ log.time }}</span>
@@ -70,7 +70,7 @@
             <div class="right-panel">
                 <el-card shadow="never" class="artifacts-card" v-if="artifacts.length > 0 || isConnecting">
                     <template #header>
-                        <span>生成产物 ({{ artifacts.length }})</span>
+                        <span>{{ $t('generate.output') }} ({{ artifacts.length }})</span>
                     </template>
                     <div class="artifacts-scroll" v-if="artifacts.length > 0" ref="artifactsScrollRef">
                         <div class="artifacts-list">
@@ -102,7 +102,7 @@
                                     lazy
                                 >
                                     <template #error>
-                                        <div class="image-error">加载失败</div>
+                                        <div class="image-error">{{ $t('common.loadFail') }}</div>
                                     </template>
                                 </el-image>
                             </template>
@@ -124,7 +124,7 @@
                         </div>
                     </div>
                     <div v-else-if="!isConnecting" class="artifacts-empty">
-                        等待产物生成...
+                        {{ $t('generate.waitOutput') }}
                     </div>
                 </el-card>
             </div>
@@ -132,19 +132,21 @@
 
         <!-- Error state -->
         <div v-if="errorMessage" class="error-section">
-            <el-alert :title="'生成失败'" :description="errorMessage" type="error" show-icon :closable="false" />
+            <el-alert :title="$t('common.generateFail')" :description="errorMessage" type="error" show-icon :closable="false" />
         </div>
     </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import { CircleCheckFilled, Loading, Clock } from '@element-plus/icons-vue';
 import { useSSE, type SSEEvent } from '@/composables/useSSE';
 import { buildApiUrl } from '@/common/apiBaseUrl';
 import { $http } from '@/common/http';
 
+const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const { connect, disconnect } = useSSE();
@@ -172,10 +174,10 @@ let statusPollTimer: ReturnType<typeof setInterval> | null = null;
 
 // Computed
 const statusText = computed(() => {
-    if (errorMessage.value) return '失败';
-    if (isComplete.value) return '完成';
-    if (isConnecting.value && logs.value.length === 0) return '连接中...';
-    return '生成中...';
+    if (errorMessage.value) return t('generate.fail');
+    if (isComplete.value) return t('generate.done');
+    if (isConnecting.value && logs.value.length === 0) return t('generate.connectingStatus');
+    return t('generate.generating');
 });
 
 const statusTagType = computed(() => {
@@ -193,35 +195,35 @@ const formattedElapsed = computed(() => {
 // Stage definitions for different modes
 const stageDefinitions: Record<string, Array<{ name: string; label: string }>> = {
     idea2video: [
-        { name: 'story', label: '故事创作' },
-        { name: 'characters', label: '角色提取' },
-        { name: 'character_portraits', label: '角色画像' },
-        { name: 'script', label: '剧本编写' },
-        { name: 'scene_0', label: '场景处理' },
-        { name: 'storyboard', label: '分镜设计' },
-        { name: 'visual_descriptions', label: '视觉描述' },
-        { name: 'scene_anchor', label: '场景锚点' },
-        { name: 'camera_tree', label: '机位构建' },
-        { name: 'frames', label: '画面生成' },
-        { name: 'videos', label: '镜头视频' },
-        { name: 'concatenate', label: '视频合成' },
+        { name: 'story', label: t('generate.storyCreate') },
+        { name: 'characters', label: t('generate.actorExtract') },
+        { name: 'character_portraits', label: t('generate.actorPortrait') },
+        { name: 'script', label: t('generate.scriptWrite') },
+        { name: 'scene_0', label: t('generate.sceneProcess') },
+        { name: 'storyboard', label: t('generate.storyboardDesign') },
+        { name: 'visual_descriptions', label: t('generate.visualDesc') },
+        { name: 'scene_anchor', label: t('generate.sceneAnchor') },
+        { name: 'camera_tree', label: t('generate.cameraBuild') },
+        { name: 'frames', label: t('generate.imageGen') },
+        { name: 'videos', label: t('generate.shotVideo') },
+        { name: 'concatenate', label: t('generate.videoCompose') },
     ],
     script2video: [
-        { name: 'characters', label: '角色提取' },
-        { name: 'character_portraits', label: '角色画像' },
-        { name: 'storyboard', label: '分镜设计' },
-        { name: 'visual_descriptions', label: '视觉描述' },
-        { name: 'scene_anchor', label: '场景锚点' },
-        { name: 'camera_tree', label: '机位构建' },
-        { name: 'frames', label: '画面生成' },
-        { name: 'videos', label: '镜头视频' },
-        { name: 'concatenate', label: '视频合成' },
+        { name: 'characters', label: t('generate.actorExtract') },
+        { name: 'character_portraits', label: t('generate.actorPortrait') },
+        { name: 'storyboard', label: t('generate.storyboardDesign') },
+        { name: 'visual_descriptions', label: t('generate.visualDesc') },
+        { name: 'scene_anchor', label: t('generate.sceneAnchor') },
+        { name: 'camera_tree', label: t('generate.cameraBuild') },
+        { name: 'frames', label: t('generate.imageGen') },
+        { name: 'videos', label: t('generate.shotVideo') },
+        { name: 'concatenate', label: t('generate.videoCompose') },
     ],
     scene_image: [
-        { name: 'scene_image', label: '场景图片生成' },
+        { name: 'scene_image', label: t('generate.sceneImgGen') },
     ],
     storyboard_image: [
-        { name: 'storyboard_image', label: '分镜图片生成' },
+        { name: 'storyboard_image', label: t('generate.storyboardImgGen') },
     ],
 };
 
@@ -336,19 +338,19 @@ const getArtifactKey = (item: SSEEvent, idx: number) => {
 
 const formatPortraitLabel = (item: SSEEvent) => {
     if (item.stage === 'character_portraits') {
-        const name = item.character_name || '角色';
+        const name = item.character_name || t('actor.character');
         const viewLabels: Record<string, string> = {
-            front: '正面',
-            side: '侧面',
-            back: '背面',
+            front: t('actor.front'),
+            side: t('actor.side'),
+            back: t('actor.back'),
         };
         const view = item.view ? viewLabels[item.view] || item.view : '';
         return view ? `${name} · ${view}` : name;
     }
     if (item.stage === 'scene_anchor') {
-        return '场景锚点 · 空镜';
+        return t('generate.sceneAnchorEmpty');
     }
-    return item.character_name || item.frame_type || item.file_path || '产物';
+    return item.character_name || item.frame_type || item.file_path || t('generate.product');
 };
 
 const finalizeComplete = async (result?: string | null) => {
@@ -358,7 +360,7 @@ const finalizeComplete = async (result?: string | null) => {
     stopStatusPolling();
     await upsertFinalVideoArtifact('final_video.mp4');
     if (!wasComplete) {
-        appendLog('INFO', `生成完成! 结果: ${result || 'final_video.mp4'}`);
+        appendLog('INFO', `${t('generate.genComplete')} ${result || 'final_video.mp4'}`);
     }
 };
 
@@ -432,7 +434,7 @@ const applyTerminalTaskStatus = async (task: TaskStatusResponse) => {
     if (task.status === 'completed') {
         await finalizeComplete(task.result);
     } else if (task.status === 'failed') {
-        errorMessage.value = task.error || '任务失败';
+        errorMessage.value = task.error || t('generate.taskFail');
         stopStatusPolling();
     }
 };
@@ -495,12 +497,12 @@ const handleEvent = (event: SSEEvent) => {
             } else if (shouldDisplayArtifact(event)) {
                 upsertArtifact(event);
                 if (event.file_type === 'image' && event.stage === 'character_portraits') {
-                    const name = event.character_name || '角色';
+                    const name = event.character_name || t('actor.character');
                     const view = event.view ? ` (${event.view})` : '';
-                    appendLog('INFO', `角色画像已生成: ${name}${view}`);
+                    appendLog('INFO', `${t('generate.actorPortraitDone')}: ${name}${view}`);
                     scrollArtifactsToBottom();
                 } else if (event.file_type === 'image' && event.stage === 'scene_anchor') {
-                    appendLog('INFO', '场景锚点空镜已生成');
+                    appendLog('INFO', t('generate.sceneAnchorDone'));
                     scrollArtifactsToBottom();
                 } else if (event.file_type === 'video') {
                     scrollArtifactsToBottom();
@@ -515,8 +517,8 @@ const handleEvent = (event: SSEEvent) => {
             break;
 
         case 'error':
-            errorMessage.value = event.error || '未知错误';
-            appendLog('ERROR', `生成失败: ${event.error}`);
+            errorMessage.value = event.error || t('generate.unknownError');
+            appendLog('ERROR', `${t('common.generateFail')}: ${event.error}`);
             break;
 
         case 'complete':
@@ -527,7 +529,7 @@ const handleEvent = (event: SSEEvent) => {
 
 const handleError = (err: Error) => {
     isConnecting.value = false;
-    errorMessage.value = err.message || '连接失败';
+    errorMessage.value = err.message || t('generate.connectFail');
 };
 
 const handleComplete = () => {

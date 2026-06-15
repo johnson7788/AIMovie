@@ -3,7 +3,9 @@ import Edit from '@/pages/voice/modules/edit.vue'
 import { ResponseCode } from '@/common/const';
 import { $http } from '@/common/http';
 import { truncate } from '@/common/functions';
+import { useI18n } from 'vue-i18n';
 import router from '@/routers';
+const { t } = useI18n()
 const voiceList = ref<any[]>([]);
 const loading = ref(false);
 const getVoiceList = () => {
@@ -18,7 +20,7 @@ const getVoiceList = () => {
             voiceList.value = res.data;
         }
     }).catch(() => {
-        ElMessage.error('获取配音列表失败');
+        ElMessage.error(t('voice.getListFail'));
     }).finally(() => {
         loading.value = false;
     });
@@ -47,7 +49,7 @@ onMounted(() => {
                     <Plus />
                 </el-icon>
                 <div class="flex flex-column grid-gap-2">
-                    <span>创建音色</span>
+                    <span>{{ t('voice.create') }}</span>
                 </div>
             </div>
             <div class="grid-column-1 rounded-4 p-4  flex flex-column grid-gap-4 actor-item actor-item-b flex-center"
@@ -58,7 +60,7 @@ onMounted(() => {
                 </el-avatar>
                 <div class="flex flex-column grid-gap-2 flex-center">
                     <span v-if="item.name">{{ item.name }}</span>
-                    <span v-else>未命名</span>
+                    <span v-else>{{ t('voice.unnamed') }}</span>
                     <div class="flex grid-gap-2" v-if="item.gender_enum && item.age_enum">
                         <span class="bg h10 rounded-2 py-1 px-2" v-if="item.gender_enum?.label">{{
                             item.gender_enum?.label
@@ -69,8 +71,8 @@ onMounted(() => {
                 </div>
             </div>
         </div>
-        <el-empty v-else description="暂无音色数据">
-            <el-button type="success" size="large" bg text @click.stop="router.push('/voice/create')"> 创建音色 </el-button>
+        <el-empty v-else :description="t('voice.noVoice')">
+            <el-button type="success" size="large" bg text @click.stop="router.push('/voice/create')"> {{ t('voice.create') }} </el-button>
         </el-empty>
         <Edit ref="editVoiceRef" @update="getVoiceList" />
     </div>

@@ -6,7 +6,7 @@
                     <el-icon size="18">
                         <Back />
                     </el-icon>
-                    <span class="h8 font-weight-600">新增音色</span>
+                    <span class="h8 font-weight-600">{{ t('voice.addVoice') }}</span>
                 </div>
             </div>
         </div>
@@ -19,17 +19,17 @@
                     <el-icon size="16">
                         <IconTips />
                     </el-icon>
-                    {{ action === 'online' ? '为了获得更理想的效果，安静的环境下录制~' : '请确保上传文件只包含一个人的声音，请尽量保证上传音频的音质和背景干净' }}
+                    {{ action === 'online' ? t('voice.recordTipOnline') : t('voice.recordTipUpload') }}
                 </div>
                 <div class="bg-overlay rounded-4 p-4 w-100 mt-6">
                     <p v-if="currentScript?.text" class="script-text">{{ currentScript.text }}</p>
-                    <p v-else class="script-text text-secondary">加载中...</p>
+                    <p v-else class="script-text text-secondary">{{ t('common.loading') }}</p>
                     <div class="flex flex-x-flex-end flex-y-center grid-gap-2 text-success pointer"
                         @click="changeScript" :class="{ 'loading': scriptLoading }">
                         <el-icon size="16" :class="{ 'is-loading': scriptLoading }">
                             <RefreshRight />
                         </el-icon>
-                        换一个
+                        {{ t('voice.changeOne') }}
                     </div>
                 </div>
                 <div class="flex ">
@@ -39,7 +39,7 @@
                                 <el-icon size="20" color="var(--el-color-white)">
                                     <IconModel />
                                 </el-icon>
-                                <span class="h10">选择模型</span>
+                                <span class="h10">{{ t('common.selectModel') }}</span>
                             </div>
                         </template>
                         <template v-else>
@@ -60,8 +60,8 @@
                 <div v-if="action === 'online'" class="w-100">
                     <div class="flex-1 w-100">
                         <ol class="list text-secondary h10 ">
-                            <li>请保持周围无噪音和其他声音，录制时长至少10秒；</li>
-                            <li>参考文案仅供参考，无需逐字读，可随意发挥；</li>
+                            <li>{{ t('voice.recordTip1') }}</li>
+                            <li>{{ t('voice.recordTip2') }}</li>
                         </ol>
                     </div>
 
@@ -80,15 +80,15 @@
                                     <el-icon class="upload-loading-icon is-loading">
                                         <Loading />
                                     </el-icon>
-                                    <div class="upload-text">正在处理中...</div>
-                                    <div class="upload-subtext">请稍候</div>
+                                    <div class="upload-text">{{ t('voice.processing') }}</div>
+                                    <div class="upload-subtext">{{ t('voice.pleaseWait') }}</div>
                                 </div>
                                 <template v-else>
                                     <el-icon class="upload-icon">
                                         <UploadFilled />
                                     </el-icon>
-                                    <div class="upload-text">点击或拖拽上传 MP3/WAV/M4A 音频</div>
-                                    <div class="upload-subtext">建议音频时长 10-300s，大小不超过20MB</div>
+                                    <div class="upload-text">{{ t('voice.uploadAudioText') }}</div>
+                                    <div class="upload-subtext">{{ t('voice.uploadAudioSubtext') }}</div>
                                 </template>
                             </template>
                         </el-upload>
@@ -114,7 +114,7 @@
                         <div class="upload-actions">
                             <el-button class="clone-btn" color="var(--el-color-success)" size="large"
                                 :disabled="!canClone" :loading="cloneLoading" @click="handleClone">
-                                立即克隆
+                                {{ t('voice.cloneNow') }}
                             </el-button>
                         </div>
                     </div>
@@ -141,16 +141,18 @@ import IconPause from '@/svg/icon/icon-pause.vue'
 import IconModel from '@/svg/icon/icon-model.vue'
 import { usePush } from '@/composables/usePush'
 import { useUserStore, useRefs } from '@/stores'
+import { useI18n } from 'vue-i18n'
 import Edit from './modules/edit.vue'
 const router = useRouter()
+const { t } = useI18n()
 const userStore = useUserStore()
 const { USERINFO } = useRefs(userStore)
 const { subscribe, unsubscribeAll } = usePush()
 let uuids: string[] = []
 const action = ref('online')
 const options = ref([
-    { label: '在线录制', value: 'online' },
-    { label: '上传音频', value: 'upload' },
+    { label: t('voice.onlineRecord'), value: 'online' },
+    { label: t('voice.uploadAudio'), value: 'upload' },
 ])
 const form = ref<any>({
     model_id: '',
@@ -190,7 +192,7 @@ const handleFileChange = async (uploadFile: any) => {
     const file = uploadFile.raw || uploadFile
 
     if (!file || !(file instanceof File)) {
-        ElMessage.error('无法获取文件信息')
+        ElMessage.error(t('voice.fileInfoFail'))
         return
     }
 
@@ -201,7 +203,7 @@ const handleFileChange = async (uploadFile: any) => {
         || /\.(mp3|wav|m4a)$/i.test(file.name)
 
     if (!okType) {
-        ElMessage.error('仅支持上传 MP3/WAV/M4A 音频')
+        ElMessage.error(t('voice.fileTypeError'))
         return
     }
     // if (!okSize) {
@@ -238,7 +240,7 @@ const handleFileChange = async (uploadFile: any) => {
         durationText,
     }
 
-    ElMessage.success('文件已选择，点击"立即克隆"提交')
+    ElMessage.success(t('voice.fileSelected'))
 }
 
 // 获取音频时长
@@ -324,9 +326,9 @@ const handlePlayAudio = () => {
 
 // 删除音频
 const handleDeleteAudio = () => {
-    ElMessageBox.confirm('确定要删除该音频吗？', '提示', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
+    ElMessageBox.confirm(t('voice.deleteAudioConfirm'), t('common.tips'), {
+        confirmButtonText: t('common.confirm'),
+        cancelButtonText: t('common.cancel'),
         type: 'warning'
     }).then(() => {
         if (audioElement.value) {
@@ -340,7 +342,7 @@ const handleDeleteAudio = () => {
         }
         uploadSuccess.value = {}
         form.value.file = null // 清除保存的文件对象
-        ElMessage.success('已删除')
+        ElMessage.success(t('voice.deleted'))
     }).catch(() => { })
 }
 const voice_id = ref(0)
@@ -351,7 +353,7 @@ const addListener = () => {
     subscribe('private-clonevoice-' + USERINFO.value?.user, (res: any) => {
         if (uuids.includes(res.id)) {
             if (res.status === 'success') {
-                ElMessage.success(res.msg || '克隆成功')
+                ElMessage.success(res.msg || t('voice.cloneSuccess'))
                 editVoiceRef.value.open(res.id)
                 voice_id.value = 0;
                 form.value = {
@@ -365,7 +367,7 @@ const addListener = () => {
                     loadingInstance = null
                 }
             } else if (res.status === 'fail') {
-                ElMessage.error(res.msg || '克隆失败')
+                ElMessage.error(res.msg || t('voice.cloneFail'))
                 if (loadingInstance) {
                     loadingInstance.close()
                     loadingInstance = null
@@ -416,12 +418,12 @@ const getScriptList = async () => {
                 currentScript.value = null
             }
         } else {
-            ElMessage.error(res.msg || '获取文案列表失败')
+            ElMessage.error(res.msg || t('voice.getScriptFail'))
             currentScript.value = null
         }
     } catch (error: any) {
         console.error('获取文案列表失败:', error)
-        ElMessage.error('获取文案列表失败')
+        ElMessage.error(t('voice.getScriptFail'))
         currentScript.value = null
     } finally {
         scriptLoading.value = false
@@ -431,7 +433,7 @@ const getScriptList = async () => {
 // 切换文案
 const changeScript = () => {
     if (scriptList.value.length === 0) {
-        ElMessage.warning('暂无可用文案')
+        ElMessage.warning(t('voice.noScript'))
         return
     }
 
@@ -460,7 +462,7 @@ const handleRecordingSuccess = (data: any) => {
 // 处理录音确认并克隆
 const handleRecordingConfirm = async (data: any) => {
     if (!data || !data.file) {
-        ElMessage.error('录音数据无效')
+        ElMessage.error(t('voice.recordingInvalid'))
         return
     }
 
@@ -474,7 +476,7 @@ const handleRecordingConfirm = async (data: any) => {
 
     // 验证录制时长（至少10秒）
     if (data.duration < 5) {
-        ElMessage.warning('录制时长至少需要10秒，请重新录制')
+        ElMessage.warning(t('voice.recordDurationMin'))
         return
     }
 
@@ -489,7 +491,7 @@ const handleRecordingConfirm = async (data: any) => {
 // 通用的克隆方法（支持文件和录音）
 const handleCloneWithFile = async (file: File) => {
     if (!file) {
-        ElMessage.error('请先选择或录制音频文件')
+        ElMessage.error(t('voice.selectOrRecordAudio'))
         return
     }
 
@@ -497,7 +499,7 @@ const handleCloneWithFile = async (file: File) => {
 
     loadingInstance = ElLoading.service({
         lock: true,
-        text: '克隆中...',
+        text: t('voice.cloning'),
         background: 'rgba(0, 0, 0, 0.7)',
     })
 
@@ -523,7 +525,7 @@ const handleCloneWithFile = async (file: File) => {
                 loadingInstance.close()
                 loadingInstance = null
             }
-            ElMessage.error(res.msg || '克隆失败')
+            ElMessage.error(res.msg || t('voice.cloneFail'))
         }
     } catch (error: any) {
         console.error('克隆失败:', error)
@@ -531,7 +533,7 @@ const handleCloneWithFile = async (file: File) => {
             loadingInstance.close()
             loadingInstance = null
         }
-        ElMessage.error(error?.response?.data?.msg || error?.msg || '克隆失败，请稍后重试')
+        ElMessage.error(error?.response?.data?.msg || error?.msg || t('voice.cloneFailRetry'))
     } finally {
         cloneLoading.value = false
     }

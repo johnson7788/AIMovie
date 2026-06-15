@@ -3,6 +3,9 @@ import { ResponseCode } from '@/common/const';
 import { $http } from '@/common/http';
 import { useUserStore, useRefs } from '@/stores';
 import { usePush } from '@/composables/usePush';
+import { useI18n } from 'vue-i18n';
+
+const { t } = useI18n();
 const userStore = useUserStore();
 const { USERINFO } = useRefs(userStore);
 const props = withDefaults(defineProps<{
@@ -36,7 +39,7 @@ const getCharacterLookList = () => {
 }
 const currentCharacterLook = ref<any>({});
 const handleCharacterLookItemClick = (item: any) => {
-    if (item.status_enum.value !== 'generated') return ElMessage.info('该装扮还未初始化完成');
+    if (item.status_enum.value !== 'generated') return ElMessage.info(t('characterLook.notInitialized'));
     currentCharacterLook.value = item;
 }
 const handleCharacterLookConfirm = () => {
@@ -98,7 +101,7 @@ const handleCharacterLookInitSubmit = () => {
         }
     })
         .catch(() => {
-            ElMessage.error('初始化失败');
+            ElMessage.error(t('characterLook.initFail'));
         })
         .finally(() => {
             initLoading.value = false;
@@ -127,21 +130,21 @@ defineExpose({
         <el-dialog v-model="characterLookDialogVisible" class="generate-scene-dialog" draggable width="min(100%,800px)"
             :close-on-press-escape="false" :close-on-click-modal="false" :before-close="handleBeforeClose">
             <template #header>
-                <span class="font-weight-600">演员装扮</span>
+                <span class="font-weight-600">{{ t('characterLook.title') }}</span>
             </template>
             <div class="flex flex-column grid-gap-4" v-loading="modelLoading">
                 <el-form class="flex flex-center grid-gap-4" @submit.prevent="getCharacterLookList">
                     <el-form-item class="mb-0">
                         <xl-tabs v-model="CharacterLookSearch.type" class="text-info" @change="getCharacterLookList">
-                            <xl-tabs-item value="all">全部</xl-tabs-item>
-                            <xl-tabs-item value="drama">本剧</xl-tabs-item>
-                            <xl-tabs-item value="episode">本集</xl-tabs-item>
-                            <xl-tabs-item value="actor" v-if="CharacterLookSearch.actor_id">演员装扮</xl-tabs-item>
+                            <xl-tabs-item value="all">{{ t('characterLook.all') }}</xl-tabs-item>
+                            <xl-tabs-item value="drama">{{ t('characterLook.thisDrama') }}</xl-tabs-item>
+                            <xl-tabs-item value="episode">{{ t('characterLook.thisEpisode') }}</xl-tabs-item>
+                            <xl-tabs-item value="actor" v-if="CharacterLookSearch.actor_id">{{ t('characterLook.actorLook') }}</xl-tabs-item>
                         </xl-tabs>
                     </el-form-item>
                     <div class="flex-1"></div>
                     <el-form-item class="mb-0">
-                        <el-input v-model="CharacterLookSearch.description" placeholder="搜索装扮" clearable
+                        <el-input v-model="CharacterLookSearch.description" :placeholder="t('characterLook.searchLook')" clearable
                             @change="getCharacterLookList">
                             <template #suffix>
                                 <el-icon>
@@ -161,7 +164,7 @@ defineExpose({
                                     <Plus />
                                 </el-icon>
                             </div>
-                            <span>新增装扮</span>
+                            <span>{{ t('characterLook.addLook') }}</span>
                         </div>
                         <div class="grid-column-1 flex flex-column flex-center grid-gap-2 character-look-item"
                             :class="{ 'character-look-item-active': currentCharacterLook.id === item.id }"
@@ -179,12 +182,12 @@ defineExpose({
                                             <el-icon>
                                                 <Loading class="circular" />
                                             </el-icon>
-                                            <span class="text-info h10">初始化中</span>
+                                            <span class="text-info h10">{{ t('characterLook.initializing') }}</span>
                                         </div>
                                     </template>
                                     <template v-else-if="item.status_enum.value === 'initializing'">
                                         <el-button type="success" size="small" text
-                                            @click.stop="handleCharacterLookInit(item)">立即初始化</el-button>
+                                            @click.stop="handleCharacterLookInit(item)">{{ t('characterLook.initNow') }}</el-button>
                                     </template>
                                 </el-avatar>
                                 <span>{{ item.title }}</span>
@@ -192,21 +195,21 @@ defineExpose({
                         </div>
                     </div>
                 </el-scrollbar>
-                <el-empty v-else description="暂无装扮">
-                    <el-button type="success" bg text @click="xlCharacterLookCreateRef?.open?.();">新增装扮</el-button>
+                <el-empty v-else :description="t('characterLook.noLook')">
+                    <el-button type="success" bg text @click="xlCharacterLookCreateRef?.open?.();">{{ t('characterLook.addLook') }}</el-button>
                 </el-empty>
             </div>
             <template #footer>
-                <el-button bg text @click="characterLookDialogVisible = false" :loading="modelLoading">取消</el-button>
+                <el-button bg text @click="characterLookDialogVisible = false" :loading="modelLoading">{{ t('common.cancel') }}</el-button>
                 <div class="flex-1"></div>
                 <template v-if="CharacterLookSearch.type !== 'actor'">
                     <div class="flex flex-center grid-gap-2 input-button rounded-4 py-2 px-6"
                         ref="actorCostumeButtonRef">
                         <template v-if="!actorCostumeModel.id">
-                            <el-icon alt="角色换装" class="icon-model" color="var(--el-color-success)">
+                            <el-icon :alt="t('characterLook.selectCostumeModel')" class="icon-model" color="var(--el-color-success)">
                                 <IconModelSvg />
                             </el-icon>
-                            <span class="h10">选择角色换装模型</span>
+                            <span class="h10">{{ t('characterLook.selectCostumeModel') }}</span>
                         </template>
                         <template v-else>
                             <el-avatar :src="actorCostumeModel.icon" :alt="actorCostumeModel.name" shape="square"
@@ -217,10 +220,10 @@ defineExpose({
                     <div class="flex flex-center grid-gap-2 input-button rounded-4 py-2 px-6"
                         ref="actorCostumeThreeViewButtonRef">
                         <template v-if="!actorCostumeThreeViewModel.id">
-                            <el-icon alt="角色换装三视图" class="icon-model" color="var(--el-color-success)">
+                            <el-icon :alt="t('characterLook.selectCostumeThreeViewModel')" class="icon-model" color="var(--el-color-success)">
                                 <IconModelSvg />
                             </el-icon>
-                            <span class="h10">选择角色换装三视图模型</span>
+                            <span class="h10">{{ t('characterLook.selectCostumeThreeViewModel') }}</span>
                         </template>
                         <template v-else>
                             <el-avatar :src="actorCostumeThreeViewModel.icon" :alt="actorCostumeThreeViewModel.name"
@@ -230,8 +233,9 @@ defineExpose({
                     </div>
                 <el-button type="success" @click="handleCharacterLookConfirm" :loading="modelLoading"
                     :disabled="!currentCharacterLook.id">
-                    <span>确认选择</span>
+                    <span>{{ t('characterLook.confirmSelect') }}</span>
                 </el-button>
+            </template>
             </template>
         </el-dialog>
         <el-popover ref="actorCostumePopoverRef" :virtual-ref="actorCostumeButtonRef" virtual-triggering
@@ -247,16 +251,16 @@ defineExpose({
             @success="CharacterLookSearch.type = 'all'; getCharacterLookList();" />
         <el-dialog v-model="initModelDialogVisible" class="generate-storyboard-dialog" draggable>
             <template #header>
-                <span class="font-weight-600">初始化装扮</span>
+                <span class="font-weight-600">{{ t('characterLook.initLook') }}</span>
             </template>
             <xl-models v-model="initCurrentCharacterLook.model_id" scene="character_look_costume" no-init />
             <template #footer>
                 <div class="flex flex-center grid-gap-2">
                     <el-button type="info" @click="initModelDialogVisible = false"
-                        :disabled="initLoading">取消</el-button>
+                        :disabled="initLoading">{{ t('common.cancel') }}</el-button>
                     <el-button type="success" icon="Check" @click="handleCharacterLookInitSubmit"
                         :disabled="!initCurrentCharacterLook.model_id || initLoading"
-                        :loading="initLoading">初始化</el-button>
+                        :loading="initLoading">{{ t('characterLook.initLook') }}</el-button>
                 </div>
             </template>
         </el-dialog>

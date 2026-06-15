@@ -1,17 +1,17 @@
 <template>
-    <el-dialog v-model="visible" title="邀请好友" width="586px" align-center append-to-body class="invitation-dialog">
+    <el-dialog v-model="visible" :title="$t('invitation.title')" width="586px" align-center append-to-body class="invitation-dialog">
 
         <div class="invitation-content">
             <!-- 邀请码列表 -->
             <div class="invitation-codes-section" v-if="invitationCodes.length > 0">
-                <div class="h8">您还剩 {{ invitationCodes.filter((item: any) => item.status === 'unused').length }} 个邀请名额，拥有下方邀请码的任何人都可以加入</div>
+                <div class="h8">{{ $t('invitation.desc', { count: invitationCodes.filter((item: any) => item.status === 'unused').length }) }}</div>
                 <div class="codes-grid">
                     <div v-for="(item, index) in invitationCodes" :key="index" class="code-item">
                         <div class="flex  flex-1 grid-gap-3">
                             <div class="code-text">{{ item.code }}</div>
                             <div class="code-status">
-                                <span v-if="item.status === 'used'" class="status-tag status-used">已使用</span>
-                                <span v-else class="status-tag status-pending">待使用</span>
+                                <span v-if="item.status === 'used'" class="status-tag status-used">{{ $t('invitation.used') }}</span>
+                                <span v-else class="status-tag status-pending">{{ $t('invitation.unused') }}</span>
                                 <!-- <div v-else-if="item.status === 'reward'" class="status-reward">
                                     <el-icon class="star-icon">
                                         <StarFilled />
@@ -20,17 +20,17 @@
                                 </div> -->
                             </div>
                         </div>
-                        <span @click="copyCodeItem(item.code)">复制</span>
+                        <span @click="copyCodeItem(item.code)">{{ $t('common.copy') }}</span>
                     </div>
                 </div>
             </div>
             <div v-else class="invitation-codes-section">
-                <div class="h8">您的邀请名额已用完</div>
+                <div class="h8">{{ $t('invitation.noQuota') }}</div>
             </div>
 
             <!-- 邀请记录 -->
             <div class="invitation-records-section">
-                <div class="records-title">邀请好友记录</div>
+                <div class="records-title">{{ $t('invitation.records') }}</div>
                 <div class="records-list" v-if="invitationRecords.length > 0">
                     <div v-for="(record, index) in invitationRecords" :key="index" class="record-item">
                         <div class="record-name">{{ record.useUser.nickname }}</div>
@@ -38,7 +38,7 @@
                     </div>
                 </div>
                 <div v-else class="h9 text-center records-list-empty">
-                    暂未邀请好友，快去复制邀请码邀请好友吧~
+                    {{ $t('invitation.noRecords') }}
                 </div>
             </div>
         </div>
@@ -49,7 +49,9 @@ import { $http } from '@/common/http';
 import { ResponseCode } from '@/common/const';
 import { ElMessage } from 'element-plus';
 import { useRefs, useWebConfigStore } from '@/stores';
+import { useI18n } from 'vue-i18n';
 
+const { t } = useI18n();
 const webConfigStore = useWebConfigStore();
 const { WEBCONFIG } = useRefs(webConfigStore);
 const visible = ref(false);
@@ -83,7 +85,7 @@ const getList = () => {
 // 复制单个邀请码
 const copyCodeItem = async (code: string) => {
     if (!code) {
-        ElMessage.warning('暂无可复制内容')
+        ElMessage.warning(t('common.noContentToCopy'))
         return
     }
     // 获取当前域名并构建完整链接
@@ -95,9 +97,9 @@ const copyCodeItem = async (code: string) => {
         } else {
             fallbackCopy(url)
         }
-        ElMessage.success('复制成功')
+        ElMessage.success(t('common.copySuccess'))
     } catch (err) {
-        ElMessage.error('复制失败')
+        ElMessage.error(t('common.copyFail'))
     }
 }
 

@@ -1,4 +1,6 @@
 <script lang="ts" setup>
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 const props = withDefaults(defineProps<{
     modelValue: string | number
     drama_id: string | number
@@ -12,16 +14,17 @@ const props = withDefaults(defineProps<{
     episode_id: '',
     episodeList: () => [],
     loading: false,
-    loadingText: '加载中...',
+    loadingText: '',
 });
 const emit = defineEmits(['update:modelValue']);
 const episodeList = ref<any[]>(props.episodeList);
+const actualLoadingText = computed(() => props.loadingText || t('common.loading'));
 const handleClick = (item: any) => {
     emit('update:modelValue', item.id);
 }
 </script>
 <template>
-    <el-scrollbar class="p-4" ref="tabsRef" v-loading="!!loading" :element-loading-text="loadingText">
+    <el-scrollbar class="p-4" ref="tabsRef" v-loading="!!loading" :element-loading-text="actualLoadingText">
         <div class="episode-tabs"
             style="--el-anchor-active-color: var(--el-color-success);--el-anchor-marker-bg-color: var(--el-color-success);">
             <span v-for="(item, index) in episodeList" :key="item.id" @click="handleClick(item)"

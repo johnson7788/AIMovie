@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ResponseCode } from '@/common/const';
 import { $http } from '@/common/http';
+import { useI18n } from 'vue-i18n';
 
+const { t } = useI18n();
 const emit = defineEmits(['success']);
 const createSceneAction = ref<'form' | 'scene'>('form');
 const createSceneForm = reactive({
@@ -17,12 +19,12 @@ const createSceneForm = reactive({
     episode_id: '',
 });
 const createSceneFormRules = {
-    title: [{ required: true, message: '请输入场景名称', trigger: 'blur' }],
-    scene_space: [{ required: true, message: '请输入内景OR外景', trigger: 'blur' }],
-    scene_location: [{ required: true, message: '请输入地点', trigger: 'blur' }],
-    scene_time: [{ required: true, message: '请输入大概时间', trigger: 'blur' }],
-    scene_weather: [{ required: true, message: '请输入天气', trigger: 'blur' }],
-    description: [{ required: true, message: '请输入描述', trigger: 'blur' }],
+    title: [{ required: true, message: '', trigger: 'blur' }],
+    scene_space: [{ required: true, message: '', trigger: 'blur' }],
+    scene_location: [{ required: true, message: '', trigger: 'blur' }],
+    scene_time: [{ required: true, message: '', trigger: 'blur' }],
+    scene_weather: [{ required: true, message: '', trigger: 'blur' }],
+    description: [{ required: true, message: '', trigger: 'blur' }],
 };
 const createSceneFormLoading = ref(false);
 const episodes = ref<any[]>([]);
@@ -40,7 +42,7 @@ const getEpisodes = () => {
             ElMessage.error(res.msg);
         }
     }).catch(() => {
-        ElMessage.error('获取分集失败');
+        ElMessage.error(t('scene.getEpisodesFail'));
     })
 }
 const handleSelectScene = (item: any) => {
@@ -58,7 +60,7 @@ const handleSelectScene = (item: any) => {
             ElMessage.error(res.msg);
         }
     }).catch(() => {
-        ElMessage.error('新增场景失败');
+        ElMessage.error(t('scene.addSceneFail'));
     }).finally(() => {
         createSceneFormLoading.value = false;
     });
@@ -90,7 +92,7 @@ const handleCreateScene = () => {
             ElMessage.error(res.msg);
         }
     }).catch(() => {
-        ElMessage.error('新增场景失败');
+        ElMessage.error(t('scene.addSceneFail'));
     }).finally(() => {
         createSceneFormLoading.value = false;
     });
@@ -108,6 +110,13 @@ const openCreateScene = (options: any) => {
     }
     createSceneForm.drama_id = options.drama_id;
     createSceneForm.episode_id = options.episode_id;
+    // Update validation messages with current locale
+    createSceneFormRules.title[0].message = t('scene.inputSceneName');
+    createSceneFormRules.scene_space[0].message = t('scene.inputInteriorExterior');
+    createSceneFormRules.scene_location[0].message = t('scene.inputLocation');
+    createSceneFormRules.scene_time[0].message = t('scene.inputTime');
+    createSceneFormRules.scene_weather[0].message = t('scene.inputWeather');
+    createSceneFormRules.description[0].message = t('scene.inputDesc');
     getEpisodes();
     createSceneDialogVisible.value = true;
 }
@@ -119,40 +128,40 @@ defineExpose({
     <div>
         <el-dialog v-model="createSceneDialogVisible" class="generate-scene-dialog" draggable>
             <template #header>
-                <span class="font-weight-600" v-if="createSceneForm.id">编辑场景</span>
-                <span class="font-weight-600" v-else>新增场景</span>
+                <span class="font-weight-600" v-if="createSceneForm.id">{{ t('scene.editScene') }}</span>
+                <span class="font-weight-600" v-else>{{ t('scene.addScene') }}</span>
             </template>
             <el-segmented v-model="createSceneAction" :disabled="createSceneFormLoading"
-                :options="[{ label: '填写场景信息', value: 'form' }, { label: '从其他分集选取', value: 'scene' }]"
+                :options="[{ label: t('scene.fillSceneInfo'), value: 'form' }, { label: t('scene.selectFromEpisode'), value: 'scene' }]"
                 class="tabs-segmented border" v-if="!createSceneForm.id" />
             <el-form ref="createSceneFormRef" label-position="top" v-if="createSceneAction === 'form'"
                 :disabled="createSceneFormLoading" :model="createSceneForm" :rules="createSceneFormRules">
-                <el-form-item label="场景名称" prop="title">
-                    <el-input v-model="createSceneForm.title" placeholder="请输入场景名称" class="scene-item-input" />
+                <el-form-item :label="t('scene.sceneName')" prop="title">
+                    <el-input v-model="createSceneForm.title" :placeholder="t('scene.sceneNamePlaceholder')" class="scene-item-input" />
                 </el-form-item>
-                <el-form-item label="地点">
+                <el-form-item :label="t('scene.location')">
                     <div class="w-100 grid-columns-2 grid-gap-2">
                         <el-form-item prop="scene_space">
-                            <el-input v-model="createSceneForm.scene_space" placeholder="内景OR外景"
+                            <el-input v-model="createSceneForm.scene_space" :placeholder="t('scene.interiorExterior')"
                                 class="scene-item-input grid-column-1 w-100" />
                         </el-form-item>
                         <el-form-item prop="scene_location">
-                            <el-input v-model="createSceneForm.scene_location" placeholder="地点"
+                            <el-input v-model="createSceneForm.scene_location" :placeholder="t('scene.location')"
                                 class="scene-item-input grid-column-1" />
                         </el-form-item>
                         <el-form-item prop="scene_time">
-                            <el-input v-model="createSceneForm.scene_time" placeholder="大概时间"
+                            <el-input v-model="createSceneForm.scene_time" :placeholder="t('scene.time')"
                                 class="scene-item-input grid-column-1" />
                         </el-form-item>
                         <el-form-item prop="scene_weather">
-                            <el-input v-model="createSceneForm.scene_weather" placeholder="天气"
+                            <el-input v-model="createSceneForm.scene_weather" :placeholder="t('scene.weather')"
                                 class="scene-item-input grid-column-1" />
                         </el-form-item>
                     </div>
                 </el-form-item>
-                <el-form-item label="描述" prop="description">
+                <el-form-item :label="t('scene.desc')" prop="description">
                     <el-input v-model="createSceneForm.description" type="textarea"
-                        :autosize="{ minRows: 1, maxRows: 10 }" placeholder="请输入描述" class="scene-item-textarea" />
+                        :autosize="{ minRows: 1, maxRows: 10 }" :placeholder="t('scene.descPlaceholder')" class="scene-item-textarea" />
                 </el-form-item>
             </el-form>
             <div v-if="createSceneAction === 'scene'" class="flex flex-center grid-gap-4">
@@ -179,9 +188,9 @@ defineExpose({
             </div>
             <template #footer>
                 <div class="flex flex-center grid-gap-2" v-if="createSceneAction === 'form'">
-                    <el-button type="info" @click="cancelCreateScene" :disabled="createSceneFormLoading">取消</el-button>
+                    <el-button type="info" @click="cancelCreateScene" :disabled="createSceneFormLoading">{{ t('common.cancel') }}</el-button>
                     <el-button type="success" @click="handleCreateScene" :disabled="createSceneFormLoading"
-                        :loading="createSceneFormLoading">提交</el-button>
+                        :loading="createSceneFormLoading">{{ t('common.submit') }}</el-button>
                 </div>
             </template>
         </el-dialog>

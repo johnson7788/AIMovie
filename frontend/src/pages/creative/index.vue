@@ -4,7 +4,10 @@ import { $http } from '@/common/http'
 import { useRefs, useUserStore, useModelStore } from '@/stores'
 import { usePush } from '@/composables/usePush'
 import { ElMessage } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 import UploadSvg from '@/svg/icon/upload.vue'
+
+const { t } = useI18n()
 
 const userStore = useUserStore()
 const modelStore = useModelStore()
@@ -31,12 +34,12 @@ const handleUploadSuccess = (response: any) => {
     if (response.code === ResponseCode.SUCCESS) {
         imageUrl.value = response.data.url
     } else {
-        ElMessage.error(response.msg || '上传失败')
+        ElMessage.error(response.msg || t('creative.uploadFail'))
     }
 }
 const handleUploadError = () => {
     uploading.value = false
-    ElMessage.error('上传失败')
+    ElMessage.error(t('creative.uploadFail'))
 }
 const beforeUpload = () => {
     uploading.value = true
@@ -54,11 +57,11 @@ const handleModelSelect = (model: any) => {
 // 生成视频
 const generate = async () => {
     if (!imageUrl.value) {
-        ElMessage.warning('请上传参考图片')
+        ElMessage.warning(t('creative.needImage'))
         return
     }
     if (!videoModelId.value) {
-        ElMessage.warning('请选择模型')
+        ElMessage.warning(t('creative.needModel'))
         return
     }
     generating.value = true
@@ -71,13 +74,13 @@ const generate = async () => {
             model_id: videoModelId.value,
         })
         if (res.code === ResponseCode.SUCCESS) {
-            ElMessage.success('视频生成中，请稍候...')
+            ElMessage.success(t('creative.genWait'))
             fetchTaskList()
         } else {
-            ElMessage.error(res.msg || '生成失败')
+            ElMessage.error(res.msg || t('common.generateFail'))
         }
     } catch (e: any) {
-        ElMessage.error(e.message || '生成失败')
+        ElMessage.error(e.message || t('common.generateFail'))
     } finally {
         generating.value = false
     }
@@ -104,15 +107,16 @@ const fetchTaskList = async () => {
 // 获取任务状态文本和类型
 const getStatusInfo = (status: string) => {
     const map: Record<string, { label: string; type: string }> = {
-        wait: { label: '待处理', type: 'info' },
-        processing: { label: '生成中', type: 'primary' },
-        wait_download: { label: '等待下载', type: 'primary' },
-        downloading: { label: '下载中', type: 'primary' },
-        uploading: { label: '上传中', type: 'primary' },
-        success: { label: '已完成', type: 'success' },
-        fail: { label: '失败', type: 'danger' },
+        wait: { label: 'creative.pending', type: 'info' },
+        processing: { label: 'creative.processing', type: 'primary' },
+        wait_download: { label: 'creative.waitDownload', type: 'primary' },
+        downloading: { label: 'creative.downloading', type: 'primary' },
+        uploading: { label: 'creative.uploading', type: 'primary' },
+        success: { label: 'creative.completed', type: 'success' },
+        fail: { label: 'creative.failed', type: 'danger' },
     }
-    return map[status] || { label: status, type: 'info' }
+    const info = map[status]
+    return info ? { label: t(info.label), type: info.type } : { label: status, type: 'info' }
 }
 
 // 获取视频地址
@@ -157,20 +161,20 @@ onUnmounted(() => {
 <template>
     <div class="creative-page">
         <div class="creative-page-header">
-            <h1>创意圈</h1>
+            <h1>{{ $t('creative.title') }}</h1>
         </div>
         <div class="creative-page-content">
             <!-- 左栏：输入面板 -->
             <div class="creative-input-panel">
                 <!-- 图片上传 -->
                 <div class="creative-section">
-                    <div class="creative-section-title">参考图片</div>
+                    <div class="creative-section-title">{{ $t('creative.refImage') }}</div>
                     <div class="creative-upload-area">
                         <el-upload
                             v-if="!imageUrl"
                             class="creative-upload"
                             drag
-                            :data="{ dir_name: 'creative/image', dir_title: '创意参考图' }"
+                            :data="{ dir_name: 'creative/image', dir_title: $t('creative.creativeRef') }"
                             :action="$http.getCompleteUrl('app/shortplay/api/Uploads/upload')"
                             :headers="$http.getHeaders()"
                             accept="image/jpeg,image/png,image/webp"
@@ -182,7 +186,7 @@ onUnmounted(() => {
                         >
                             <div class="creative-upload-inner" v-loading="uploading">
                                 <el-icon size="40" color="var(--el-color-primary)"><UploadSvg /></el-icon>
-                                <p>拖拽或点击上传图片</p>
+                                <p>{{ $t('creative.dragOrClick') }}</p>
                             </div>
                         </el-upload>
                         <div v-else class="creative-image-preview">
@@ -198,28 +202,28 @@ onUnmounted(() => {
 
                 <!-- 提示词 -->
                 <div class="creative-section">
-                    <div class="creative-section-title">提示词</div>
+                    <div class="creative-section-title">{{ $t('creative.prompt') }}</div>
                     <el-input
                         v-model="prompt"
                         type="textarea"
                         :rows="4"
-                        placeholder="描述你想要的视频效果，例如：无人机以极快速度穿越复杂障碍或自然奇观，带来沉浸式飞行体验"
+                        :placeholder="$t('creative.promptPlaceholder')"
                     />
                 </div>
 
                 <!-- 参数设置 -->
                 <div class="creative-section">
-                    <div class="creative-section-title">参数设置</div>
+                    <div class="creative-section-title">{{ $t('creative.params') }}</div>
                     <div class="creative-params">
                         <div class="creative-param-item">
-                            <span class="creative-param-label">时长</span>
+                            <span class="creative-param-label">{{ $t('creative.duration') }}</span>
                             <el-radio-group v-model="duration" size="small">
-                                <el-radio-button :value="5">5秒</el-radio-button>
-                                <el-radio-button :value="10">10秒</el-radio-button>
+                                <el-radio-button :value="5">{{ $t('creative.second5') }}</el-radio-button>
+                                <el-radio-button :value="10">{{ $t('creative.second10') }}</el-radio-button>
                             </el-radio-group>
                         </div>
                         <div class="creative-param-item">
-                            <span class="creative-param-label">分辨率</span>
+                            <span class="creative-param-label">{{ $t('creative.resolution') }}</span>
                             <el-radio-group v-model="resolution" size="small">
                                 <el-radio-button value="1080p">1080p</el-radio-button>
                                 <el-radio-button value="720p">720p</el-radio-button>
@@ -230,12 +234,12 @@ onUnmounted(() => {
 
                 <!-- 模型选择 -->
                 <div class="creative-section">
-                    <div class="creative-section-title">选择模型</div>
+                    <div class="creative-section-title">{{ $t('common.selectModel') }}</div>
                     <xl-models
                         v-model="videoModelId"
                         @select="handleModelSelect"
                         scene="creative_video"
-                        title="视频生成模型"
+                        :title="$t('creative.videoModel')"
                     />
                 </div>
 
@@ -249,14 +253,14 @@ onUnmounted(() => {
                         @click="generate"
                         class="creative-generate-btn"
                     >
-                        {{ generating ? '生成中...' : '生成视频' }}
+                        {{ generating ? $t('creative.generating') : $t('creative.generateVideo') }}
                     </el-button>
                 </div>
             </div>
 
             <!-- 右栏：结果面板 -->
             <div class="creative-result-panel">
-                <div class="creative-section-title">生成记录</div>
+                <div class="creative-section-title">{{ $t('creative.history') }}</div>
                 <div class="creative-task-list" v-if="taskList.length > 0">
                     <div
                         v-for="task in taskList"
@@ -273,7 +277,7 @@ onUnmounted(() => {
                             <!-- 生成中 -->
                             <div v-if="['processing', 'wait', 'wait_download', 'downloading', 'uploading'].includes(task.status)" class="creative-task-progress">
                                 <el-icon class="is-loading"><Loading /></el-icon>
-                                <span>视频生成中，请耐心等待...</span>
+                                <span>{{ $t('creative.waitGen') }}</span>
                             </div>
                             <!-- 成功 - 播放视频 -->
                             <div v-else-if="task.status === 'success' && getVideoUrl(task)" class="creative-task-video">
@@ -286,13 +290,13 @@ onUnmounted(() => {
                             </div>
                             <!-- 失败 -->
                             <div v-else-if="task.status === 'fail'" class="creative-task-fail">
-                                <span>{{ task.result?.message || '生成失败' }}</span>
+                                <span>{{ task.result?.message || $t('common.generateFail') }}</span>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div v-else class="creative-empty">
-                    <el-empty description="暂无生成记录，上传图片开始创作" />
+                    <el-empty :description="$t('creative.noHistory')" />
                 </div>
             </div>
         </div>

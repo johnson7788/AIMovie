@@ -3,6 +3,8 @@ import { ResponseCode } from '@/common/const';
 import { truncate } from '@/common/functions';
 import { $http } from '@/common/http';
 import { useRefs, useWebConfigStore } from '@/stores';
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 const props = withDefaults(defineProps<{
     modelValue: string | number
 }>(), {
@@ -41,14 +43,14 @@ onMounted(() => {
         <el-form class="flex flex-center grid-gap-4" @submit.prevent="getStyleList">
             <el-form-item class="mb-0">
                 <xl-tabs v-model="StyleSearch.classify" class="text-info" @change="getStyleList">
-                    <xl-tabs-item value="all">全部</xl-tabs-item>
+                    <xl-tabs-item value="all">{{ $t('common.all') }}</xl-tabs-item>
                     <xl-tabs-item v-for="value in WEBCONFIG?.enum?.style_classify" :key="value.value"
                         :value="value.value">{{ value.label }}</xl-tabs-item>
                 </xl-tabs>
             </el-form-item>
             <div class="flex-1"></div>
             <el-form-item class="mb-0">
-                <el-input v-model="StyleSearch.name" placeholder="搜索风格" clearable @change="getStyleList">
+                <el-input v-model="StyleSearch.name" :placeholder="t('style.search')" clearable @change="getStyleList">
                     <template #suffix>
                         <el-icon>
                             <Search />

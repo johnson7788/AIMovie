@@ -2,6 +2,8 @@
 import { ResponseCode } from '@/common/const';
 import { $http } from '@/common/http';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 const props = withDefaults(defineProps<{
     modelValue: string | number
     storyboard: any[]
@@ -88,7 +90,7 @@ const handleChangeStoryboard = (row: any, newSort?: number) => {
                 storyboardList.value = originalList;
             }
         }).catch(() => {
-            ElMessage.error('更新分镜失败');
+            ElMessage.error(t('storyboard.updateFail'));
             storyboardList.value = originalList;
         }).finally(() => {
             handleChangeStoryboardLoading.value = false;
@@ -159,14 +161,14 @@ const handleCopyStoryboard = (row: any) => {
                     return item;
                 });
 
-                ElMessage.success('复制成功');
+                ElMessage.success(t('common.copySuccess'));
             } else {
                 ElMessage.error(res.msg);
                 storyboardList.value = backup; // 回滚
             }
         })
         .catch(() => {
-            ElMessage.error('复制失败');
+            ElMessage.error(t('storyboard.copyFail'));
             storyboardList.value = backup; // 回滚
         })
         .finally(() => {
@@ -212,7 +214,7 @@ const handleDeleteStoryboard = (row: any) => {
     })
         .then((res: any) => {
             if (res.code === ResponseCode.SUCCESS) {
-                ElMessage.success('删除成功');
+                ElMessage.success(t('common.deleteSuccess'));
             } else {
                 ElMessage.error(res.msg);
 
@@ -221,7 +223,7 @@ const handleDeleteStoryboard = (row: any) => {
             }
         })
         .catch(() => {
-            ElMessage.error('删除失败');
+            ElMessage.error(t('common.deleteFail'));
 
             // ❗请求失败 → 回滚
             storyboardList.value = backup;
@@ -269,7 +271,7 @@ const handleInsertEmptyStoryboard = (afterItem?: any) => {
             ElMessage.error(res.msg)
         }
     }).catch(() => {
-        ElMessage.error('插入失败')
+        ElMessage.error(t('storyboard.insertFail'))
     })
 }
 const handleMouseEnterStoryboard = (item: any) => {
@@ -301,7 +303,7 @@ const handleSave = (item: any) => {
             ElMessage.error(res.msg)
         }
     }).catch(() => {
-        ElMessage.error('保存失败')
+        ElMessage.error(t('common.saveFail'))
     }).finally(() => {
         item.saveLoading = false
     })
@@ -332,16 +334,16 @@ const handleGenerateStoryboard = () => {
         }
     }).catch(() => {
         initLoading.value = false;
-        ElMessage.error('绘制分镜失败');
+        ElMessage.error(t('storyboard.drawFail'));
     }).finally(() => {
         initLoading.value = false;
     });
 }
 const handleDeleteDialogue = (index: number, dialogueIndex: number) => {
     const dialogue = storyboardList.value[index].dialogues[dialogueIndex];
-    ElMessageBox.confirm('确定删除该对话吗？', '提示', {
-        title: '提示',
-        message: '确定删除该对话吗？',
+    ElMessageBox.confirm(t('storyboard.deleteDialogueConfirm'), t('common.tips'), {
+        title: t('common.tips'),
+        message: t('storyboard.deleteDialogueConfirm'),
         beforeClose: (action: any, instance: any, done: () => void) => {
             if (action === 'confirm') {
                 instance.confirmButtonLoading = true;
@@ -352,14 +354,14 @@ const handleDeleteDialogue = (index: number, dialogueIndex: number) => {
                     dialogue_id: dialogue.id,
                 }).then((res: any) => {
                     if (res.code === ResponseCode.SUCCESS) {
-                        ElMessage.success('删除成功');
+                        ElMessage.success(t('common.deleteSuccess'));
                         storyboardList.value[index].dialogues.splice(dialogueIndex, 1)
                         done();
                     } else {
                         ElMessage.error(res.msg);
                     }
                 }).catch(() => {
-                    ElMessage.error('删除失败');
+                    ElMessage.error(t('common.deleteFail'));
                 }).finally(() => {
                     instance.confirmButtonLoading = false;
                     instance.cancelButtonLoading = false;
@@ -396,10 +398,10 @@ defineExpose({
     <el-scrollbar class="storyboard-scrollbar p-4" ref="storyboardScrollbarRef"
         v-loading="handleCopyStoryboardLoading || handleDeleteStoryboardLoading">
         <div class="storyboard-list pb-10">
-            <el-empty v-if="storyboardList.length === 0" description="暂无分镜">
+            <el-empty v-if="storyboardList.length === 0" :description="t('storyboard.noStoryboard')">
                 <!-- <el-button type="success" @click="generateStoryboardDialogVisible = true">AI绘制</el-button> -->
                 <el-button type="success" icon="Plus" bg text @click="handleInsertEmptyStoryboard()"
-                    v-if="props.scene.length">新增</el-button>
+                    v-if="props.scene.length">{{ t('storyboard.add') }}</el-button>
             </el-empty>
             <div class="p-6 bg-gray rounded-4 flex flex-column grid-gap-4 storyboard-item"
                 :class="{ 'storyboard-item-current': item.id === currentStoryboardId }"
@@ -410,7 +412,7 @@ defineExpose({
                         :disabled="handleChangeStoryboardLoading" style="width: 120px;font-weight: 600;" size="large"
                         @change="($event: any) => handleChangeStoryboard(item, $event)">
                         <template #prefix>
-                            <span class="text-dark h10">分镜</span>
+                            <span class="text-dark h10">{{ t('storyboard.title') }}</span>
                         </template>
                     </el-input-number>
                     <div class="flex-1"></div>
@@ -419,30 +421,30 @@ defineExpose({
                         <el-icon size="16" class="text-info">
                             <ChatDotRound />
                         </el-icon>
-                        <span>新增对话</span>
+                        <span>{{ t('storyboard.addDialogue') }}</span>
                     </div>
                     <div class="flex flex-center grid-gap-2 storyboard-item-copy"
                         @click="handleMouseEnterStoryboard(item)">
                         <el-icon size="16">
                             <Edit />
                         </el-icon>
-                        <span>编辑</span>
+                        <span>{{ t('common.edit') }}</span>
                     </div>
                     <div class="flex flex-center grid-gap-2 storyboard-item-copy"
                         @click.stop="handleCopyStoryboard(item)">
                         <el-icon size="16">
                             <CopyDocument />
                         </el-icon>
-                        <span>复制</span>
+                        <span>{{ t('common.copy') }}</span>
                     </div>
-                    <el-popconfirm icon="Delete" title="确定删除该分镜吗？" placement="bottom-end" confirm-button-type="danger"
+                    <el-popconfirm icon="Delete" :title="t('storyboard.deleteConfirm')" placement="bottom-end" confirm-button-type="danger"
                         width="fit-content" @confirm="handleDeleteStoryboard(item)">
                         <template #reference>
                             <div class="flex flex-center grid-gap-2 storyboard-item-delete">
                                 <el-icon size="16">
                                     <Delete />
                                 </el-icon>
-                                <span>删除</span>
+                                <span>{{ t('common.delete') }}</span>
                             </div>
                         </template>
                     </el-popconfirm>
@@ -451,7 +453,7 @@ defineExpose({
                     @click="handleInsertEmptyStoryboard(item)"></el-button>
                 <div class=" flex flex-column grid-gap-4" v-if="item.component === 'view'">
                     <div class="flex flex-center">
-                        <span class="storyboard-item-label">场景：</span>
+                        <span class="storyboard-item-label">{{ t('storyboard.scene') }}</span>
                         <div class="flex-1">
                             <span class="text-regular" v-if="item.sceneFind">
                                 {{ item.sceneFind.title }}·{{ item.sceneFind.scene_location }}
@@ -459,7 +461,7 @@ defineExpose({
                         </div>
                     </div>
                     <div class="flex flex-center">
-                        <span class="storyboard-item-label">镜头设计：</span>
+                        <span class="storyboard-item-label">{{ t('storyboard.cameraDesign') }}</span>
                         <div class="flex-1 flex grid-gap-2">
                             <span class="el-tag el-tag--info text-wrap" v-if="item.shot_type">{{ item.shot_type
                             }}</span>
@@ -470,7 +472,7 @@ defineExpose({
                         </div>
                     </div>
                     <div class="flex flex-center">
-                        <span class="storyboard-item-label">出镜演员：</span>
+                        <span class="storyboard-item-label">{{ t('storyboard.castActors') }}</span>
                         <div class="flex-1 flex grid-gap-2">
                             <span class="el-tag el-tag--info text-wrap" v-for="actor in item.actors" :key="actor.id">
                                 {{ actor.actor.name }}
@@ -478,53 +480,53 @@ defineExpose({
                         </div>
                     </div>
                     <div class="flex flex-center">
-                        <span class="storyboard-item-label">时长：</span>
+                        <span class="storyboard-item-label">{{ t('storyboard.duration') }}</span>
                         <div class="flex-1">
-                            <span class="text-info">{{ item.duration / 1000 }}秒</span>
+                            <span class="text-info">{{ item.duration / 1000 }}{{ t('storyboard.second') }}</span>
                         </div>
                     </div>
                     <div class="flex flex-center">
-                        <span class="storyboard-item-label">画面描述：</span>
+                        <span class="storyboard-item-label">{{ t('storyboard.imageDesc') }}</span>
                         <div class="flex-1">
                             <span class="text-info">{{ item.description }}</span>
                         </div>
                     </div>
                     <div class="flex flex-center">
-                        <span class="storyboard-item-label">首帧图提示词：</span>
+                        <span class="storyboard-item-label">{{ t('storyboard.firstFramePrompt') }}</span>
                         <div class="flex-1">
                             <span class="text-info">{{ item.image_prompt }}</span>
                         </div>
                     </div>
                     <div class="flex flex-center">
-                        <span class="storyboard-item-label">视频提示词：</span>
+                        <span class="storyboard-item-label">{{ t('storyboard.videoPrompt') }}</span>
                         <div class="flex-1">
                             <span class="text-info">{{ item.video_prompt }}</span>
                         </div>
                     </div>
                     <div class="flex flex-center">
-                        <span class="storyboard-item-label">音效：</span>
+                        <span class="storyboard-item-label">{{ t('storyboard.soundEffect') }}</span>
                         <div class="flex-1">
                             <span class="text-info">{{ item.sfx }}</span>
                         </div>
                     </div>
                     <div class="flex flex-center">
-                        <span class="storyboard-item-label">旁白内容：</span>
+                        <span class="storyboard-item-label">{{ t('storyboard.narration') }}</span>
                         <div class="flex-1">
                             <span class="text-info">{{ item.narration }}</span>
                         </div>
                     </div>
                     <div class="flex">
-                        <span class="storyboard-item-label pt-5">对话内容：</span>
+                        <span class="storyboard-item-label pt-5">{{ t('storyboard.dialogue') }}</span>
                         <div class="flex-1 flex flex-column grid-gap-2 flex-y-flex-start"
                             v-if="item.dialogues?.length > 0">
                             <div class="flex grid-gap-2 el-tag el-tag--success flex-column "
                                 v-for="(dialogue, dialogueIndex) in item.dialogues" :key="dialogue.id">
-                                <span class="text-wrap pointer" @click="handleEditDialogue(item,dialogue)"> {{ dialogue.actor.name }}{{ dialogue.inner_monologue?'(内心OS)':'' }}:{{ dialogue.content }} </span>
+                                <span class="text-wrap pointer" @click="handleEditDialogue(item,dialogue)"> {{ dialogue.actor.name }}{{ dialogue.inner_monologue?t('storyboard.innerOS'):'' }}:{{ dialogue.content }} </span>
                                 <div class="h10 text-info flex grid-gap-4">
-                                    <span>语速：{{ dialogue.prosody_speed }}x</span>
-                                    <span>音量：{{ dialogue.prosody_volume }}</span>
-                                    <span>情感：{{ dialogue.emotion }}</span>
-                                    <span>字幕时长：{{ dialogue.start_time / 1000 }} ~ {{ dialogue.end_time / 1000 }}秒</span>
+                                    <span>{{ t('storyboard.speed') }}{{ dialogue.prosody_speed }}x</span>
+                                    <span>{{ t('storyboard.volume') }}{{ dialogue.prosody_volume }}</span>
+                                    <span>{{ t('storyboard.emotion') }}{{ dialogue.emotion }}</span>
+                                    <span>{{ t('storyboard.subtitleDuration') }}{{ dialogue.start_time / 1000 }} ~ {{ dialogue.end_time / 1000 }}{{ t('storyboard.second') }}</span>
                                 </div>
                                 <el-icon class="dialogue-delete-icon"
                                     @click.stop="handleDeleteDialogue(index, dialogueIndex as number)">
@@ -538,11 +540,11 @@ defineExpose({
                 <el-form v-else-if="item.component === 'form'" class=" flex flex-column grid-gap-4" size="large"
                     :disabled="item.saveLoading">
                     <div class="flex flex-center">
-                        <span class="storyboard-item-label">场景：</span>
+                        <span class="storyboard-item-label">{{ t('storyboard.scene') }}</span>
                         <div class="flex-1">
                             <el-select v-model="item.scene_id" :teleported="false"
                                 style=" --el-select-bg-color: var(--el-bg-color); --el-select-input-focus-border-color: var(--el-color-success);"
-                                placeholder="选择场景" @change="item.editMode = true">
+                                :placeholder="t('storyboard.selectScene')" @change="item.editMode = true">
                                 <el-option v-for="scene in props.scene" :key="scene.id"
                                     :label="scene.title + '·' + scene.scene_location" :value="scene.id">
                                     {{ scene.title }}·{{ scene.scene_location }}
@@ -551,41 +553,41 @@ defineExpose({
                         </div>
                     </div>
                     <div class="flex flex-center">
-                        <span class="storyboard-item-label">镜头设计：</span>
+                        <span class="storyboard-item-label">{{ t('storyboard.cameraDesign') }}</span>
                         <div class="flex-1 flex grid-gap-2 flex-x-flex-start">
                             <el-select class="storyboard-item-select" v-model="item.shot_type" filterable allow-create
-                                :teleported="false" placeholder="镜头类型" @change="item.editMode = true">
-                                <el-option label="远景镜头" value="远景镜头" />
-                                <el-option label="中景镜头" value="中景镜头" />
-                                <el-option label="近景镜头" value="近景镜头" />
-                                <el-option label="特写镜头" value="特写镜头" />
+                                :teleported="false" :placeholder="t('storyboard.cameraType')" @change="item.editMode = true">
+                                <el-option :label="t('storyboard.longShot')" value="远景镜头" />
+                                <el-option :label="t('storyboard.mediumShot')" value="中景镜头" />
+                                <el-option :label="t('storyboard.closeUp')" value="近景镜头" />
+                                <el-option :label="t('storyboard.extremeCloseUp')" value="特写镜头" />
                             </el-select>
                             <el-select class="storyboard-item-select" v-model="item.shot_angle" filterable allow-create
-                                :teleported="false" placeholder="镜头视角" @change="item.editMode = true">
-                                <el-option label="正面镜头" value="正面镜头" />
-                                <el-option label="侧面镜头" value="侧面镜头" />
-                                <el-option label="背面镜头" value="背面镜头" />
-                                <el-option label="斜侧面镜头" value="斜侧面镜头" />
-                                <el-option label="斜背面镜头" value="斜背面镜头" />
-                                <el-option label="斜正面镜头" value="斜正面镜头" />
-                                <el-option label="斜侧面背面镜头" value="斜侧面背面镜头" />
-                                <el-option label="斜侧面正面镜头" value="斜侧面正面镜头" />
-                                <el-option label="斜背面正面镜头" value="斜背面正面镜头" />
+                                :teleported="false" :placeholder="t('storyboard.cameraAngle')" @change="item.editMode = true">
+                                <el-option :label="t('storyboard.frontAngle')" value="正面镜头" />
+                                <el-option :label="t('storyboard.sideAngle')" value="侧面镜头" />
+                                <el-option :label="t('storyboard.backAngle')" value="背面镜头" />
+                                <el-option :label="t('storyboard.obliqueAngle')" value="斜侧面镜头" />
+                                <el-option :label="t('storyboard.obliqueBackAngle')" value="斜背面镜头" />
+                                <el-option :label="t('storyboard.obliqueFrontAngle')" value="斜正面镜头" />
+                                <el-option :label="t('storyboard.obliqueSideBackAngle')" value="斜侧面背面镜头" />
+                                <el-option :label="t('storyboard.obliqueSideFrontAngle')" value="斜侧面正面镜头" />
+                                <el-option :label="t('storyboard.obliqueBackFrontAngle')" value="斜背面正面镜头" />
                             </el-select>
                             <el-select class="storyboard-item-select" v-model="item.shot_motion" filterable allow-create
-                                :teleported="false" placeholder="镜头运动" @change="item.editMode = true">
-                                <el-option label="固定镜头" value="固定镜头" />
-                                <el-option label="平稳推进" value="平稳推进" />
-                                <el-option label="缓慢推进" value="缓慢推进" />
-                                <el-option label="快速推进" value="快速推进" />
-                                <el-option label="极速推进" value="极速推进" />
-                                <el-option label="缓慢后退" value="缓慢后退" />
-                                <el-option label="快速后退" value="快速后退" />
+                                :teleported="false" :placeholder="t('storyboard.cameraMove')" @change="item.editMode = true">
+                                <el-option :label="t('storyboard.fixedCamera')" value="固定镜头" />
+                                <el-option :label="t('storyboard.smoothPush')" value="平稳推进" />
+                                <el-option :label="t('storyboard.slowPush')" value="缓慢推进" />
+                                <el-option :label="t('storyboard.fastPush')" value="快速推进" />
+                                <el-option :label="t('storyboard.extremePush')" value="极速推进" />
+                                <el-option :label="t('storyboard.slowPull')" value="缓慢后退" />
+                                <el-option :label="t('storyboard.fastPull')" value="快速后退" />
                             </el-select>
                         </div>
                     </div>
                     <div class="flex flex-center">
-                        <span class="storyboard-item-label">出镜演员：</span>
+                        <span class="storyboard-item-label">{{ t('storyboard.castActors') }}</span>
                         <div class="flex-1 flex grid-gap-2">
                             <span class="el-tag el-tag--info text-wrap" v-for="actor in item.actors" :key="actor.id"
                                 closable>
@@ -597,56 +599,56 @@ defineExpose({
                         </div>
                     </div>
                     <div class="flex grid-gap-2">
-                        <span class="storyboard-item-label pt-3">画面描述：</span>
+                        <span class="storyboard-item-label pt-3">{{ t('storyboard.imageDesc') }}</span>
                         <el-input v-model="item.description" type="textarea" :autosize="{ minRows: 1, maxRows: 10 }"
-                            placeholder="请输入画面描述" class="storyboard-item-textarea" @input="item.editMode = true" />
+                            :placeholder="t('storyboard.imageDescPlaceholder')" class="storyboard-item-textarea" @input="item.editMode = true" />
                     </div>
                     <div class="flex grid-gap-2">
-                        <span class="storyboard-item-label pt-3">首帧图提示词：</span>
+                        <span class="storyboard-item-label pt-3">{{ t('storyboard.firstFramePrompt') }}</span>
                         <el-input v-model="item.image_prompt" type="textarea" :autosize="{ minRows: 1, maxRows: 10 }"
-                            placeholder="请输入首帧图提示词" class="storyboard-item-textarea" @input="item.editMode = true" />
+                            :placeholder="t('storyboard.firstFramePlaceholder')" class="storyboard-item-textarea" @input="item.editMode = true" />
                     </div>
                     <div class="flex grid-gap-2">
-                        <span class="storyboard-item-label pt-3">视频提示词：</span>
+                        <span class="storyboard-item-label pt-3">{{ t('storyboard.videoPrompt') }}</span>
                         <el-input v-model="item.video_prompt" type="textarea" :autosize="{ minRows: 1, maxRows: 10 }"
-                            placeholder="请输入视频提示词" class="storyboard-item-textarea" @input="item.editMode = true" />
+                            :placeholder="t('storyboard.videoPromptPlaceholder')" class="storyboard-item-textarea" @input="item.editMode = true" />
                     </div>
                     <div class="flex grid-gap-2">
-                        <span class="storyboard-item-label pt-3">音效：</span>
+                        <span class="storyboard-item-label pt-3">{{ t('storyboard.soundEffect') }}</span>
                         <el-input v-model="item.sfx" type="textarea" :autosize="{ minRows: 1, maxRows: 10 }"
-                            placeholder="请输入音效" class="storyboard-item-textarea" @input="item.editMode = true" />
+                            :placeholder="t('storyboard.soundEffectPlaceholder')" class="storyboard-item-textarea" @input="item.editMode = true" />
                     </div>
                     <div class="flex grid-gap-2">
-                        <span class="storyboard-item-label pt-3">旁白内容：</span>
+                        <span class="storyboard-item-label pt-3">{{ t('storyboard.narration') }}</span>
                         <el-input v-model="item.narration" type="textarea" :autosize="{ minRows: 1, maxRows: 10 }"
-                            placeholder="请输入旁白内容" class="storyboard-item-textarea" @input="item.editMode = true" />
+                            :placeholder="t('storyboard.narrationPlaceholder')" class="storyboard-item-textarea" @input="item.editMode = true" />
                     </div>
                     <div class="flex flex-x-flex-end">
-                        <el-button type="info" @click.stop="handleCancel(item)">取消</el-button>
+                        <el-button type="info" @click.stop="handleCancel(item)">{{ t('common.cancel') }}</el-button>
                         <el-button type="success" icon="Check" @click.stop="handleSave(item)" :disabled="!item.editMode"
-                            :loading="item.saveLoading">保存</el-button>
+                            :loading="item.saveLoading">{{ t('common.save') }}</el-button>
                     </div>
                 </el-form>
             </div>
         </div>
         <div class="loading-mask" v-if="episodeInfo.init_storyboard_state" v-loading="episodeInfo.init_storyboard_state"
-            element-loading-text="绘制分镜中..."></div>
+            :element-loading-text="t('storyboard.drawing')"></div>
         <el-popover :virtual-ref="actorButtonRef" virtual-triggering placement="bottom-start" width="min(100vw,880px)"
             trigger="click">
             <xl-actor />
         </el-popover>
         <el-dialog v-model="generateStoryboardDialogVisible" class="generate-storyboard-dialog" draggable>
             <template #header>
-                <span class="font-weight-600">AI绘制分镜</span>
+                <span class="font-weight-600">{{ t('storyboard.aiDraw') }}</span>
             </template>
-            <el-alert title="当前分集尚未创建分镜，是否使用AI绘制？" type="warning" :closable="false" />
+            <el-alert :title="t('storyboard.aiDrawConfirm')" type="warning" :closable="false" />
             <xl-models v-model="initForm.model_id" scene="creative_storyboards" no-init />
             <template #footer>
                 <div class="flex flex-center grid-gap-2">
                     <el-button type="info" @click="handleGenerateStoryboardCancel"
-                        :disabled="initLoading">取消</el-button>
+                        :disabled="initLoading">{{ t('common.cancel') }}</el-button>
                     <el-button type="success" icon="Check" @click="handleGenerateStoryboard"
-                        :disabled="!initForm.model_id || initLoading" :loading="initLoading">绘制</el-button>
+                        :disabled="!initForm.model_id || initLoading" :loading="initLoading">{{ t('storyboard.aiDraw') }}</el-button>
                 </div>
             </template>
         </el-dialog>

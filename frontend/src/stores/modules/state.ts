@@ -1,10 +1,11 @@
 import { useStorage } from '@/composables/useStorage';
+import { i18n } from '@/locale';
 type StateValueType<T extends keyof StateInterface> = StateInterface[T];
 export default () => {
     const storage = useStorage();
     const LANGUARE: LanguageListInterface[] = [
         {
-            label: '简体中文',
+            label: i18n.global.t('language.zhCN'),
             value: 'zh-CN'
         },
         {

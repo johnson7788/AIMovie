@@ -11,8 +11,8 @@
                 </div>
             </div>
             <div class="flex flex-y-center grid-gap-10">
-                <div class="btn flex-shrink-0" @click="xlUserinfoRef.open">编辑主页</div>
-                <div class="btn flex-shrink-0" @click="xlInvitationCodeRef.open">邀请好友
+                <div class="btn flex-shrink-0" @click="xlUserinfoRef.open">{{ t('user.editHome') }}</div>
+                <div class="btn flex-shrink-0" @click="xlInvitationCodeRef.open">{{ t('user.inviteFriends') }}
                 </div>
             </div>
         </div>
@@ -21,8 +21,8 @@
         </div>
         <div class="py-10" v-if="activeName === 'works'">
             <xl-tabs v-model="tabsActiveName" class="text-info" color="var(--el-color-white)">
-                <xl-tabs-item value="works">创作作品</xl-tabs-item>
-                <xl-tabs-item value="publish">发布作品</xl-tabs-item>
+                <xl-tabs-item value="works">{{ t('user.createWorks') }}</xl-tabs-item>
+                <xl-tabs-item value="publish">{{ t('user.publishWorks') }}</xl-tabs-item>
             </xl-tabs>
         </div>
         <Works v-if="activeName === 'works'" />
@@ -38,20 +38,22 @@ import Actors from './modules/actors.vue';
 import Voice from './modules/voice.vue';
 import { truncate } from '@/common/functions';
 import { useRefs, useUserStore } from '@/stores';
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import XlInvitationCode from '@/components/xl-invitation-code/index.vue';
+const { t } = useI18n()
 const tabsActiveName = ref('works')
 const activeName = ref('works')
-const options = [{
-    label: '我的作品',
+const options = computed(() => [{
+    label: t('user.myWorks'),
     value: 'works',
 }, {
-    label: '我的演员',
+    label: t('user.myActors'),
     value: 'actor'
 }, {
-    label: '我的音色',
+    label: t('user.myVoices'),
     value: 'voice'
-}];
+}]);
 
 const userStore = useUserStore();
 const { USERINFO } = useRefs(userStore);
