@@ -16,8 +16,8 @@ const en = {
     home: {
         title: 'All-in-One Long-Form Creation Platform',
         subtitle: 'Script, Storyboard, Visuals, Voice, Editing — All AI-Powered',
-        scriptMode: 'Script Mode',
-        creativeMode: 'Creative Mode',
+        scriptMode: 'Series Mode',
+        creativeMode: 'Short Film Mode',
         placeholder: 'Enter your script prompt. Use @actor to reference actors, #prop for props. Shift+Enter for new line, Enter to submit',
         example: 'Examples:',
         exampleCat: 'Cat Visits Bookstore',

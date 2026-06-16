@@ -31,14 +31,14 @@ const stateStore = useStateStore()
 const login = useLogin()
 const form = reactive({
 	model: '',
-	script: 'drama',
+	script: 'script',
 	title: '',
 	cover: '',
 	description: '',
 	import: '',
 	prompt: '',
 	style: '',
-	aspect_ratio: '9:16',
+	aspect_ratio: '16:9',
 	episode_sum: 1,
 	episode_duration: 15
 })
@@ -261,7 +261,7 @@ const resetForm = () => {
 	form.import = '';
 	form.prompt = '';
 	form.style = '';
-	form.aspect_ratio = '9:16';
+	form.aspect_ratio = '16:9';
 	form.episode_sum = 1;
 	form.episode_duration = 15;
 	styleFind.value = { id: '' };
@@ -428,7 +428,7 @@ onUnmounted(() => {
 		<span class="head-title">{{ $t('home.title') }}</span>
 		<span class="head-subtitle">{{ $t('home.subtitle') }}</span>
 		<el-segmented v-model="form.script" :disabled="loading"
-			:options="[{ label: $t('home.scriptMode'), value: 'drama', icon: DramaSvg }, { label: $t('home.creativeMode'), value: 'script', icon: ScriptSvg }]"
+			:options="[{ label: $t('home.creativeMode'), value: 'script', icon: ScriptSvg }, { label: $t('home.scriptMode'), value: 'drama', icon: DramaSvg }]"
 			class="tabs-segmented border" @change="handleScriptChange">
 			<template #default="{ item }">
 				<div class="flex flex-center grid-gap-2">
