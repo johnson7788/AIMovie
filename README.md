@@ -147,6 +147,9 @@ MINIMAX_API_KEY=your_minimax_api_key
 
 # OpenAI
 OPENAI_API_KEY=your_openai_api_key
+
+# GPUGEEK — https://gpugeek.com
+GPUGEEK=your_gpugeek_api_key
 ```
 
 ### 4. 启动
@@ -186,6 +189,7 @@ npm run dev
 | 模型 | 服务商 | 说明 |
 |------|--------|------|
 | Seedream 4.0 | 火山引擎（豆包） | 文生图 |
+| Seedream 5.0 | GPUGEEK | 文生图（代理） |
 | Nanobanana | Google Gemini | 图片生成 |
 | Hunyuan | 腾讯混元 | hy-image-v3.0 |
 
@@ -194,6 +198,8 @@ npm run dev
 | 模型 | 服务商 | 说明 |
 |------|--------|------|
 | Seedance 1.5 Pro | 火山引擎（豆包） | 图生视频 |
+| Seedance 2.0 | GPUGEEK | 图生视频（代理） |
+| Vira | GPUGEEK | 视频生成 |
 | Veo 3 | Google | 视频生成 |
 
 ### 大语言模型
