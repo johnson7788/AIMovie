@@ -18,7 +18,10 @@
             </div>
             <div class="flex-1 h-p-100 box">
                 <User v-if="activeValue === 'account'" ref="userRef" />
-                <div v-else v-html="html"></div>
+                <SettingsHelp v-else-if="activeValue === 'help'" />
+                <SettingsTerms v-else-if="activeValue === 'terms'" />
+                <SettingsPrivacy v-else-if="activeValue === 'privacy'" />
+                <SettingsAbout v-else-if="activeValue === 'about'" />
             </div>
         </div>
         <template #footer>
@@ -32,9 +35,11 @@
     </el-dialog>
 </template>
 <script setup lang="ts">
-import { $http } from '@/common/http';
-import { ResponseCode } from '@/common/const';
 import User from './modules/xl-user.vue';
+import SettingsHelp from './modules/settings-help.vue';
+import SettingsTerms from './modules/settings-terms.vue';
+import SettingsPrivacy from './modules/settings-privacy.vue';
+import SettingsAbout from './modules/settings-about.vue';
 import { useUserStore } from '@/stores';
 import router from '@/routers';
 import HelpSvg from '@/svg/icon/icon-help.vue';
@@ -46,7 +51,6 @@ import LogoutSvg from '@/svg/icon/icon-logout.vue';
 import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
-const html = ref(null);
 const activeValue = ref('account');
 const options = reactive([
     { name: 'user.account', icon: 'UserSvg', value: 'account' },
@@ -59,17 +63,7 @@ const options = reactive([
 const visible = ref(false);
 const userRef = ref<InstanceType<typeof User> | null>(null);
 const userStore = useUserStore();
-const getArticle = (key: string) => {
-    $http.get('/app/article/api/Article/index', { params: { key } }).then((res: any) => {
-        if (res.code === ResponseCode.SUCCESS) {
-            html.value = res.data;
-        }
-    })
-}
 const onChange = (value: string) => {
-    if (value !== 'account' && value !== 'logout') {
-        getArticle(value);
-    }
     if (value === 'logout') {
         ElMessageBox.confirm(t('user.logoutConfirm'), t('common.tips'), {
             confirmButtonText: t('common.confirm'),

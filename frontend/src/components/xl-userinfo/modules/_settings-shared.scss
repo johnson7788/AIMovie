@@ -1,0 +1,44 @@
+.settings-content {
+    padding: 4px 8px;
+
+    h2 {
+        font-size: 18px;
+        font-weight: 600;
+        margin: 0 0 16px 0;
+        color: var(--el-text-color-primary);
+    }
+
+    h3 {
+        font-size: 14px;
+        font-weight: 600;
+        margin: 20px 0 8px 0;
+        color: var(--el-text-color-primary);
+    }
+
+    p {
+        font-size: 13px;
+        line-height: 1.8;
+        margin: 4px 0;
+        color: var(--el-text-color-regular);
+    }
+
+    ul {
+        padding-left: 20px;
+        margin: 4px 0;
+
+        li {
+            font-size: 13px;
+            line-height: 1.8;
+            color: var(--el-text-color-regular);
+        }
+    }
+
+    a {
+        color: var(--el-color-primary);
+        text-decoration: none;
+
+        &:hover {
+            text-decoration: underline;
+        }
+    }
+}
