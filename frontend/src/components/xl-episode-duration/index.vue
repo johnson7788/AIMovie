@@ -10,7 +10,7 @@ interface DurationOption {
 
 const props = withDefaults(defineProps<{
     modelValue: number;
-    variant?: 'default' | 'drama';
+    variant?: 'default' | 'drama' | 'script';
 }>(), {
     variant: 'default',
 });
@@ -37,8 +37,19 @@ const dramaOptions = computed<DurationOption[]>(() => [
     { value: 600, label: t('episode.minute10') },
 ]);
 
+const scriptOptions = computed<DurationOption[]>(() => [
+    { value: 5, label: `5${t('episode.second')}` },
+    { value: 10, label: `10${t('episode.second')}` },
+    { value: 15, label: `15${t('episode.second')}` },
+    { value: 30, label: `30${t('episode.second')}` },
+    { value: 60, label: `60${t('episode.second')}` },
+    { value: 120, label: t('episode.minute2') },
+]);
+
 const durationOptions = computed(() => {
-    return props.variant === 'drama' ? dramaOptions.value : defaultOptions.value;
+    if (props.variant === 'drama') return dramaOptions.value;
+    if (props.variant === 'script') return scriptOptions.value;
+    return defaultOptions.value;
 });
 
 const selectedLabel = computed(() => {
@@ -56,12 +67,12 @@ const handleSelect = (value: number) => {
         <template #reference>
             <slot>
                 <div class="flex flex-center grid-gap-2  input-button input-button-selected px-6 ">
-                    <span>{{ $t('episode.duration') }}</span>
+                    <span>{{ props.variant === 'script' ? $t('episode.durationShort') : $t('episode.duration') }}</span>
                     <span class="h10 font-weight-600 text-episode-sum">{{ selectedLabel }}</span>
                 </div>
             </slot>
         </template>
-        <span class="h10">{{ $t('episode.selectDuration') }}</span>
+        <span class="h10">{{ props.variant === 'script' ? $t('episode.selectDurationShort') : $t('episode.selectDuration') }}</span>
         <div class="grid-columns-4 grid-gap-4 text-center mt-4">
             <div class="grid-column-2 btn rounded-4 p-4" v-for="item in durationOptions" :key="item.value" :class="{'active': props.modelValue === item.value}"
                 @click.stop="handleSelect(item.value)">

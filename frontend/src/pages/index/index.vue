@@ -40,7 +40,7 @@ const form = reactive({
 	style: '',
 	aspect_ratio: '16:9',
 	episode_sum: 1,
-	episode_duration: 15
+	episode_duration: 5
 })
 
 interface ExamplePreset {
@@ -263,7 +263,7 @@ const resetForm = () => {
 	form.style = '';
 	form.aspect_ratio = '16:9';
 	form.episode_sum = 1;
-	form.episode_duration = 15;
+	form.episode_duration = 5;
 	styleFind.value = { id: '' };
 	selectedModel.value = { id: '' };
 }
@@ -517,14 +517,13 @@ onUnmounted(() => {
 
 					<xl-aspect-ratio v-model="form.aspect_ratio" />
 					<xl-episode-sum
+						v-if="form.script === 'drama'"
 						v-model="form.episode_sum"
-						:allow-input="form.script === 'script'"
-						:variant="form.script === 'drama' ? 'drama' : 'default'"
+						variant="drama"
 					/>
 					<xl-episode-duration
-						v-if="form.script !== 'script'"
 						v-model="form.episode_duration"
-						variant="drama"
+						:variant="form.script === 'drama' ? 'drama' : 'script'"
 					/>
 					<div class="flex-1"></div>
 					<div class="flex flex-center grid-gap-2 input-button " style="width: 40px; height: 40px;"

@@ -28,7 +28,7 @@ AIMovie 是一个开源的 AI 视频生成平台，提供从创意构思到成�
 
 ## 演示视频
 
-https://github.com/user-attachments/assets/example_generate_video
+https://github.com/johnson7788/AIMovie/blob/main/doc/example_generate_video.mp4
 
 > 点击上方播放完整演示，或下载查看：[example_generate_video.mp4](doc/example_generate_video.mp4)
 
