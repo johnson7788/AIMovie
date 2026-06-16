@@ -68,7 +68,7 @@ python main.py
 | POST | `/app/shortplay/api/Generate/storyboardVideo` | 生成 storyboard 视频 |
 | POST | `/app/shortplay/api/Generate/characterLook` | 生成角色外观图片 |
 | POST | `/app/shortplay/api/Generate/dramaCover` | 生成短剧封面 |
-| POST | `/app/shortplay/api/Creative/video` | 图生视频（创意模式） |
+| POST | `/app/shortplay/api/Creative/video` | 图生视频（单片模式） |
 | POST | `/app/shortplay/api/Uploads/upload` | 文件上传（stub） |
 
 ---
@@ -482,7 +482,7 @@ python main.py
 
 ### POST /app/shortplay/api/Creative/video
 
-图生视频（创意模式）。根据参考图片和提示词生成视频。
+图生视频（单片模式）。根据参考图片和提示词生成视频。
 
 **Request Body:**
 

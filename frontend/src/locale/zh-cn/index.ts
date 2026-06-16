@@ -16,8 +16,8 @@ const zhCn = {
     home: {
         title: '一站式长片创作平台',
         subtitle: '剧本、分镜、画面、配音、剪辑，一站式智能生成',
-        scriptMode: '剧本模式',
-        creativeMode: '创意模式',
+        scriptMode: '连续剧模式',
+        creativeMode: '单片模式',
         placeholder: '请输入剧本创作提示词，@演员名称可以引用演员，#物品名称可以引用物品，Shift + Enter换行，Enter提交',
         example: '示例：',
         exampleCat: '橘猫探访书店',
