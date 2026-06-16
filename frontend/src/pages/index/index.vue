@@ -40,7 +40,8 @@ const form = reactive({
 	style: '',
 	aspect_ratio: '16:9',
 	episode_sum: 1,
-	episode_duration: 5
+	episode_duration: 5,
+	resolution: '720p'
 })
 
 interface ExamplePreset {
@@ -264,6 +265,7 @@ const resetForm = () => {
 	form.aspect_ratio = '16:9';
 	form.episode_sum = 1;
 	form.episode_duration = 5;
+	form.resolution = '720p';
 	styleFind.value = { id: '' };
 	selectedModel.value = { id: '' };
 }
@@ -525,6 +527,7 @@ onUnmounted(() => {
 						v-model="form.episode_duration"
 						:variant="form.script === 'drama' ? 'drama' : 'script'"
 					/>
+					<xl-resolution v-model="form.resolution" />
 					<div class="flex-1"></div>
 					<div class="flex flex-center grid-gap-2 input-button " style="width: 40px; height: 40px;"
 						@click="submit">

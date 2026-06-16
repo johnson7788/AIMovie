@@ -359,6 +359,7 @@ class Script2VideoRequest(BaseModel):
     config_path: str = "configs/script2video.yaml"
     model_id: str = ""
     aspect_ratio: str = ""
+    resolution: str = "720p"
 
 
 class Idea2VideoRequest(BaseModel):
@@ -370,6 +371,7 @@ class Idea2VideoRequest(BaseModel):
     episode_count: int = 0  # 0 = let LLM decide; >0 = force this many episodes
     episode_duration: int = 0  # seconds per episode; 0 = no hard limit
     aspect_ratio: str = ""
+    resolution: str = "720p"
 
 
 class TaskResponse(BaseModel):
@@ -413,6 +415,7 @@ async def run_script2video(task_id: str, req: Script2VideoRequest):
             req.config_path,
             req.model_id,
             req.aspect_ratio or "",
+            req.resolution or "1080p",
         ])
         cache_key = hashlib.sha256(cache_key_raw.encode("utf-8")).hexdigest()[:16]
         pipeline.working_dir = os.path.join(pipeline.working_dir, cache_key)
@@ -438,6 +441,7 @@ async def run_script2video(task_id: str, req: Script2VideoRequest):
             user_requirement=req.user_requirement,
             style=req.style,
             aspect_ratio=req.aspect_ratio,
+            resolution=req.resolution,
             progress_callback=progress_callback,
         )
         pm.emit(task_id, {"type": "complete", "result": result_path})
@@ -581,6 +585,7 @@ async def run_idea2video(task_id: str, req: Idea2VideoRequest):
             req.model_id,
             req.config_path,
             req.aspect_ratio or "",
+            req.resolution or "1080p",
         ])
         cache_key = hashlib.sha256(cache_key_raw.encode("utf-8")).hexdigest()[:16]
         pipeline.working_dir = os.path.join(pipeline.working_dir, cache_key)
@@ -607,6 +612,7 @@ async def run_idea2video(task_id: str, req: Idea2VideoRequest):
             episode_count=req.episode_count,
             episode_duration=req.episode_duration,
             aspect_ratio=req.aspect_ratio,
+            resolution=req.resolution,
             progress_callback=progress_callback,
         )
         pm.emit(task_id, {"type": "complete", "result": result_path})
@@ -984,6 +990,7 @@ class LegacySubmitRequest(BaseModel):
     aspect_ratio: str = "9:16"
     episode_sum: int = 0
     episode_duration: int = 60
+    resolution: str = "720p"
 
 
 @app.post("/app/shortplay/api/Index/submit")
@@ -1014,6 +1021,7 @@ async def legacy_submit(req: LegacySubmitRequest):
             config_path="configs/script2video.yaml",
             model_id=req.model,
             aspect_ratio=req.aspect_ratio,
+            resolution=req.resolution,
         )
         mode = "script2video"
         with get_db() as conn:
@@ -1032,6 +1040,7 @@ async def legacy_submit(req: LegacySubmitRequest):
             episode_count=episode_count,
             episode_duration=req.episode_duration,
             aspect_ratio=req.aspect_ratio,
+            resolution=req.resolution,
         )
         mode = "idea2video"
         with get_db() as conn:

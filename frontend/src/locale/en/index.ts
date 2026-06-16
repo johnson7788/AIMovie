@@ -70,6 +70,10 @@ const en = {
         minute3: '3 min',
         minute10: '10 min',
     },
+    resolution: {
+        label: 'Resolution',
+        selectLabel: 'Select resolution',
+    },
     common: {
         cancel: 'Cancel',
         confirm: 'Confirm',

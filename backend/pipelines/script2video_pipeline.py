@@ -192,11 +192,13 @@ class Script2VideoPipeline:
         characters: List[CharacterInScene] = None,
         character_portraits_registry: Optional[Dict[str, Dict[str, Dict[str, str]]]] = None,
         aspect_ratio: str = "",
+        resolution: str = "720p",
         progress_callback: Optional[Callable[[dict], Awaitable[None]]] = None,
     ):
         cb = progress_callback or _noop_progress
         self._progress_callback = cb
         self._aspect_ratio = resolve_aspect_ratio(user_requirement, explicit=aspect_ratio or None)
+        self._resolution = resolution or "720p"
         self._frame_size = image_size_for_aspect(self._aspect_ratio)
         self._concat_size = concat_dimensions_for_aspect(self._aspect_ratio)
         self._style_prompt = expand_style_prompt(style)
@@ -898,6 +900,7 @@ class Script2VideoPipeline:
             duration=shot_duration,
             aspect_ratio=self._aspect_ratio,
             style=self._style,
+            resolution=self._resolution,
             moderation_rewrite_callback=lambda rejected_paths, error: self._rewrite_rejected_video_reference(
                 shot_description,
                 rejected_paths,

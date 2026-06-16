@@ -363,6 +363,7 @@ class Idea2VideoPipeline:
         episode_count: int = 0,
         episode_duration: int = 0,
         aspect_ratio: str = "",
+        resolution: str = "720p",
         progress_callback: Optional[Callable[[dict], Awaitable[None]]] = None,
     ):
         cb = progress_callback or _noop_progress
@@ -370,6 +371,7 @@ class Idea2VideoPipeline:
         from utils.pipeline_media import resolve_aspect_ratio
 
         self._aspect_ratio = resolve_aspect_ratio(user_requirement, explicit=aspect_ratio or None)
+        self._resolution = resolution or "720p"
         effective_requirement = build_effective_user_requirement(
             user_requirement, episode_count, episode_duration, self._aspect_ratio
         )
@@ -465,6 +467,7 @@ class Idea2VideoPipeline:
                 characters=characters,
                 character_portraits_registry=character_portraits_registry,
                 aspect_ratio=self._aspect_ratio,
+                resolution=self._resolution,
                 progress_callback=scoped_cb,
             )
             await cb({

@@ -74,6 +74,7 @@ declare module 'vue' {
     XlPropCreate: typeof import('./src/components/xl-prop/xl-prop-create.vue')['default']
     XlQrcode: typeof import('./src/components/xl-qrcode/index.vue')['default']
     XlQrcodeView: typeof import('./src/components/xl-qrcode-view/index.vue')['default']
+    XlResolution: typeof import('./src/components/xl-resolution/index.vue')['default']
     XlSceneCreate: typeof import('./src/components/xl-scene/xl-scene-create.vue')['default']
     XlStoryboard: typeof import('./src/components/xl-storyboard/index.vue')['default']
     XlStyle: typeof import('./src/components/xl-style/index.vue')['default']

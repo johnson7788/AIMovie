@@ -70,6 +70,10 @@ const zhCn = {
         minute3: '3分钟',
         minute10: '10分钟',
     },
+    resolution: {
+        label: '分辨率',
+        selectLabel: '选择分辨率',
+    },
     common: {
         cancel: '取消',
         confirm: '确定',
