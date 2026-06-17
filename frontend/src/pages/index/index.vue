@@ -86,26 +86,6 @@ const examplePresets = computed<ExamplePreset[]>(() => [
 		episode_duration: 10,
 		model_id: '5',
 	},
-	{
-		label: t('home.exampleRomance'),
-		mode: 'drama',
-		prompt: '两个年轻人在繁忙的都市中偶然相遇，从误解到理解，从陌生到熟悉。在追逐梦想的路上，他们互相扶持，共同成长，一段温暖治愈的都市爱情故事徐徐展开。',
-		style: 'cinematic',
-		aspect_ratio: '9:16',
-		episode_sum: 1,
-		episode_duration: 10,
-		model_id: '5',
-	},
-	{
-		label: t('home.exampleWuxia'),
-		mode: 'drama',
-		prompt: '少年侠客初入江湖，意外卷入一场惊天阴谋。在刀光剑影中磨砺成长，在恩怨情仇中坚守本心。江湖路远，儿女情长，一段荡气回肠的武侠传奇就此展开。',
-		style: 'anime',
-		aspect_ratio: '9:16',
-		episode_sum: 1,
-		episode_duration: 10,
-		model_id: '5',
-	},
 ])
 
 const options = ref<MentionOption[]>([])
