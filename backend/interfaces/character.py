@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 from typing import List, Optional, Union, Dict
 from PIL import Image
 
@@ -12,6 +12,7 @@ class CharacterInScene(BaseModel):
     identifier_in_scene: str = Field(
         description="The identifier for the character in this specific scene, which may differ from the base identifier",
         examples=["Alice", "Bob the Builder"],
+        validation_alias=AliasChoices("identifier_in_scene", "identifier_in_script"),
     )
     is_visible: bool = Field(
         description="Indicates whether the character is visible in this scene",

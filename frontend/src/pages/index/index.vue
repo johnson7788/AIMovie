@@ -40,7 +40,7 @@ const form = reactive({
 	style: '',
 	aspect_ratio: '16:9',
 	episode_sum: 1,
-	episode_duration: 5,
+	episode_duration: 10,
 	resolution: '480p'
 })
 
@@ -63,7 +63,7 @@ const examplePresets = computed<ExamplePreset[]>(() => [
 		style: 'storybook',
 		aspect_ratio: '9:16',
 		episode_sum: 1,
-		episode_duration: 5,
+		episode_duration: 10,
 		model_id: '5',
 	},
 	{
@@ -73,7 +73,7 @@ const examplePresets = computed<ExamplePreset[]>(() => [
 		style: 'storybook',
 		aspect_ratio: '9:16',
 		episode_sum: 1,
-		episode_duration: 5,
+		episode_duration: 10,
 		model_id: '5',
 	},
 	{
@@ -83,7 +83,7 @@ const examplePresets = computed<ExamplePreset[]>(() => [
 		style: 'cinematic',
 		aspect_ratio: '9:16',
 		episode_sum: 1,
-		episode_duration: 5,
+		episode_duration: 10,
 		model_id: '5',
 	},
 	{
@@ -93,7 +93,7 @@ const examplePresets = computed<ExamplePreset[]>(() => [
 		style: 'cinematic',
 		aspect_ratio: '9:16',
 		episode_sum: 1,
-		episode_duration: 5,
+		episode_duration: 10,
 		model_id: '5',
 	},
 	{
@@ -103,7 +103,7 @@ const examplePresets = computed<ExamplePreset[]>(() => [
 		style: 'anime',
 		aspect_ratio: '9:16',
 		episode_sum: 1,
-		episode_duration: 5,
+		episode_duration: 10,
 		model_id: '5',
 	},
 ])
@@ -264,7 +264,7 @@ const resetForm = () => {
 	form.style = '';
 	form.aspect_ratio = '16:9';
 	form.episode_sum = 1;
-	form.episode_duration = 5;
+	form.episode_duration = 10;
 	form.resolution = '480p';
 	styleFind.value = { id: '' };
 	selectedModel.value = { id: '' };
@@ -395,7 +395,7 @@ watch(
 )
 const handleScriptChange = () => {
 	form.episode_sum = 1;
-	form.episode_duration = 5;
+	form.episode_duration = 10;
 }
 const applyExample = (example: ExamplePreset) => {
 	form.script = example.mode;
@@ -511,6 +511,7 @@ onUnmounted(() => {
 					</div>
 
 					<xl-aspect-ratio v-model="form.aspect_ratio" />
+					<xl-episode-sum v-model="form.episode_sum" variant="drama" allow-input v-if="form.script === 'drama'" />
 					<xl-episode-duration v-model="form.episode_duration" />
 					<xl-resolution v-model="form.resolution" />
 					<div class="flex-1"></div>

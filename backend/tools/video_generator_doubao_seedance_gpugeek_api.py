@@ -142,7 +142,7 @@ class VideoGeneratorDoubaoSeedanceGPUGEEKAPI:
         reference_image_paths: List[str],
         resolution: Literal["480p", "720p", "1080p"] = "720p",
         aspect_ratio: str = "16:9",
-        duration: Literal[4, 5, 10] = 5,
+        duration: Literal[4, 5, 10, 15] = 5,
         *,
         generate_audio: Optional[bool] = None,
     ) -> Dict[str, Any]:
@@ -278,7 +278,7 @@ class VideoGeneratorDoubaoSeedanceGPUGEEKAPI:
         reference_image_paths: List[str],
         resolution: Literal["480p", "720p", "1080p"],
         aspect_ratio: str,
-        duration: Literal[4, 5, 10],
+        duration: Literal[4, 5, 10, 15],
         *,
         generate_audio: Optional[bool] = None,
     ) -> VideoOutput:
@@ -315,7 +315,7 @@ class VideoGeneratorDoubaoSeedanceGPUGEEKAPI:
         reference_image_paths: List[str],
         resolution: Literal["480p", "720p", "1080p"] = "720p",
         aspect_ratio: str = "16:9",
-        duration: Literal[4, 5, 10] = 5,
+        duration: Literal[4, 5, 10, 15] = 5,
         *,
         style: str = "",
         **kwargs,

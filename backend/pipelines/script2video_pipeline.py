@@ -18,8 +18,14 @@ from utils.image import image_output_to_pil, crop_turnaround_views
 from utils.seedance_prompt import build_seedance_video_prompt
 from utils.pipeline_media import (
     concat_dimensions_for_aspect,
-    image_size_for_aspect,
+    frame_image_size_for_resolution,
+    portrait_turnaround_size,
+    portrait_view_size,
+    resolve_max_shots_for_duration,
+    scene_image_size_for_aspect,
     resolve_aspect_ratio,
+    seedance_shot_duration,
+    SEEDANCE_SINGLE_CLIP_MAX_SECONDS,
     video_short_side_for_resolution,
 )
 from utils.pipeline_consistency import (
@@ -49,13 +55,13 @@ def _max_shots_from_user_requirement(user_requirement: str) -> Optional[int]:
 def resolve_max_shots(user_requirement: str = "", episode_duration: int = 0) -> Optional[int]:
     """Derive the hard shot cap from explicit duration or prompt text."""
     if episode_duration > 0:
-        return max(1, min(3, episode_duration // 5))
+        return resolve_max_shots_for_duration(episode_duration)
     parsed = _max_shots_from_user_requirement(user_requirement)
     if parsed is not None:
         return parsed
     duration = _episode_duration_from_user_requirement(user_requirement)
     if duration is not None:
-        return max(1, min(3, duration // 5))
+        return resolve_max_shots_for_duration(duration)
     return None
 
 
@@ -92,9 +98,6 @@ def _episode_duration_from_user_requirement(user_requirement: str) -> Optional[i
     return int(match.group(1)) if match else None
 
 
-_SEEDANCE_SHOT_DURATIONS = (4, 5, 10)
-
-
 def _effective_episode_duration(user_requirement: str, episode_duration: int = 0) -> int:
     """Prefer explicit UI duration over text embedded in user_requirement."""
     if episode_duration > 0:
@@ -108,14 +111,9 @@ def _shot_duration_from_user_requirement(
     shot_count: int,
     episode_duration: int = 0,
 ) -> int:
-    """Pick Seedance-supported duration (4/5/10s) closest to target per-shot length."""
-    if shot_count <= 0:
-        return 5
+    """Pick Seedance-supported duration (4/5/10/15s) for the target clip."""
     total = _effective_episode_duration(user_requirement, episode_duration)
-    if total <= 0:
-        return 5
-    per_shot = total / shot_count
-    return min(_SEEDANCE_SHOT_DURATIONS, key=lambda d: abs(d - per_shot))
+    return seedance_shot_duration(total, shot_count)
 
 
 def _image_mse(path_a: str, path_b: str, size: Tuple[int, int] = (64, 64)) -> Optional[float]:
@@ -143,9 +141,9 @@ def _should_skip_shot_concat(
     shot_count: int,
     episode_duration: int = 0,
 ) -> bool:
-    """5s clips are a single shot; no ffmpeg concat needed."""
+    """≤15s single Seedance clip or one shot — no ffmpeg concat."""
     duration = episode_duration or _episode_duration_from_user_requirement(user_requirement) or 0
-    if duration > 0 and duration <= 5:
+    if duration > 0 and duration <= SEEDANCE_SINGLE_CLIP_MAX_SECONDS:
         return True
     return shot_count <= 1
 
@@ -183,6 +181,15 @@ def _looks_like_brief_idea(script: str) -> bool:
     if text.count("\n") >= 3:
         return False
     return True
+
+
+def is_fast_single_clip(episode_duration: int, max_shots: Optional[int]) -> bool:
+    """≤15s is one Seedance clip; skip heavy multi-shot prep where safe."""
+    return (
+        episode_duration > 0
+        and episode_duration <= SEEDANCE_SINGLE_CLIP_MAX_SECONDS
+        and max_shots == 1
+    )
 
 
 class Script2VideoPipeline:
@@ -292,13 +299,32 @@ class Script2VideoPipeline:
         self._progress_callback = cb
         self._episode_duration = _effective_episode_duration(user_requirement, episode_duration)
         self._max_shots = resolve_max_shots(user_requirement, self._episode_duration)
+        self._fast_single_clip = is_fast_single_clip(self._episode_duration, self._max_shots)
+        skip_concat = (
+            self._episode_duration <= SEEDANCE_SINGLE_CLIP_MAX_SECONDS
+            or self._max_shots == 1
+        )
         print(
             f"⏱️ Episode duration: {self._episode_duration}s, "
-            f"max_shots={self._max_shots}, skip_concat={self._episode_duration <= 5 or self._max_shots == 1}"
+            f"max_shots={self._max_shots}, skip_concat={skip_concat}, "
+            f"seedance_single_clip={self._episode_duration <= SEEDANCE_SINGLE_CLIP_MAX_SECONDS}"
         )
+        if skip_concat and not self._fast_single_clip:
+            print(
+                "ℹ️ skip_concat only skips final ffmpeg merge; script/portraits/frames/video "
+                "still run. Restart backend to enable ⚡ fast single-clip optimizations."
+            )
+        if self._fast_single_clip:
+            print(
+                f"⚡ Fast single-clip mode (≤{SEEDANCE_SINGLE_CLIP_MAX_SECONDS}s): micro script, "
+                "3-view turnaround portraits, skip last frame / extra frame candidates / camera-tree LLM."
+            )
         self._aspect_ratio = resolve_aspect_ratio(user_requirement, explicit=aspect_ratio or None)
         self._resolution = resolution or "480p"
-        self._frame_size = image_size_for_aspect(self._aspect_ratio)
+        self._scene_image_size = scene_image_size_for_aspect(self._aspect_ratio)
+        self._portrait_turnaround_size = portrait_turnaround_size()
+        self._portrait_view_size = portrait_view_size()
+        self._frame_size = self._scene_image_size
         self._concat_size = concat_dimensions_for_aspect(
             self._aspect_ratio,
             short_side=video_short_side_for_resolution(self._resolution),
@@ -310,7 +336,8 @@ class Script2VideoPipeline:
         self.camera_image_generator.aspect_ratio = self._aspect_ratio
         print(
             f"📐 Output aspect ratio: {self._aspect_ratio} "
-            f"(images={self._frame_size}, video={self._resolution}, "
+            f"(portraits={self._portrait_turnaround_size}, "
+            f"scene/keyframes={self._scene_image_size}, video={self._resolution}, "
             f"concat={self._concat_size[0]}x{self._concat_size[1]})"
         )
 
@@ -327,16 +354,23 @@ class Script2VideoPipeline:
                     "message": "Expanding idea into script before character extraction...",
                 })
                 t0 = time.time()
-                print("📝 Input looks like a brief idea; expanding into script...")
-                story = await self.screenwriter.develop_story(
-                    idea=script,
-                    user_requirement=user_requirement,
-                )
-                scene_scripts = await self.screenwriter.write_script_based_on_story(
-                    story=story,
-                    user_requirement=user_requirement,
-                )
-                script = scene_scripts[0] if scene_scripts else story
+                if self._fast_single_clip:
+                    print("⚡ Fast single-clip mode: writing micro script in one LLM call...")
+                    script = await self.screenwriter.write_micro_script_from_idea(
+                        idea=script,
+                        user_requirement=user_requirement,
+                    )
+                else:
+                    print("📝 Input looks like a brief idea; expanding into script...")
+                    story = await self.screenwriter.develop_story(
+                        idea=script,
+                        user_requirement=user_requirement,
+                    )
+                    scene_scripts = await self.screenwriter.write_script_based_on_story(
+                        story=story,
+                        user_requirement=user_requirement,
+                    )
+                    script = scene_scripts[0] if scene_scripts else story
                 with open(script_path, "w", encoding="utf-8") as f:
                     f.write(script)
                 await cb({
@@ -404,6 +438,10 @@ class Script2VideoPipeline:
             characters=characters,
         )
         await cb({"type": "stage_end", "stage": "visual_descriptions", "duration_ms": int((time.time() - t0) * 1000)})
+
+        if self._fast_single_clip:
+            for shot_description in shot_descriptions:
+                shot_description.variation_type = "small"
 
         await cb({"type": "stage_start", "stage": "scene_anchor", "message": "Generating scene establishing anchor..."})
         t0 = time.time()
@@ -515,6 +553,25 @@ class Script2VideoPipeline:
         self._progress_callback = None
         return final_video_path
 
+    def _portrait_image_gen_kwargs(self, *, turnaround: bool = False) -> dict:
+        return {
+            "size": self._portrait_turnaround_size if turnaround else self._portrait_view_size,
+        }
+
+    def _scene_image_gen_kwargs(self) -> dict:
+        """Scene anchor and shot keyframes (Seedream API minimum for aspect ratio)."""
+        return {"size": self._scene_image_size}
+
+    def _frame_image_gen_kwargs(self) -> dict:
+        return self._scene_image_gen_kwargs()
+
+    def _frame_candidate_count(self) -> int:
+        if getattr(self, "_fast_single_clip", False):
+            return 1
+        if (getattr(self, "_resolution", "480p") or "480p").lower() == "480p":
+            return 1
+        return self.FRAME_CANDIDATE_COUNT if self.best_image_selector else 1
+
     def _scene_anchor_pair(self) -> Tuple[str, str]:
         return (self._scene_anchor_path, scene_anchor_reference_text())
 
@@ -529,7 +586,7 @@ class Script2VideoPipeline:
         anchor_image = await self.image_generator.generate_single_image(
             prompt=prompt,
             reference_image_paths=[],
-            size=self._frame_size,
+            **self._frame_image_gen_kwargs(),
         )
         anchor_image.save(anchor_path)
         print(f"☑️ Scene anchor saved to {anchor_path}.")
@@ -551,7 +608,7 @@ class Script2VideoPipeline:
         reference_image_path_and_text_pairs: List[Tuple[str, str]],
         target_description: str,
     ) -> None:
-        candidate_count = self.FRAME_CANDIDATE_COUNT if self.best_image_selector else 1
+        candidate_count = self._frame_candidate_count()
         candidates_dir = os.path.join(os.path.dirname(frame_image_path), "candidates")
         os.makedirs(candidates_dir, exist_ok=True)
         candidate_paths: List[str] = []
@@ -562,7 +619,7 @@ class Script2VideoPipeline:
                 frame_image = await self.image_generator.generate_single_image(
                     prompt=prompt,
                     reference_image_paths=reference_image_paths,
-                    size=self._frame_size,
+                    **self._frame_image_gen_kwargs(),
                 )
                 frame_image.save(candidate_path)
             elif os.path.exists(frame_image_path):
@@ -728,7 +785,7 @@ class Script2VideoPipeline:
             )
             self.frame_events[shot_idx]["first_frame"].set()
 
-            if shot_description.variation_type in ["medium", "large"]:
+            if shot_description.variation_type in ["medium", "large"] and not getattr(self, "_fast_single_clip", False):
                 await self.generate_frame_for_single_shot(
                     shot_idx=shot_idx,
                     frame_type="last_frame",
@@ -841,7 +898,7 @@ class Script2VideoPipeline:
         safe_image = await self.image_generator.generate_single_image(
             prompt=prompt,
             reference_image_paths=[source_path],
-            size=self._frame_size,
+            **self._frame_image_gen_kwargs(),
         )
         safe_image.save(safe_path)
         logging.info(
@@ -1036,7 +1093,7 @@ class Script2VideoPipeline:
 
         if "first_frame" in self.frame_events[shot_description.idx]:
             await self.frame_events[shot_description.idx]["first_frame"].wait()
-        if shot_description.variation_type in ["medium", "large"]:
+        if shot_description.variation_type in ["medium", "large"] and not getattr(self, "_fast_single_clip", False):
             await self.frame_events[shot_description.idx]["last_frame"].wait()
 
         frame_paths = self._build_video_reference_paths(
@@ -1193,6 +1250,14 @@ class Script2VideoPipeline:
                 cameras_by_idx[cam_idx].active_shot_idxs.append(shot_description.idx)
         cameras = list(cameras_by_idx.values())
 
+        if getattr(self, "_fast_single_clip", False) and len(shot_descriptions) == 1:
+            shot = shot_descriptions[0]
+            camera_tree = [Camera(idx=shot.cam_idx, active_shot_idxs=[shot.idx])]
+            with open(camera_tree_path, "w", encoding="utf-8") as f:
+                json.dump([camera.model_dump() for camera in camera_tree], f, ensure_ascii=False, indent=4)
+            print("⚡ Fast single-clip mode: using trivial single-camera tree (no LLM).")
+            return camera_tree
+
         camera_tree = await self.camera_image_generator.construct_camera_tree(cameras=cameras, shot_descs=shot_descriptions)
         with open(camera_tree_path, "w", encoding="utf-8") as f:
             json.dump([camera.model_dump() for camera in camera_tree], f, ensure_ascii=False, indent=4)
@@ -1291,11 +1356,16 @@ class Script2VideoPipeline:
         back_portrait_path = os.path.join(character_dir, "back.png")
 
         all_exist = all(os.path.exists(p) for p in [front_portrait_path, side_portrait_path, back_portrait_path])
+        portrait_kwargs = self._portrait_image_gen_kwargs
         if all_exist:
             pass
         elif self.USE_TURNAROUND_SHEET:
             try:
-                turnaround_output = await self.character_portraits_generator.generate_turnaround_sheet(character, style)
+                turnaround_output = await self.character_portraits_generator.generate_turnaround_sheet(
+                    character,
+                    style,
+                    image_gen_kwargs=portrait_kwargs(turnaround=True),
+                )
                 sheet_pil = image_output_to_pil(turnaround_output)
                 paths = crop_turnaround_views(sheet_pil, character_dir)
                 front_portrait_path = paths.get("front", front_portrait_path)
@@ -1358,14 +1428,21 @@ class Script2VideoPipeline:
         back_path: str,
     ):
         """Fallback: generate 3 separate portrait images (front, side, back)."""
+        portrait_kwargs = self._portrait_image_gen_kwargs
         if not os.path.exists(front_path):
-            front_output = await self.character_portraits_generator.generate_front_portrait(character, style)
+            front_output = await self.character_portraits_generator.generate_front_portrait(
+                character, style, image_gen_kwargs=portrait_kwargs(turnaround=False),
+            )
             front_output.save(front_path)
         if not os.path.exists(side_path):
-            side_output = await self.character_portraits_generator.generate_side_portrait(character, front_path, style)
+            side_output = await self.character_portraits_generator.generate_side_portrait(
+                character, front_path, style, image_gen_kwargs=portrait_kwargs(turnaround=False),
+            )
             side_output.save(side_path)
         if not os.path.exists(back_path):
-            back_output = await self.character_portraits_generator.generate_back_portrait(character, front_path, style)
+            back_output = await self.character_portraits_generator.generate_back_portrait(
+                character, front_path, style, image_gen_kwargs=portrait_kwargs(turnaround=False),
+            )
             back_output.save(back_path)
 
 

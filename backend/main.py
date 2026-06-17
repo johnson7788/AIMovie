@@ -1005,7 +1005,7 @@ class LegacySubmitRequest(BaseModel):
     style: str = ""
     aspect_ratio: str = "9:16"
     episode_sum: int = 1
-    episode_duration: int = 5
+    episode_duration: int = 10
     resolution: str = "480p"
 
 
@@ -1030,7 +1030,7 @@ async def legacy_submit(
     if req.description:
         user_requirement_parts.append(f"Description: {req.description}")
     base_requirement = "; ".join(user_requirement_parts) if user_requirement_parts else ""
-    episode_duration = req.episode_duration if req.episode_duration > 0 else 5
+    episode_duration = req.episode_duration if req.episode_duration > 0 else 10
     logging.info(
         "legacy_submit mode=%s episode_duration=%ss aspect_ratio=%s resolution=%s",
         req.script,

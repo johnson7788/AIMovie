@@ -60,7 +60,15 @@ def _map_size(size: Optional[str]) -> str:
         return mapping[size]
     parsed = _parse_pixel_size(size)
     if parsed is not None:
-        return _ensure_min_pixel_size(size)
+        upscaled = _ensure_min_pixel_size(size)
+        if upscaled != size:
+            logging.info(
+                "Seedream requires >= %s px; upscaled requested size %s → %s",
+                f"{SEEDREAM_MIN_PIXELS:,}",
+                size,
+                upscaled,
+            )
+        return upscaled
     return size
 
 
@@ -96,6 +104,7 @@ class ImageGeneratorDoubaoSeedreamGPUGEEKAPI:
     ) -> ImageOutput:
         logging.info(f"Sending image generation request to GPUGEEK {self.model}...")
 
+        kwargs.pop("enforce_min_pixels", None)  # API always enforces minimum in _map_size
         input_data = {
             "prompt": prompt,
             "size": _map_size(size),

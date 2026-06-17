@@ -76,6 +76,7 @@ class CharacterPortraitsGenerator:
         self,
         character: CharacterInScene,
         style: str,
+        image_gen_kwargs: Optional[Dict] = None,
     ) -> ImageOutput:
         features = "(static) " + character.static_features + "; (dynamic) " + character.dynamic_features
         prompt = prompt_template_front.format(
@@ -83,9 +84,10 @@ class CharacterPortraitsGenerator:
             features=features,
             style=self._style_phrase(style),
         )
+        gen_kwargs = dict(image_gen_kwargs or {})
         image_output = await self.image_generator.generate_single_image(
             prompt=prompt,
-            # size="512x512",
+            **gen_kwargs,
         )
         return image_output
 
@@ -95,6 +97,7 @@ class CharacterPortraitsGenerator:
         character: CharacterInScene,
         front_image_path: str,
         style: str,
+        image_gen_kwargs: Optional[Dict] = None,
     ) -> ImageOutput:
         features = "(static) " + character.static_features + "; (dynamic) " + character.dynamic_features
         prompt = prompt_template_side.format(
@@ -102,10 +105,11 @@ class CharacterPortraitsGenerator:
             features=features,
             style=self._style_phrase(style),
         )
+        gen_kwargs = dict(image_gen_kwargs or {})
         image_output = await self.image_generator.generate_single_image(
             prompt=prompt,
             reference_image_paths=[front_image_path],
-            # size="1024x1024",
+            **gen_kwargs,
         )
         return image_output
 
@@ -116,6 +120,7 @@ class CharacterPortraitsGenerator:
         character: CharacterInScene,
         front_image_path: str,
         style: str,
+        image_gen_kwargs: Optional[Dict] = None,
     ) -> ImageOutput:
         features = "(static) " + character.static_features + "; (dynamic) " + character.dynamic_features
         prompt = prompt_template_back.format(
@@ -123,10 +128,11 @@ class CharacterPortraitsGenerator:
             features=features,
             style=self._style_phrase(style),
         )
+        gen_kwargs = dict(image_gen_kwargs or {})
         image_output = await self.image_generator.generate_single_image(
             prompt=prompt,
             reference_image_paths=[front_image_path],
-            # size="512x512",
+            **gen_kwargs,
         )
         return image_output
 
@@ -135,6 +141,7 @@ class CharacterPortraitsGenerator:
         self,
         character: CharacterInScene,
         style: str,
+        image_gen_kwargs: Optional[Dict] = None,
     ) -> ImageOutput:
         """Generate a single 3-view turnaround sheet image.
 
@@ -148,7 +155,9 @@ class CharacterPortraitsGenerator:
             features=features,
             style=self._style_phrase(style),
         )
+        gen_kwargs = dict(image_gen_kwargs or {})
         image_output = await self.image_generator.generate_single_image(
             prompt=prompt,
+            **gen_kwargs,
         )
         return image_output

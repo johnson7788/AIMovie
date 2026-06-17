@@ -181,6 +181,36 @@ class Screenwriter:
         print(f"✅ Script writing completed in {elapsed:.1f}s ({len(script)} scenes)")
         return script
 
+    async def write_micro_script_from_idea(
+        self,
+        idea: str,
+        user_requirement: Optional[str] = None,
+    ) -> str:
+        """One LLM call: turn a brief idea into a single-scene script for ~5s video."""
+        print(f"⚡ Writing micro script via {self.chat_model.model_name} ...")
+        print(f"   idea: {idea[:200]}{'...' if len(idea) > 200 else ''}")
+        requirement = user_requirement or ""
+        messages = [
+            (
+                "system",
+                "You are a short-form video screenwriter. "
+                "Write ONE compact scene script for a single continuous 5-second clip. "
+                "Include visible characters with speakable dialogue or clear action, "
+                "one location, and one simple beat. Output only the script text.",
+            ),
+            (
+                "human",
+                f"Idea: {idea}\n\nRequirements: {requirement}\n\n"
+                "Write the script now.",
+            ),
+        ]
+        t0 = __import__("time").time()
+        response = await self.chat_model.ainvoke(messages)
+        elapsed = __import__("time").time() - t0
+        script = (response.content or "").strip()
+        print(f"✅ Micro script completed in {elapsed:.1f}s ({len(script)} chars)")
+        return script
+
     async def polish_scene_script(
         self,
         scene_script: str,

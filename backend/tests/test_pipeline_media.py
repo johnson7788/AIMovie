@@ -7,9 +7,16 @@ from utils.pipeline_media import (
     dimensions_for_aspect,
     dimensions_for_aspect_min_pixels,
     frame_size_for_aspect,
+    frame_image_size_for_resolution,
+    portrait_turnaround_size,
+    portrait_view_size,
+    scene_image_size_for_aspect,
     image_size_for_aspect,
     resolve_aspect_ratio,
     sanitize_polished_script,
+    resolve_max_shots_for_duration,
+    seedance_shot_duration,
+    SEEDANCE_SINGLE_CLIP_MAX_SECONDS,
     SEEDREAM_MIN_PIXELS,
 )
 
@@ -40,6 +47,26 @@ class TestPipelineMedia(unittest.TestCase):
         width, height = dimensions_for_aspect_min_pixels("9:16")
         self.assertEqual(image_size_for_aspect("9:16"), f"{width}x{height}")
         self.assertGreaterEqual(width * height, SEEDREAM_MIN_PIXELS)
+
+    def test_frame_image_size_matches_video_resolution(self):
+        self.assertEqual(frame_image_size_for_resolution("16:9", "480p"), "852x480")
+        self.assertEqual(frame_image_size_for_resolution("9:16", "480p"), "480x852")
+        self.assertEqual(frame_image_size_for_resolution("16:9", "720p"), "1280x720")
+
+    def test_scene_and_portrait_reference_sizes(self):
+        self.assertEqual(scene_image_size_for_aspect("16:9"), "2560x1440")
+        width, height = (int(p) for p in portrait_turnaround_size().split("x"))
+        self.assertGreaterEqual(width * height, SEEDREAM_MIN_PIXELS)
+        self.assertEqual(width, height * 3)
+        self.assertEqual(portrait_view_size(), image_size_for_aspect("1:1"))
+
+    def test_seedance_single_clip_and_duration(self):
+        self.assertEqual(resolve_max_shots_for_duration(10), 1)
+        self.assertEqual(resolve_max_shots_for_duration(15), 1)
+        self.assertEqual(resolve_max_shots_for_duration(30), 3)
+        self.assertEqual(seedance_shot_duration(10, 1), 10)
+        self.assertEqual(seedance_shot_duration(15, 1), 15)
+        self.assertEqual(SEEDANCE_SINGLE_CLIP_MAX_SECONDS, 15)
 
     def test_resolve_explicit_over_text(self):
         self.assertEqual(

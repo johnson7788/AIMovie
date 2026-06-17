@@ -130,18 +130,20 @@ class TestPipelineConsistency(unittest.TestCase):
             self.assertFalse(os.path.exists(first_frame))
             self.assertFalse(os.path.exists(video_path))
 
-    def test_skip_shot_concat_for_five_second_target(self):
-        requirement = "Target episode duration: approximately 5 seconds. Use at most 1 shots"
-        self.assertTrue(_should_skip_shot_concat(requirement, 1))
+    def test_skip_shot_concat_for_single_clip_durations(self):
+        self.assertTrue(_should_skip_shot_concat("", 1, episode_duration=5))
+        self.assertTrue(_should_skip_shot_concat("", 1, episode_duration=10))
+        self.assertTrue(_should_skip_shot_concat("", 1, episode_duration=15))
         self.assertFalse(_should_skip_shot_concat(
-            "Target episode duration: approximately 10 seconds. Use at most 2 shots",
-            2,
+            "Target episode duration: approximately 30 seconds. Use at most 3 shots",
+            3,
+            episode_duration=30,
         ))
 
     def test_resolve_max_shots_from_duration(self):
         self.assertEqual(resolve_max_shots(episode_duration=5), 1)
-        self.assertEqual(resolve_max_shots(episode_duration=10), 2)
-        self.assertEqual(resolve_max_shots(episode_duration=15), 3)
+        self.assertEqual(resolve_max_shots(episode_duration=10), 1)
+        self.assertEqual(resolve_max_shots(episode_duration=15), 1)
         self.assertEqual(resolve_max_shots(episode_duration=30), 3)
 
     def test_resolve_max_shots_prefers_explicit_duration(self):

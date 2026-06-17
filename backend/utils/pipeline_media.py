@@ -20,8 +20,11 @@ SUPPORTED_ASPECT_RATIOS = (
 DEFAULT_ASPECT_RATIO = "9:16"
 DEFAULT_VIDEO_RESOLUTION = "480p"
 DEFAULT_SHORT_SIDE = 720
-# GPUGEEK / Volcengine Seedream minimum output area (e.g. 1920x1920)
+# GPUGEEK / Volcengine Seedream minimum output area (e.g. 1920x1920 = 3686400 px)
 SEEDREAM_MIN_PIXELS = 3_686_400
+# Seedance 2.0 (GPUGEEK): one reference task can output up to 15s.
+SEEDANCE_SINGLE_CLIP_MAX_SECONDS = 15
+SEEDANCE_SUPPORTED_DURATIONS = (4, 5, 10, 15)
 
 
 def _even(value: int) -> int:
@@ -86,6 +89,43 @@ def image_size_for_aspect(
     return f"{width}x{height}"
 
 
+def frame_image_size_for_resolution(
+    aspect_ratio: str,
+    resolution: str = DEFAULT_VIDEO_RESOLUTION,
+) -> str:
+    """Keyframe size aligned to video output (e.g. 480p → 852x480 for 16:9)."""
+    short_side = video_short_side_for_resolution(resolution)
+    return frame_size_for_aspect(aspect_ratio, short_side=short_side)
+
+
+def scene_image_size_for_aspect(aspect_ratio: str) -> str:
+    """Scene anchor / shot keyframes at Seedream API minimum for the aspect ratio."""
+    return image_size_for_aspect(aspect_ratio)
+
+
+def dimensions_for_turnaround_min_pixels(
+    min_pixels: int = SEEDREAM_MIN_PIXELS,
+) -> Tuple[int, int]:
+    """3:1 wide turnaround sheet (front | side | back) meeting Seedream minimum area."""
+    height = _even(int(math.ceil(math.sqrt(min_pixels / 3))))
+    width = _even(height * 3)
+    while width * height < min_pixels:
+        height += 2
+        width = _even(height * 3)
+    return width, height
+
+
+def portrait_turnaround_size(min_pixels: int = SEEDREAM_MIN_PIXELS) -> str:
+    """Wide turnaround sheet: front | side | back panels in one image."""
+    width, height = dimensions_for_turnaround_min_pixels(min_pixels)
+    return f"{width}x{height}"
+
+
+def portrait_view_size(min_pixels: int = SEEDREAM_MIN_PIXELS) -> str:
+    """Single full-body portrait view (square, API minimum)."""
+    return image_size_for_aspect("1:1", min_pixels=min_pixels)
+
+
 def concat_dimensions_for_aspect(
     aspect_ratio: str,
     short_side: int = DEFAULT_SHORT_SIDE,
@@ -97,6 +137,29 @@ def video_short_side_for_resolution(resolution: str) -> int:
     """Map Seedance resolution label to concat/output short side in pixels."""
     mapping = {"480p": 480, "720p": 720, "1080p": 1080}
     return mapping.get((resolution or DEFAULT_VIDEO_RESOLUTION).lower(), 720)
+
+
+def resolve_max_shots_for_duration(episode_duration: int) -> Optional[int]:
+    """≤15s → one Seedance clip; longer targets use multi-shot + concat."""
+    if episode_duration <= 0:
+        return None
+    if episode_duration <= SEEDANCE_SINGLE_CLIP_MAX_SECONDS:
+        return 1
+    return max(1, min(3, episode_duration // 5))
+
+
+def seedance_shot_duration(total_seconds: int, shot_count: int) -> int:
+    """Map target length to a Seedance-supported duration (4/5/10/15s)."""
+    if shot_count <= 0:
+        return 5
+    if total_seconds <= 0:
+        return 5
+    if shot_count == 1 and total_seconds <= SEEDANCE_SINGLE_CLIP_MAX_SECONDS:
+        if total_seconds in SEEDANCE_SUPPORTED_DURATIONS:
+            return total_seconds
+        return min(SEEDANCE_SUPPORTED_DURATIONS, key=lambda d: abs(d - total_seconds))
+    per_shot = total_seconds / shot_count
+    return min(SEEDANCE_SUPPORTED_DURATIONS, key=lambda d: abs(d - per_shot))
 
 
 def parse_aspect_ratio(user_requirement: str, default: str = DEFAULT_ASPECT_RATIO) -> str:

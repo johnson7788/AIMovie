@@ -14,7 +14,7 @@ from langchain.chat_models import init_chat_model
 from tools.render_backend import RenderBackend
 from utils.provider_presets import resolve_chat_model_config
 from utils.image import image_output_to_pil, crop_turnaround_views
-from utils.pipeline_media import aspect_ratio_llm_hint
+from utils.pipeline_media import aspect_ratio_llm_hint, resolve_max_shots_for_duration, SEEDANCE_SINGLE_CLIP_MAX_SECONDS
 from agents.best_image_selector import BestImageSelector
 
 
@@ -52,12 +52,12 @@ def build_effective_user_requirement(
             f"each episode should map to one scene in the script."
         )
     if episode_duration > 0:
-        max_shots = max(1, min(3, episode_duration // 5))
+        max_shots = resolve_max_shots_for_duration(episode_duration) or 1
         parts.append(
             f"Target episode duration: approximately {episode_duration} seconds. "
             f"Use at most {max_shots} shots in the storyboard."
         )
-        if episode_duration <= 5:
+        if episode_duration <= SEEDANCE_SINGLE_CLIP_MAX_SECONDS:
             parts.append(
                 "Use exactly ONE shot in the storyboard for a single continuous clip."
             )
