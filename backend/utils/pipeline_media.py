@@ -18,6 +18,7 @@ SUPPORTED_ASPECT_RATIOS = (
 )
 
 DEFAULT_ASPECT_RATIO = "9:16"
+DEFAULT_VIDEO_RESOLUTION = "480p"
 DEFAULT_SHORT_SIDE = 720
 # GPUGEEK / Volcengine Seedream minimum output area (e.g. 1920x1920)
 SEEDREAM_MIN_PIXELS = 3_686_400
@@ -90,6 +91,12 @@ def concat_dimensions_for_aspect(
     short_side: int = DEFAULT_SHORT_SIDE,
 ) -> Tuple[int, int]:
     return dimensions_for_aspect(aspect_ratio, short_side=short_side)
+
+
+def video_short_side_for_resolution(resolution: str) -> int:
+    """Map Seedance resolution label to concat/output short side in pixels."""
+    mapping = {"480p": 480, "720p": 720, "1080p": 1080}
+    return mapping.get((resolution or DEFAULT_VIDEO_RESOLUTION).lower(), 720)
 
 
 def parse_aspect_ratio(user_requirement: str, default: str = DEFAULT_ASPECT_RATIO) -> str:

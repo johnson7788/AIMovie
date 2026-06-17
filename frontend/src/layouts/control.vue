@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import HomeSvg from '@/svg/tabs/home.vue'
-import SquareSvg from '@/svg/tabs/square.vue'
 import UserSvg from '@/svg/tabs/user.vue'
 import HomeActiveSvg from '@/svg/tabs/home-active.vue'
-import SquareActiveSvg from '@/svg/tabs/square-active.vue'
 import UserActiveSvg from '@/svg/tabs/user-active.vue'
 import IconLogoSvg from '@/svg/icon/icon-logo.vue'
 import NoticeSvg from '@/svg/tabs/notice.vue'
@@ -20,10 +18,8 @@ const { t } = useI18n()
 const iconMap: Record<string, any> = {
     ...ElementPlusIconsVue,
     HomeSvg,
-    SquareSvg,
     UserSvg,
     HomeActiveSvg,
-    SquareActiveSvg,
     UserActiveSvg,
     IconLogoSvg,
     NoticeSvg,
@@ -37,14 +33,6 @@ const menus = computed(() => [
         menu: 'index',
         icon: 'HomeSvg',
         activeIcon: 'HomeActiveSvg'
-    },
-    {
-        type: 'router',
-        name: t('menu.square'),
-        path: '/square',
-        menu: 'square',
-        icon: 'SquareSvg',
-        activeIcon: 'SquareActiveSvg'
     },
     {
         type: 'router',

@@ -8,36 +8,13 @@ interface DurationOption {
     label: string;
 }
 
-const props = withDefaults(defineProps<{
+const props = defineProps<{
     modelValue: number;
-    variant?: 'default' | 'drama' | 'script';
-}>(), {
-    variant: 'default',
-});
+}>();
 
 const emit = defineEmits(['update:modelValue']);
 
-const defaultOptions = computed<DurationOption[]>(() => [
-    { value: 60, label: `60${t('episode.second')}` },
-    { value: 90, label: `90${t('episode.second')}` },
-    { value: 120, label: `120${t('episode.second')}` },
-    { value: 150, label: `150${t('episode.second')}` },
-    { value: 180, label: `180${t('episode.second')}` },
-    { value: 210, label: `210${t('episode.second')}` },
-    { value: 240, label: `240${t('episode.second')}` },
-    { value: 270, label: `270${t('episode.second')}` },
-    { value: 300, label: `300${t('episode.second')}` },
-]);
-
-const dramaOptions = computed<DurationOption[]>(() => [
-    { value: 15, label: `15${t('episode.second')}` },
-    { value: 30, label: `30${t('episode.second')}` },
-    { value: 60, label: `60${t('episode.second')}` },
-    { value: 180, label: t('episode.minute3') },
-    { value: 600, label: t('episode.minute10') },
-]);
-
-const scriptOptions = computed<DurationOption[]>(() => [
+const durationOptions = computed<DurationOption[]>(() => [
     { value: 5, label: `5${t('episode.second')}` },
     { value: 10, label: `10${t('episode.second')}` },
     { value: 15, label: `15${t('episode.second')}` },
@@ -45,12 +22,6 @@ const scriptOptions = computed<DurationOption[]>(() => [
     { value: 60, label: `60${t('episode.second')}` },
     { value: 120, label: t('episode.minute2') },
 ]);
-
-const durationOptions = computed(() => {
-    if (props.variant === 'drama') return dramaOptions.value;
-    if (props.variant === 'script') return scriptOptions.value;
-    return defaultOptions.value;
-});
 
 const selectedLabel = computed(() => {
     const matched = durationOptions.value.find(item => item.value === props.modelValue);
@@ -67,12 +38,12 @@ const handleSelect = (value: number) => {
         <template #reference>
             <slot>
                 <div class="flex flex-center grid-gap-2  input-button input-button-selected px-6 ">
-                    <span>{{ props.variant === 'script' ? $t('episode.durationShort') : $t('episode.duration') }}</span>
+                    <span>{{ $t('episode.durationShort') }}</span>
                     <span class="h10 font-weight-600 text-episode-sum">{{ selectedLabel }}</span>
                 </div>
             </slot>
         </template>
-        <span class="h10">{{ props.variant === 'script' ? $t('episode.selectDurationShort') : $t('episode.selectDuration') }}</span>
+        <span class="h10">{{ $t('episode.selectDurationShort') }}</span>
         <div class="grid-columns-4 grid-gap-4 text-center mt-4">
             <div class="grid-column-2 btn rounded-4 p-4" v-for="item in durationOptions" :key="item.value" :class="{'active': props.modelValue === item.value}"
                 @click.stop="handleSelect(item.value)">

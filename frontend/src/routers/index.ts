@@ -64,15 +64,6 @@ const router = createRouter({
                     }
                 },
                 {
-                    path: '/square',
-                    name: 'square',
-                    component: () => import("@/pages/works/square.vue"),
-                    meta: {
-                        title: i18n.global.t('menu.square'),
-                        menu: 'square',
-                    }
-                },
-                {
                     path: '/works/:drama_id',
                     name: 'works-detail',
                     component: () => import("@/pages/works/drama.vue"),
@@ -334,7 +325,7 @@ router.beforeEach(async (to, from, next) => {
             // ignore guest bootstrap failure
         }
     }
-    const whiteList = ['index', 'article', 'progress', 'square']
+    const whiteList = ['index', 'article', 'progress']
     if (!userStore.hasLogin() && !whiteList.includes(to.name as string)) {
         return next({ name: 'index' })
     }

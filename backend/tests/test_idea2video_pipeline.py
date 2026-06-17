@@ -137,6 +137,15 @@ class TestPipelineCall(unittest.TestCase):
             return_value=script_data or [{"scene": 1}]
         )
 
+    def _mock_scene_video(self, working_dir: str, scene_idx: int = 0) -> str:
+        from pathlib import Path
+
+        scene_video = os.path.join(working_dir, f"scene_{scene_idx}", "final_video.mp4")
+        Path(scene_video).parent.mkdir(parents=True, exist_ok=True)
+        with open(scene_video, "wb") as handle:
+            handle.write(b"fake-video")
+        return scene_video
+
     @patch("utils.video.concat_videos")
     @patch("pipelines.idea2video_pipeline.Script2VideoPipeline")
     @patch("os.makedirs")
@@ -174,6 +183,7 @@ class TestPipelineCall(unittest.TestCase):
                 user_requirement="Make it good",
                 style="storybook",
                 episode_count=2,
+                episode_duration=10,
                 progress_callback=progress_callback,
             )
 
@@ -208,7 +218,8 @@ class TestPipelineCall(unittest.TestCase):
         script_data = [{"scene": 1, "description": "Opening scene"}]
         self._setup_mocks(pipeline, story_text=story_text, script_data=script_data)
 
-        mock_s2v_instance = AsyncMock(return_value="/tmp/scene_0/final_video.mp4")
+        scene_video = self._mock_scene_video(pipeline.working_dir)
+        mock_s2v_instance = AsyncMock(return_value=scene_video)
         MockS2V.return_value = mock_s2v_instance
 
         events = []
@@ -252,28 +263,53 @@ class TestPipelineCall(unittest.TestCase):
     @patch("pipelines.idea2video_pipeline.Script2VideoPipeline")
     @patch("os.makedirs")
     def test_uses_concat_videos_not_moviepy(self, mock_makedirs, MockS2V, mock_concat):
-        """Final concatenation should use concat_videos (ffmpeg), not MoviePy."""
+        """Multi-scene final output should use concat_videos (ffmpeg), not MoviePy."""
         pipeline = self._make_pipeline()
         pipeline.working_dir = "/tmp/test_idea2video/test_hash"
-        self._setup_mocks(pipeline)
+        self._setup_mocks(pipeline, script_data=[{"scene": 1}, {"scene": 2}])
 
-        mock_s2v_instance = AsyncMock(return_value="/tmp/scene_0/final_video.mp4")
+        scene_videos = [
+            self._mock_scene_video(pipeline.working_dir, 0),
+            self._mock_scene_video(pipeline.working_dir, 1),
+        ]
+        mock_s2v_instance = AsyncMock(side_effect=scene_videos)
         MockS2V.return_value = mock_s2v_instance
 
         async def run():
             await pipeline(
                 idea="test", user_requirement="test", style="test",
-                episode_count=1, progress_callback=AsyncMock(),
+                episode_count=2, episode_duration=10, progress_callback=AsyncMock(),
             )
 
         asyncio.run(run())
 
-        # concat_videos should have been called exactly once
         mock_concat.assert_called_once()
         call_args = mock_concat.call_args[0]
         video_paths = call_args[0]
-        self.assertEqual(len(video_paths), 1)
+        self.assertEqual(len(video_paths), 2)
         self.assertIn("final_video.mp4", video_paths[0])
+
+    @patch("utils.video.concat_videos")
+    @patch("pipelines.idea2video_pipeline.Script2VideoPipeline")
+    @patch("os.makedirs")
+    def test_single_scene_skips_concat(self, mock_makedirs, MockS2V, mock_concat):
+        pipeline = self._make_pipeline()
+        pipeline.working_dir = "/tmp/test_idea2video/test_hash"
+        self._setup_mocks(pipeline)
+
+        scene_video = self._mock_scene_video(pipeline.working_dir)
+        mock_s2v_instance = AsyncMock(return_value=scene_video)
+        MockS2V.return_value = mock_s2v_instance
+
+        async def run():
+            await pipeline(
+                idea="test", user_requirement="test", style="test",
+                episode_count=1, episode_duration=5, progress_callback=AsyncMock(),
+            )
+
+        asyncio.run(run())
+
+        mock_concat.assert_not_called()
 
     @patch("utils.video.concat_videos")
     @patch("pipelines.idea2video_pipeline.Script2VideoPipeline")
@@ -284,6 +320,8 @@ class TestPipelineCall(unittest.TestCase):
         pipeline.working_dir = "/tmp/test_idea2video/test_hash"
         self._setup_mocks(pipeline)
 
+        scene_video = self._mock_scene_video(pipeline.working_dir)
+
         # Script2VideoPipeline mock: emit shot artifact through callback, then return path
         async def fake_s2v(**kwargs):
             cb = kwargs.get("progress_callback")
@@ -293,7 +331,7 @@ class TestPipelineCall(unittest.TestCase):
                     "file_path": "shots/0/first_frame.png",
                     "shot_idx": 0, "frame_type": "first_frame",
                 })
-            return "/tmp/scene_0/final_video.mp4"
+            return scene_video
 
         mock_s2v_instance = AsyncMock(side_effect=fake_s2v)
         MockS2V.return_value = mock_s2v_instance
@@ -389,6 +427,15 @@ class TestBuildEffectiveUserRequirement(unittest.TestCase):
         result = build_effective_user_requirement("做一个短剧", episode_count=1, episode_duration=15)
         self.assertIn("原创虚构角色与场景", result)
         self.assertIn("避免模仿知名影视或宗教地标", result)
+
+    def test_five_second_duration_requests_single_shot(self):
+        from pipelines.idea2video_pipeline import build_effective_user_requirement
+
+        result = build_effective_user_requirement("", episode_count=1, episode_duration=5)
+        self.assertIn("Use at most 1 shots", result)
+        self.assertIn("Use exactly ONE shot", result)
+        self.assertNotIn("Prefer 2-3 shots", result)
+        self.assertNotIn("Prefer 3 shots", result)
 
 
 if __name__ == "__main__":

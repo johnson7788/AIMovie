@@ -11,6 +11,9 @@
                 </div>
             </div>
             <div class="header-right">
+                <el-button v-if="isComplete" type="primary" @click="router.push('/user')">
+                    {{ $t('generate.viewInProfile') }}
+                </el-button>
                 <span class="task-id">Task: {{ taskId?.substring(0, 8) }}...</span>
             </div>
         </div>

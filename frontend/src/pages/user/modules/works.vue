@@ -9,9 +9,9 @@
                         </el-icon>
                     </div>
                     <span class="box-drama-episode ">
-                        {{ $t('works.totalEpisodes', { num: item.episode_num }) }}
+                        {{ item.task_id ? $t('works.videoWork') : $t('works.totalEpisodes', { num: item.episode_num }) }}
                     </span>
-                    <el-avatar :src="item.cover" class="box-image" shape="square">
+                    <el-avatar :src="resolveAssetUrl(item.cover)" class="box-image" shape="square">
                         <div class="flex flex-column grid-gap-1 flex-center" v-if="item.cover_state">
                             <el-icon size="40">
                                 <Loading class="circular" />
@@ -46,8 +46,11 @@ import { ResponseCode } from '@/common/const';
 import { useUserStore } from '@/stores';
 import { ElMessageBox, ElMessage } from 'element-plus';
 import { useI18n } from 'vue-i18n';
+import { buildApiUrl } from '@/common/apiBaseUrl';
 import router from '@/routers';
 const { t } = useI18n()
+
+const resolveAssetUrl = (url: string) => url ? buildApiUrl(url) : '';
 
 const userStore = useUserStore();
 const SearchForm = reactive({
@@ -101,6 +104,10 @@ const handleDelete = (item: any) => {
     });
 }
 const handleItemClick = (item: any) => {
+    if (item.task_id) {
+        router.push(`/progress/${item.task_id}?mode=${item.mode || 'idea2video'}`);
+        return;
+    }
     router.push('/works/' + item.id);
 }
 onMounted(() => {

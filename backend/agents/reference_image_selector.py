@@ -4,7 +4,6 @@ from tenacity import retry, stop_after_attempt
 from pydantic import BaseModel, Field
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.output_parsers import PydanticOutputParser
-from langchain.chat_models import init_chat_model
 from utils.image import image_path_to_b64
 
 from utils.retry import after_func
@@ -46,12 +45,11 @@ You need to select up to 8 of the most relevant reference images based on the us
 
 
 [Guidelines]
-- Ensure that the language of all output values (not include keys) matches that used in the frame description.
+- Ensure that the language of all output values (except keys) matches that used in the frame description.
 - The reference image descriptions may depict the same character from different angles, in different outfits, or in different scenes. Identify the description closest to the version described by the user
 - Prioritize image descriptions with similar compositions, i.e., shots taken by the same camera.
 - The images from prior frames are arranged in chronological order. Give higher priority to more recent images (those closer to the end of the sequence).
 - Choose reference image descriptions that are as concise as possible and avoid including duplicate information. For example, if Image 3 depicts the facial features of Bob from the front, and Image 1 also depicts Bob's facial features from the front-view portrait, then Image 1 is redundant and should not be selected.
-- When a new character appears in the frame description, prioritize selecting their portrait image description (if available) to ensure accurate depiction of their appearance. Pay attention to whether the character is facing the camera from the front, side, or back. Choose the most suitable view as the reference image for the character.
 - For character portraits, you can only select at most one image from multiple views (front, side, back). Choose the most appropriate one based on the frame description. For example, when depicting a character from the side, choose the side view of the character.
 - Select at most **8** optimal reference image descriptions.
 - Match the visual medium implied by the frame description and reference images (live-action film vs illustration); do not switch to anime unless references are illustrated.
@@ -147,6 +145,44 @@ class ReferenceImageSelector:
         self.chat_model = chat_model
         self.multimodal_model = multimodal_model or chat_model
 
+    @staticmethod
+    def _should_fallback_to_text_only(error: Exception) -> bool:
+        message = str(error).lower()
+        return "multimodal" in message or "image_url" in message or "vision" in message
+
+    async def _select_with_text_only(
+        self,
+        image_path_and_text_pairs: List[Tuple[str, str]],
+        frame_description: str,
+    ) -> dict:
+        human_content = []
+        for idx, (_, text) in enumerate(image_path_and_text_pairs):
+            human_content.append({
+                "type": "text",
+                "text": f"Image {idx}: {text}",
+            })
+        human_content.append({
+            "type": "text",
+            "text": human_prompt_template_select_reference_images.format(frame_description=frame_description),
+        })
+
+        parser = PydanticOutputParser(pydantic_object=RefImageIndicesAndTextPrompt)
+        messages = [
+            SystemMessage(content=system_prompt_template_select_reference_images_only_text.format(
+                format_instructions=parser.get_format_instructions(),
+            )),
+            HumanMessage(content=human_content),
+        ]
+        chain = self.chat_model | parser
+        response = await chain.ainvoke(messages)
+        reference_image_path_and_text_pairs = [
+            image_path_and_text_pairs[i] for i in response.ref_image_indices
+        ]
+        return {
+            "reference_image_path_and_text_pairs": reference_image_path_and_text_pairs,
+            "text_prompt": response.text_prompt,
+        }
+
 
     @retry(
         stop=stop_after_attempt(3),
@@ -189,6 +225,14 @@ class ReferenceImageSelector:
                 logging.error(f"Error get image prompt: \n{e}")
                 raise e
 
+        use_multimodal = self.multimodal_model is not self.chat_model
+        if not use_multimodal:
+            logging.info("Multimodal model unavailable; using text-only reference selection.")
+            return await self._select_with_text_only(
+                filtered_image_path_and_text_pairs,
+                frame_description,
+            )
+
         # 2. filter images using multimodal model
         human_content = []
         for idx, (image_path, text) in enumerate(filtered_image_path_and_text_pairs):
@@ -223,7 +267,14 @@ class ReferenceImageSelector:
             }
 
         except Exception as e:
+            if self._should_fallback_to_text_only(e):
+                logging.warning(
+                    "Multimodal reference selection failed (%s); falling back to text-only.",
+                    e,
+                )
+                return await self._select_with_text_only(
+                    filtered_image_path_and_text_pairs,
+                    frame_description,
+                )
             logging.error(f"Error get image prompt: \n{e}")
             raise e
-
-

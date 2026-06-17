@@ -20,6 +20,7 @@ from utils.pipeline_media import (
     concat_dimensions_for_aspect,
     image_size_for_aspect,
     resolve_aspect_ratio,
+    video_short_side_for_resolution,
 )
 from utils.pipeline_consistency import (
     build_crossfade_schedule,
@@ -34,6 +35,7 @@ from utils.style_prompts import expand_style_prompt, expand_video_style_prompt
 from utils.video import extract_last_frame_from_video
 from utils.video import ensure_valid_cached_video
 from agents.best_image_selector import BestImageSelector
+from agents.screenwriter import Screenwriter
 
 async def _noop_progress(_event):
     pass
@@ -42,6 +44,43 @@ async def _noop_progress(_event):
 def _max_shots_from_user_requirement(user_requirement: str) -> Optional[int]:
     match = re.search(r"Use at most (\d+) shots", user_requirement or "")
     return int(match.group(1)) if match else None
+
+
+def resolve_max_shots(user_requirement: str = "", episode_duration: int = 0) -> Optional[int]:
+    """Derive the hard shot cap from explicit duration or prompt text."""
+    if episode_duration > 0:
+        return max(1, min(3, episode_duration // 5))
+    parsed = _max_shots_from_user_requirement(user_requirement)
+    if parsed is not None:
+        return parsed
+    duration = _episode_duration_from_user_requirement(user_requirement)
+    if duration is not None:
+        return max(1, min(3, duration // 5))
+    return None
+
+
+def _cleanup_stale_shot_dirs(working_dir: str, allowed_shot_idxs: set[int]) -> bool:
+    shots_root = os.path.join(working_dir, "shots")
+    if not os.path.isdir(shots_root):
+        return False
+    removed_any = False
+    for name in os.listdir(shots_root):
+        if not name.isdigit():
+            continue
+        shot_idx = int(name)
+        if shot_idx not in allowed_shot_idxs:
+            stale_dir = os.path.join(shots_root, name)
+            shutil.rmtree(stale_dir, ignore_errors=True)
+            removed_any = True
+            logging.info("Removed stale cached shot directory: %s", stale_dir)
+    return removed_any
+
+
+def _invalidate_final_video_cache(working_dir: str) -> None:
+    final_video_path = os.path.join(working_dir, "final_video.mp4")
+    if os.path.exists(final_video_path):
+        os.remove(final_video_path)
+        logging.info("Removed stale final_video.mp4 cache at %s", final_video_path)
 
 
 def _episode_duration_from_user_requirement(user_requirement: str) -> Optional[int]:
@@ -56,12 +95,24 @@ def _episode_duration_from_user_requirement(user_requirement: str) -> Optional[i
 _SEEDANCE_SHOT_DURATIONS = (4, 5, 10)
 
 
-def _shot_duration_from_user_requirement(user_requirement: str, shot_count: int) -> int:
+def _effective_episode_duration(user_requirement: str, episode_duration: int = 0) -> int:
+    """Prefer explicit UI duration over text embedded in user_requirement."""
+    if episode_duration > 0:
+        return episode_duration
+    parsed = _episode_duration_from_user_requirement(user_requirement)
+    return parsed or 0
+
+
+def _shot_duration_from_user_requirement(
+    user_requirement: str,
+    shot_count: int,
+    episode_duration: int = 0,
+) -> int:
     """Pick Seedance-supported duration (4/5/10s) closest to target per-shot length."""
     if shot_count <= 0:
         return 5
-    total = _episode_duration_from_user_requirement(user_requirement)
-    if total is None:
+    total = _effective_episode_duration(user_requirement, episode_duration)
+    if total <= 0:
         return 5
     per_shot = total / shot_count
     return min(_SEEDANCE_SHOT_DURATIONS, key=lambda d: abs(d - per_shot))
@@ -87,6 +138,25 @@ def _images_are_nearly_identical(path_a: str, path_b: str, threshold: float = 1.
     return mse is not None and mse <= threshold
 
 
+def _should_skip_shot_concat(
+    user_requirement: str,
+    shot_count: int,
+    episode_duration: int = 0,
+) -> bool:
+    """5s clips are a single shot; no ffmpeg concat needed."""
+    duration = episode_duration or _episode_duration_from_user_requirement(user_requirement) or 0
+    if duration > 0 and duration <= 5:
+        return True
+    return shot_count <= 1
+
+
+def _finalize_single_shot_video(source_path: str, output_path: str) -> None:
+    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+    if os.path.abspath(source_path) == os.path.abspath(output_path):
+        return
+    shutil.copy2(source_path, output_path)
+
+
 def _safe_last_frame_description(frame_desc: str) -> str:
     return (
         f"{frame_desc}\n"
@@ -95,6 +165,24 @@ def _safe_last_frame_description(frame_desc: str) -> str:
         "composition while preserving the same character, wardrobe, location, lighting, "
         "and story continuity."
     )
+
+
+def _looks_like_brief_idea(script: str) -> bool:
+    """Detect one-line creative prompts that are not yet a screenplay."""
+    text = script.strip()
+    if len(text) < 20:
+        return True
+    if len(text) > 500:
+        return False
+    screenplay_markers = (
+        "INT.", "EXT.", "SCENE", "场景", "镜头", "【", "——", "---",
+        "FADE IN", "CUT TO",
+    )
+    if any(marker in text for marker in screenplay_markers):
+        return False
+    if text.count("\n") >= 3:
+        return False
+    return True
 
 
 class Script2VideoPipeline:
@@ -121,6 +209,7 @@ class Script2VideoPipeline:
         self.character_extractor = CharacterExtractor(chat_model=self.chat_model)
         self.character_portraits_generator = CharacterPortraitsGenerator(image_generator=self.image_generator)
         self.storyboard_artist = StoryboardArtist(chat_model=self.chat_model)
+        self.screenwriter = Screenwriter(chat_model=self.chat_model)
         self.camera_image_generator = CameraImageGenerator(chat_model=self.chat_model, image_generator=self.image_generator, video_generator=self.video_generator)
         self.reference_image_selector = ReferenceImageSelector(chat_model=self.chat_model, multimodal_model=multimodal_chat_model)
         self.best_image_selector = best_image_selector
@@ -156,6 +245,9 @@ class Script2VideoPipeline:
         if "multimodal_chat_model" in config:
             multimodal_args = resolve_chat_model_config(config["multimodal_chat_model"]["init_args"])
             multimodal_chat_model = init_chat_model(**multimodal_args)
+            print(f"🖼️ Multimodal model for reference selection: {multimodal_args.get('model')}")
+        elif chat_model_override is not None:
+            print("⚠️ No multimodal_chat_model in config; reference image selection will use text-only fallback.")
 
         if image_generator_override is not None and video_generator_override is not None:
             image_generator = image_generator_override
@@ -192,15 +284,25 @@ class Script2VideoPipeline:
         characters: List[CharacterInScene] = None,
         character_portraits_registry: Optional[Dict[str, Dict[str, Dict[str, str]]]] = None,
         aspect_ratio: str = "",
-        resolution: str = "720p",
+        resolution: str = "480p",
+        episode_duration: int = 0,
         progress_callback: Optional[Callable[[dict], Awaitable[None]]] = None,
     ):
         cb = progress_callback or _noop_progress
         self._progress_callback = cb
+        self._episode_duration = _effective_episode_duration(user_requirement, episode_duration)
+        self._max_shots = resolve_max_shots(user_requirement, self._episode_duration)
+        print(
+            f"⏱️ Episode duration: {self._episode_duration}s, "
+            f"max_shots={self._max_shots}, skip_concat={self._episode_duration <= 5 or self._max_shots == 1}"
+        )
         self._aspect_ratio = resolve_aspect_ratio(user_requirement, explicit=aspect_ratio or None)
-        self._resolution = resolution or "720p"
+        self._resolution = resolution or "480p"
         self._frame_size = image_size_for_aspect(self._aspect_ratio)
-        self._concat_size = concat_dimensions_for_aspect(self._aspect_ratio)
+        self._concat_size = concat_dimensions_for_aspect(
+            self._aspect_ratio,
+            short_side=video_short_side_for_resolution(self._resolution),
+        )
         self._style_prompt = expand_style_prompt(style)
         self._video_style_prompt = expand_video_style_prompt(style)
         self._style = style
@@ -208,10 +310,48 @@ class Script2VideoPipeline:
         self.camera_image_generator.aspect_ratio = self._aspect_ratio
         print(
             f"📐 Output aspect ratio: {self._aspect_ratio} "
-            f"(images={self._frame_size}, concat={self._concat_size[0]}x{self._concat_size[1]})"
+            f"(images={self._frame_size}, video={self._resolution}, "
+            f"concat={self._concat_size[0]}x{self._concat_size[1]})"
         )
 
         if characters is None:
+            script_path = os.path.join(self.working_dir, "script.txt")
+            if os.path.exists(script_path):
+                with open(script_path, "r", encoding="utf-8") as f:
+                    script = f.read()
+                print(f"🚀 Loaded script from {script_path}.")
+            elif _looks_like_brief_idea(script):
+                await cb({
+                    "type": "stage_start",
+                    "stage": "script",
+                    "message": "Expanding idea into script before character extraction...",
+                })
+                t0 = time.time()
+                print("📝 Input looks like a brief idea; expanding into script...")
+                story = await self.screenwriter.develop_story(
+                    idea=script,
+                    user_requirement=user_requirement,
+                )
+                scene_scripts = await self.screenwriter.write_script_based_on_story(
+                    story=story,
+                    user_requirement=user_requirement,
+                )
+                script = scene_scripts[0] if scene_scripts else story
+                with open(script_path, "w", encoding="utf-8") as f:
+                    f.write(script)
+                await cb({
+                    "type": "artifact",
+                    "stage": "script",
+                    "file_type": "text",
+                    "file_path": "script.txt",
+                    "content_preview": script[:500],
+                })
+                await cb({
+                    "type": "stage_end",
+                    "stage": "script",
+                    "duration_ms": int((time.time() - t0) * 1000),
+                })
+
             await cb({"type": "stage_start", "stage": "characters", "message": "Extracting characters from script..."})
             t0 = time.time()
             characters = await self.extract_characters(script=script)
@@ -223,7 +363,13 @@ class Script2VideoPipeline:
                 with open(character_portraits_registry_path, "r", encoding="utf-8") as f:
                     character_portraits_registry = json.load(f)
                 print(f"🚀 Loaded {len(character_portraits_registry)} character portraits from existing file.")
-                await cb({"type": "log", "level": "INFO", "message": f"Loaded {len(character_portraits_registry)} character portraits from cache."})
+                await cb({
+                    "type": "stage_start",
+                    "stage": "character_portraits",
+                    "message": f"Loaded {len(character_portraits_registry)} character portrait set(s) from cache.",
+                })
+                await self._emit_character_portrait_artifacts(character_portraits_registry, cb)
+                await cb({"type": "stage_end", "stage": "character_portraits", "duration_ms": 0})
             else:
                 await cb({"type": "stage_start", "stage": "character_portraits", "message": "Generating character portraits..."})
                 t0 = time.time()
@@ -246,6 +392,7 @@ class Script2VideoPipeline:
             script=script,
             characters=characters,
             user_requirement=user_requirement,
+            episode_duration=self._episode_duration,
         )
         await cb({"type": "stage_end", "stage": "storyboard", "duration_ms": int((time.time() - t0) * 1000), "shot_count": len(storyboard)})
 
@@ -264,9 +411,9 @@ class Script2VideoPipeline:
         await cb({"type": "stage_end", "stage": "scene_anchor", "duration_ms": int((time.time() - t0) * 1000)})
 
         self._shot_duration = _shot_duration_from_user_requirement(
-            user_requirement, len(shot_descriptions)
+            user_requirement, len(shot_descriptions), self._episode_duration
         )
-        target_episode = _episode_duration_from_user_requirement(user_requirement)
+        target_episode = self._episode_duration
         if target_episode:
             print(
                 f"⏱️ Per-shot video duration: {self._shot_duration}s "
@@ -318,17 +465,36 @@ class Script2VideoPipeline:
         await cb({"type": "stage_end", "stage": "frames", "duration_ms": int((time.time() - t0) * 1000)})
 
         final_video_path = os.path.join(self.working_dir, "final_video.mp4")
+        shot_video_paths = [
+            os.path.join(self.working_dir, "shots", f"{shot_description.idx}", "video.mp4")
+            for shot_description in shot_descriptions
+        ]
+        skip_concat = _should_skip_shot_concat(
+            user_requirement,
+            len(shot_descriptions),
+            self._episode_duration,
+        )
         if ensure_valid_cached_video(final_video_path, "scene final video"):
             print(f"🚀 Skipped concatenating videos, already exists.")
+        elif skip_concat:
+            source_video = shot_video_paths[0]
+            if not os.path.exists(source_video):
+                raise FileNotFoundError(f"Single-shot video not found: {source_video}")
+            await cb({
+                "type": "stage_start",
+                "stage": "concatenate",
+                "message": "Using single generated clip (no concat)...",
+            })
+            t0 = time.time()
+            print(f"🎬 Single {len(shot_descriptions)}-shot clip; copying to {final_video_path}...")
+            _finalize_single_shot_video(source_video, final_video_path)
+            print(f"☑️ Saved final video to {final_video_path}.")
+            await cb({"type": "stage_end", "stage": "concatenate", "duration_ms": int((time.time() - t0) * 1000)})
         else:
             await cb({"type": "stage_start", "stage": "concatenate", "message": "Concatenating shot videos..."})
             t0 = time.time()
             print(f"🎬 Starting concatenating videos...")
             from utils.video import concat_videos
-            shot_video_paths = [
-                os.path.join(self.working_dir, "shots", f"{shot_description.idx}", "video.mp4")
-                for shot_description in shot_descriptions
-            ]
             width, height = self._concat_size
             crossfade_schedule = build_crossfade_schedule(shot_descriptions)
             concat_videos(
@@ -1088,7 +1254,28 @@ class Script2VideoPipeline:
             print(f"✅ Completed character portrait generation for {len(characters)} characters.")
         else:
             print("🚀 All characters already have portraits, skipping portrait generation.")
+        if not character_portraits_registry:
+            print("ℹ️ No visible characters to generate portraits for.")
         return character_portraits_registry
+
+    async def _emit_character_portrait_artifacts(
+        self,
+        character_portraits_registry: Dict[str, Dict[str, Dict[str, str]]],
+        cb,
+    ) -> None:
+        for character_name, views in character_portraits_registry.items():
+            for view_name, view_data in views.items():
+                path = view_data.get("path") if isinstance(view_data, dict) else None
+                if not path or not os.path.exists(path):
+                    continue
+                await cb({
+                    "type": "artifact",
+                    "stage": "character_portraits",
+                    "file_type": "image",
+                    "file_path": os.path.relpath(path, self.working_dir).replace(os.sep, "/"),
+                    "character_name": character_name,
+                    "view": view_name,
+                })
 
 
     async def generate_portraits_for_single_character(
@@ -1188,8 +1375,23 @@ class Script2VideoPipeline:
         script: str,
         characters: List[CharacterInScene],
         user_requirement: str,
+        episode_duration: int = 0,
     ):
         storyboard_path = os.path.join(self.working_dir, "storyboard.json")
+        max_shots = resolve_max_shots(user_requirement, episode_duration)
+        storyboard_requirement = user_requirement
+        if max_shots == 1:
+            storyboard_requirement = (
+                f"{user_requirement}\n\n"
+                "CRITICAL: The storyboard must contain EXACTLY ONE shot (idx=0, is_last=true). "
+                "Do not split into multiple shots."
+            )
+        elif max_shots is not None:
+            storyboard_requirement = (
+                f"{user_requirement}\n\n"
+                f"CRITICAL: The storyboard must contain AT MOST {max_shots} shots."
+            )
+
         if os.path.exists(storyboard_path):
             with open(storyboard_path, 'r', encoding='utf-8') as f:
                 storyboard = json.load(f)
@@ -1200,17 +1402,25 @@ class Script2VideoPipeline:
             storyboard = await self.storyboard_artist.design_storyboard(
                 script=script,
                 characters=characters,
-                user_requirement=user_requirement,
+                user_requirement=storyboard_requirement,
                 retry_timeout=150,
             )
             with open(storyboard_path, 'w', encoding='utf-8') as f:
                 json.dump([shot.model_dump() for shot in storyboard], f, ensure_ascii=False, indent=4)
             print(f"✅ Designed storyboard and saved to {storyboard_path}.")
 
-        max_shots = _max_shots_from_user_requirement(user_requirement)
         if max_shots is not None and len(storyboard) > max_shots:
             storyboard = storyboard[:max_shots]
+            if len(storyboard) == 1:
+                storyboard[0].is_last = True
             print(f"✂️ Limited storyboard to {max_shots} shot(s) for target duration.")
+            with open(storyboard_path, 'w', encoding='utf-8') as f:
+                json.dump([shot.model_dump() for shot in storyboard], f, ensure_ascii=False, indent=4)
+            _invalidate_final_video_cache(self.working_dir)
+
+        allowed_shot_idxs = {shot.idx for shot in storyboard}
+        if _cleanup_stale_shot_dirs(self.working_dir, allowed_shot_idxs):
+            _invalidate_final_video_cache(self.working_dir)
 
         for shot_brief_description in storyboard:
             self.shot_desc_events[shot_brief_description.idx] = asyncio.Event()

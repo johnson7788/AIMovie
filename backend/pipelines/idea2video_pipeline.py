@@ -1,5 +1,6 @@
 import os
 import logging
+import shutil
 import time
 from agents import Screenwriter, CharacterExtractor, CharacterPortraitsGenerator
 from pipelines.script2video_pipeline import Script2VideoPipeline
@@ -56,11 +57,29 @@ def build_effective_user_requirement(
             f"Target episode duration: approximately {episode_duration} seconds. "
             f"Use at most {max_shots} shots in the storyboard."
         )
-        parts.append(
-            "Use exactly ONE camera position for the entire scene when possible. "
-            "Keep the same background, props, lighting, and room layout across all shots. "
-            "Prefer 2-3 shots total with minimal camera movement."
-        )
+        if episode_duration <= 5:
+            parts.append(
+                "Use exactly ONE shot in the storyboard for a single continuous clip."
+            )
+        elif max_shots <= 1:
+            parts.append(
+                "Use exactly ONE shot in the storyboard for a single continuous clip."
+            )
+        else:
+            parts.append(
+                f"Prefer {max_shots} shots total with minimal camera movement."
+            )
+        if max_shots > 1:
+            parts.append(
+                "Use exactly ONE camera position for the entire scene when possible. "
+                "Keep the same background, props, lighting, and room layout across all shots. "
+                "Prefer minimal camera movement."
+            )
+        else:
+            parts.append(
+                "Use exactly ONE camera position for the entire scene. "
+                "Keep one fixed background, props, lighting, and room layout in a single continuous clip."
+            )
         parts.append(
             "Short drama pacing: hook the audience in the first 3 seconds, "
             "build one clear conflict, use speakable dialogue, "
@@ -363,7 +382,7 @@ class Idea2VideoPipeline:
         episode_count: int = 0,
         episode_duration: int = 0,
         aspect_ratio: str = "",
-        resolution: str = "720p",
+        resolution: str = "480p",
         progress_callback: Optional[Callable[[dict], Awaitable[None]]] = None,
     ):
         cb = progress_callback or _noop_progress
@@ -371,7 +390,7 @@ class Idea2VideoPipeline:
         from utils.pipeline_media import resolve_aspect_ratio
 
         self._aspect_ratio = resolve_aspect_ratio(user_requirement, explicit=aspect_ratio or None)
-        self._resolution = resolution or "720p"
+        self._resolution = resolution or "480p"
         effective_requirement = build_effective_user_requirement(
             user_requirement, episode_count, episode_duration, self._aspect_ratio
         )
@@ -468,6 +487,7 @@ class Idea2VideoPipeline:
                 character_portraits_registry=character_portraits_registry,
                 aspect_ratio=self._aspect_ratio,
                 resolution=self._resolution,
+                episode_duration=episode_duration,
                 progress_callback=scoped_cb,
             )
             await cb({
@@ -483,13 +503,27 @@ class Idea2VideoPipeline:
         if ensure_valid_cached_video(final_video_path, "episode final video"):
             print(f"Skipped concatenating videos, already exists.")
             await cb({"type": "stage_end", "stage": "concatenate", "message": "Final video already exists"})
+        elif len(all_video_paths) == 1:
+            await cb({
+                "type": "stage_start",
+                "stage": "concatenate",
+                "message": "Using single scene video (no concat)...",
+            })
+            t0 = time.time()
+            print(f"Single scene output; copying to {final_video_path}...")
+            os.makedirs(os.path.dirname(final_video_path), exist_ok=True)
+            shutil.copy2(all_video_paths[0], final_video_path)
+            await cb({"type": "stage_end", "stage": "concatenate", "duration_ms": int((time.time() - t0) * 1000)})
         else:
             await cb({"type": "stage_start", "stage": "concatenate", "message": "Concatenating all scene videos..."})
             t0 = time.time()
             print(f"Starting concatenating videos...")
             from utils.video import concat_videos
-            from utils.pipeline_media import concat_dimensions_for_aspect
-            width, height = concat_dimensions_for_aspect(self._aspect_ratio)
+            from utils.pipeline_media import concat_dimensions_for_aspect, video_short_side_for_resolution
+            width, height = concat_dimensions_for_aspect(
+                self._aspect_ratio,
+                short_side=video_short_side_for_resolution(self._resolution),
+            )
             concat_videos(
                 all_video_paths,
                 final_video_path,

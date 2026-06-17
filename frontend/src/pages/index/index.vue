@@ -41,7 +41,7 @@ const form = reactive({
 	aspect_ratio: '16:9',
 	episode_sum: 1,
 	episode_duration: 5,
-	resolution: '720p'
+	resolution: '480p'
 })
 
 interface ExamplePreset {
@@ -63,7 +63,7 @@ const examplePresets = computed<ExamplePreset[]>(() => [
 		style: 'storybook',
 		aspect_ratio: '9:16',
 		episode_sum: 1,
-		episode_duration: 15,
+		episode_duration: 5,
 		model_id: '5',
 	},
 	{
@@ -73,7 +73,7 @@ const examplePresets = computed<ExamplePreset[]>(() => [
 		style: 'storybook',
 		aspect_ratio: '9:16',
 		episode_sum: 1,
-		episode_duration: 15,
+		episode_duration: 5,
 		model_id: '5',
 	},
 	{
@@ -83,7 +83,7 @@ const examplePresets = computed<ExamplePreset[]>(() => [
 		style: 'cinematic',
 		aspect_ratio: '9:16',
 		episode_sum: 1,
-		episode_duration: 15,
+		episode_duration: 5,
 		model_id: '5',
 	},
 	{
@@ -93,7 +93,7 @@ const examplePresets = computed<ExamplePreset[]>(() => [
 		style: 'cinematic',
 		aspect_ratio: '9:16',
 		episode_sum: 1,
-		episode_duration: 15,
+		episode_duration: 5,
 		model_id: '5',
 	},
 	{
@@ -103,7 +103,7 @@ const examplePresets = computed<ExamplePreset[]>(() => [
 		style: 'anime',
 		aspect_ratio: '9:16',
 		episode_sum: 1,
-		episode_duration: 15,
+		episode_duration: 5,
 		model_id: '5',
 	},
 ])
@@ -244,10 +244,10 @@ const xlLoading = useLoading({
 	showCancelButton: true,
 	showConfirmButton: true,
 	cancelButtonText: t('home.backHome'),
-	confirmButtonText: t('home.goSquare'),
+	confirmButtonText: t('home.goUserCenter'),
 	confirmButtonClick: () => {
 		xlLoading.close();
-		router.push('/square');
+		router.push('/user');
 	},
 	cancelButtonClick: () => {
 		xlLoading.close();
@@ -265,7 +265,7 @@ const resetForm = () => {
 	form.aspect_ratio = '16:9';
 	form.episode_sum = 1;
 	form.episode_duration = 5;
-	form.resolution = '720p';
+	form.resolution = '480p';
 	styleFind.value = { id: '' };
 	selectedModel.value = { id: '' };
 }
@@ -393,15 +393,9 @@ watch(
 	},
 	{ immediate: true, deep: true },
 )
-const handleScriptChange = (val: any) => {
-	switch (val) {
-		case 'script':
-			form.episode_sum = 1;
-			break;
-		case 'drama':
-			form.episode_sum = 1;
-			break;
-	}
+const handleScriptChange = () => {
+	form.episode_sum = 1;
+	form.episode_duration = 5;
 }
 const applyExample = (example: ExamplePreset) => {
 	form.script = example.mode;
@@ -409,7 +403,6 @@ const applyExample = (example: ExamplePreset) => {
 	form.style = example.style;
 	form.aspect_ratio = example.aspect_ratio;
 	form.episode_sum = example.episode_sum;
-	form.episode_duration = example.episode_duration;
 	form.model = example.model_id;
 	styleFind.value = { id: example.style };
 	selectedModel.value = modelStore.get('creative_script', example.model_id) || {};
@@ -518,15 +511,7 @@ onUnmounted(() => {
 					</div>
 
 					<xl-aspect-ratio v-model="form.aspect_ratio" />
-					<xl-episode-sum
-						v-if="form.script === 'drama'"
-						v-model="form.episode_sum"
-						variant="drama"
-					/>
-					<xl-episode-duration
-						v-model="form.episode_duration"
-						:variant="form.script === 'drama' ? 'drama' : 'script'"
-					/>
+					<xl-episode-duration v-model="form.episode_duration" />
 					<xl-resolution v-model="form.resolution" />
 					<div class="flex-1"></div>
 					<div class="flex flex-center grid-gap-2 input-button " style="width: 40px; height: 40px;"

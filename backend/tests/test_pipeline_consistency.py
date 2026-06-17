@@ -1,3 +1,4 @@
+import json
 import os
 import tempfile
 import unittest
@@ -6,7 +7,11 @@ from unittest.mock import MagicMock
 from PIL import Image
 
 from interfaces import ShotDescription
-from pipelines.script2video_pipeline import Script2VideoPipeline
+from pipelines.script2video_pipeline import (
+    Script2VideoPipeline,
+    _should_skip_shot_concat,
+    resolve_max_shots,
+)
 from utils.pipeline_consistency import (
     build_crossfade_schedule,
     resolve_shot_end_reference,
@@ -124,6 +129,62 @@ class TestPipelineConsistency(unittest.TestCase):
 
             self.assertFalse(os.path.exists(first_frame))
             self.assertFalse(os.path.exists(video_path))
+
+    def test_skip_shot_concat_for_five_second_target(self):
+        requirement = "Target episode duration: approximately 5 seconds. Use at most 1 shots"
+        self.assertTrue(_should_skip_shot_concat(requirement, 1))
+        self.assertFalse(_should_skip_shot_concat(
+            "Target episode duration: approximately 10 seconds. Use at most 2 shots",
+            2,
+        ))
+
+    def test_resolve_max_shots_from_duration(self):
+        self.assertEqual(resolve_max_shots(episode_duration=5), 1)
+        self.assertEqual(resolve_max_shots(episode_duration=10), 2)
+        self.assertEqual(resolve_max_shots(episode_duration=15), 3)
+        self.assertEqual(resolve_max_shots(episode_duration=30), 3)
+
+    def test_resolve_max_shots_prefers_explicit_duration(self):
+        requirement = "Target episode duration: approximately 15 seconds. Use at most 3 shots."
+        self.assertEqual(resolve_max_shots(requirement, episode_duration=5), 1)
+
+    def test_design_storyboard_trims_cached_three_shot_storyboard_for_five_seconds(self):
+        async def _run():
+            with tempfile.TemporaryDirectory() as tmpdir:
+                storyboard_path = os.path.join(tmpdir, "storyboard.json")
+                with open(storyboard_path, "w", encoding="utf-8") as handle:
+                    json.dump([
+                        {"idx": 0, "is_last": False, "cam_idx": 0, "visual_desc": "a", "audio_desc": ""},
+                        {"idx": 1, "is_last": False, "cam_idx": 0, "visual_desc": "b", "audio_desc": ""},
+                        {"idx": 2, "is_last": True, "cam_idx": 0, "visual_desc": "c", "audio_desc": ""},
+                    ], handle)
+                for idx in (0, 1, 2):
+                    os.makedirs(os.path.join(tmpdir, "shots", str(idx)), exist_ok=True)
+                with open(os.path.join(tmpdir, "final_video.mp4"), "wb") as handle:
+                    handle.write(b"stale concat")
+
+                pipeline = Script2VideoPipeline.__new__(Script2VideoPipeline)
+                pipeline.working_dir = tmpdir
+                pipeline.shot_desc_events = {}
+                pipeline.storyboard_artist = MagicMock()
+
+                storyboard = await pipeline.design_storyboard(
+                    script="test script",
+                    characters=[],
+                    user_requirement="Target episode duration: approximately 5 seconds. Use at most 1 shots.",
+                    episode_duration=5,
+                )
+
+                self.assertEqual(len(storyboard), 1)
+                self.assertFalse(os.path.exists(os.path.join(tmpdir, "shots", "1")))
+                self.assertFalse(os.path.exists(os.path.join(tmpdir, "shots", "2")))
+                self.assertFalse(os.path.exists(os.path.join(tmpdir, "final_video.mp4")))
+                with open(storyboard_path, encoding="utf-8") as handle:
+                    saved = json.load(handle)
+                self.assertEqual(len(saved), 1)
+
+        import asyncio
+        asyncio.run(_run())
 
 
 if __name__ == "__main__":

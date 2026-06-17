@@ -22,7 +22,6 @@
         <div class="py-10" v-if="activeName === 'works'">
             <xl-tabs v-model="tabsActiveName" class="text-info" color="var(--el-color-white)">
                 <xl-tabs-item value="works">{{ t('user.createWorks') }}</xl-tabs-item>
-                <xl-tabs-item value="publish">{{ t('user.publishWorks') }}</xl-tabs-item>
             </xl-tabs>
         </div>
         <Works v-if="activeName === 'works'" />

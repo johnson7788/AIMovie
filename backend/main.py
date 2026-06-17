@@ -90,6 +90,7 @@ from fastapi.responses import FileResponse, StreamingResponse, JSONResponse, Res
 from pydantic import BaseModel, Field
 from progress_manager import ProgressManager
 import auth as auth_service
+import user_works as user_works_service
 from utils.retry import format_exception
 
 def _import_pipelines():
@@ -153,6 +154,15 @@ async def _download_image(url: str) -> str:
 
 def _backend_path(*parts: str) -> str:
     return os.path.join(_BACKEND_DIR, *parts)
+
+
+def _default_pipeline_config(basename: str) -> str:
+    """Prefer provider-specific config when credentials are available."""
+    if os.environ.get("GPUGEEK"):
+        gpugeek_path = f"configs/{basename}_gpugeek.yaml"
+        if os.path.exists(_backend_path(gpugeek_path)):
+            return gpugeek_path
+    return f"configs/{basename}.yaml"
 
 
 def _track_background_task(coro):
@@ -285,6 +295,7 @@ def init_db():
     except sqlite3.OperationalError:
         pass  # column already exists
     auth_service.init_auth_tables(conn)
+    user_works_service.init_works_tables(conn)
     conn.commit()
     return conn
 
@@ -359,7 +370,8 @@ class Script2VideoRequest(BaseModel):
     config_path: str = "configs/script2video.yaml"
     model_id: str = ""
     aspect_ratio: str = ""
-    resolution: str = "720p"
+    resolution: str = "480p"
+    episode_duration: int = 0
 
 
 class Idea2VideoRequest(BaseModel):
@@ -371,7 +383,7 @@ class Idea2VideoRequest(BaseModel):
     episode_count: int = 0  # 0 = let LLM decide; >0 = force this many episodes
     episode_duration: int = 0  # seconds per episode; 0 = no hard limit
     aspect_ratio: str = ""
-    resolution: str = "720p"
+    resolution: str = "480p"
 
 
 class TaskResponse(BaseModel):
@@ -416,6 +428,7 @@ async def run_script2video(task_id: str, req: Script2VideoRequest):
             req.model_id,
             req.aspect_ratio or "",
             req.resolution or "1080p",
+            str(req.episode_duration or 0),
         ])
         cache_key = hashlib.sha256(cache_key_raw.encode("utf-8")).hexdigest()[:16]
         pipeline.working_dir = os.path.join(pipeline.working_dir, cache_key)
@@ -442,6 +455,7 @@ async def run_script2video(task_id: str, req: Script2VideoRequest):
             style=req.style,
             aspect_ratio=req.aspect_ratio,
             resolution=req.resolution,
+            episode_duration=req.episode_duration,
             progress_callback=progress_callback,
         )
         pm.emit(task_id, {"type": "complete", "result": result_path})
@@ -450,6 +464,7 @@ async def run_script2video(task_id: str, req: Script2VideoRequest):
                 "UPDATE tasks SET status = ?, result = ? WHERE task_id = ?",
                 ("completed", result_path, task_id),
             )
+        _persist_user_work(task_id)
     except Exception as e:
         pm.emit(task_id, {"type": "error", "error": format_exception(e)})
         with get_db() as conn:
@@ -621,6 +636,7 @@ async def run_idea2video(task_id: str, req: Idea2VideoRequest):
                 "UPDATE tasks SET status = ?, result = ? WHERE task_id = ?",
                 ("completed", result_path, task_id),
             )
+        _persist_user_work(task_id)
     except Exception as e:
         pm.emit(task_id, {"type": "error", "error": format_exception(e)})
         with get_db() as conn:
@@ -988,17 +1004,24 @@ class LegacySubmitRequest(BaseModel):
     prompt: str = ""
     style: str = ""
     aspect_ratio: str = "9:16"
-    episode_sum: int = 0
-    episode_duration: int = 60
-    resolution: str = "720p"
+    episode_sum: int = 1
+    episode_duration: int = 5
+    resolution: str = "480p"
 
 
 @app.post("/app/shortplay/api/Index/submit")
-async def legacy_submit(req: LegacySubmitRequest):
+async def legacy_submit(
+    req: LegacySubmitRequest,
+    authorization: Optional[str] = Header(default=None),
+):
     """Handle creative mode submit from legacy frontend.
     Maps to idea2video or script2video based on req.script field.
     """
+    from pipelines.idea2video_pipeline import build_effective_user_requirement
+
+    user = _optional_user(authorization)
     task_id = str(uuid.uuid4())
+    work_title = _task_title(req.title, req.prompt)
 
     # Build user_requirement from optional fields
     user_requirement_parts = []
@@ -1006,28 +1029,43 @@ async def legacy_submit(req: LegacySubmitRequest):
         user_requirement_parts.append(f"Title: {req.title}")
     if req.description:
         user_requirement_parts.append(f"Description: {req.description}")
-    if req.aspect_ratio:
-        user_requirement_parts.append(f"Aspect ratio: {req.aspect_ratio}")
-    if req.episode_duration:
-        user_requirement_parts.append(f"Episode duration: {req.episode_duration}s")
-    user_requirement = "; ".join(user_requirement_parts) if user_requirement_parts else ""
-    episode_count = req.episode_sum if req.episode_sum > 0 else 0
+    base_requirement = "; ".join(user_requirement_parts) if user_requirement_parts else ""
+    episode_duration = req.episode_duration if req.episode_duration > 0 else 5
+    logging.info(
+        "legacy_submit mode=%s episode_duration=%ss aspect_ratio=%s resolution=%s",
+        req.script,
+        episode_duration,
+        req.aspect_ratio,
+        req.resolution,
+    )
+    user_requirement = build_effective_user_requirement(
+        base_requirement,
+        episode_count=1,
+        episode_duration=episode_duration,
+        aspect_ratio=req.aspect_ratio,
+    )
+    episode_count = 1
 
     if req.script == "script":
         script_req = Script2VideoRequest(
             script=req.prompt,
             user_requirement=user_requirement,
             style=req.style or "Cinematic",
-            config_path="configs/script2video.yaml",
+            config_path=_default_pipeline_config("script2video"),
             model_id=req.model,
             aspect_ratio=req.aspect_ratio,
             resolution=req.resolution,
+            episode_duration=episode_duration,
         )
         mode = "script2video"
         with get_db() as conn:
-            conn.execute(
-                "INSERT INTO tasks (task_id, mode, status) VALUES (?, ?, ?)",
-                (task_id, mode, "pending"),
+            _insert_task(
+                conn,
+                task_id=task_id,
+                mode=mode,
+                user_id=user["id"] if user else None,
+                title=work_title,
+                prompt=req.prompt,
             )
         _track_background_task(run_script2video(task_id, script_req))
     else:
@@ -1035,18 +1073,22 @@ async def legacy_submit(req: LegacySubmitRequest):
             idea=req.prompt,
             user_requirement=user_requirement,
             style=req.style or "Cinematic",
-            config_path="configs/idea2video.yaml",
+            config_path=_default_pipeline_config("idea2video"),
             model_id=req.model,
             episode_count=episode_count,
-            episode_duration=req.episode_duration,
+            episode_duration=episode_duration,
             aspect_ratio=req.aspect_ratio,
             resolution=req.resolution,
         )
         mode = "idea2video"
         with get_db() as conn:
-            conn.execute(
-                "INSERT INTO tasks (task_id, mode, status) VALUES (?, ?, ?)",
-                (task_id, mode, "pending"),
+            _insert_task(
+                conn,
+                task_id=task_id,
+                mode=mode,
+                user_id=user["id"] if user else None,
+                title=work_title,
+                prompt=req.prompt,
             )
         _track_background_task(run_idea2video(task_id, idea_req))
 
@@ -1711,7 +1753,7 @@ CONTROL_CONFIG_DATA = {
             {"value": "angry", "label": "愤怒"},
         ],
     },
-    "showMenu": ["index", "square", "notice", "user"],
+    "showMenu": ["index", "notice", "user"],
 }
 
 
@@ -1727,7 +1769,6 @@ async def get_sms_vcode():
     return error_response(400, "当前仅支持账号密码登录")
 
 
-# --- User ---
 def _extract_token(authorization: Optional[str] = Header(default=None)) -> Optional[str]:
     if not authorization:
         return None
@@ -1735,6 +1776,73 @@ def _extract_token(authorization: Optional[str] = Header(default=None)) -> Optio
     if token.lower().startswith("bearer "):
         token = token[7:].strip()
     return token or None
+
+
+# --- User ---
+def _optional_user(authorization: Optional[str]) -> Optional[dict]:
+    token = _extract_token(authorization)
+    if not token:
+        return None
+    with get_db() as conn:
+        return auth_service.get_user_by_token(conn, token)
+
+
+def _require_user(authorization: Optional[str]) -> dict:
+    user = _optional_user(authorization)
+    if user is None:
+        raise HTTPException(status_code=401, detail="请先登录")
+    return user
+
+
+def _task_title(title: str, prompt: str, fallback: str = "未命名作品") -> str:
+    cleaned_title = (title or "").strip()
+    if cleaned_title:
+        return cleaned_title[:80]
+    cleaned_prompt = " ".join((prompt or "").split())
+    if cleaned_prompt:
+        return cleaned_prompt[:80]
+    return fallback
+
+
+def _persist_user_work(task_id: str) -> None:
+    with get_db() as conn:
+        row = conn.execute(
+            """
+            SELECT user_id, title, prompt, mode, working_dir, result
+            FROM tasks WHERE task_id = ?
+            """,
+            (task_id,),
+        ).fetchone()
+        if row is None or not row["user_id"]:
+            return
+        user_works_service.create_work_from_task(
+            conn,
+            user_id=row["user_id"],
+            task_id=task_id,
+            title=row["title"] or _task_title("", row["prompt"] or ""),
+            prompt=row["prompt"] or "",
+            mode=row["mode"] or "idea2video",
+            result_path=row["result"] or "",
+            working_dir=row["working_dir"],
+        )
+
+
+def _insert_task(
+    conn,
+    *,
+    task_id: str,
+    mode: str,
+    user_id: Optional[str] = None,
+    title: str = "",
+    prompt: str = "",
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO tasks (task_id, mode, status, user_id, title, prompt)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (task_id, mode, "pending", user_id, title, prompt),
+    )
 
 
 class LoginRequest(BaseModel):
@@ -1854,29 +1962,71 @@ async def actor_list():
     return success_response([])
 
 
-# --- Works / Drama / Episode (桩) ---
-_EMPTY_LIST = {"data": [], "total": 0}
-
-
+# --- Prop (桩) ---
 @app.get("/app/shortplay/api/Prop/index")
 async def prop_list():
     """道具列表（桩）— returns empty array for mention search."""
     return success_response([])
 
 
+_EMPTY_LIST = {"data": [], "total": 0}
+
+
+# --- Works / Drama / Episode ---
 @app.get("/app/shortplay/api/Works/index")
-async def works_list():
-    return success_response(_EMPTY_LIST)
+async def works_list(
+    page: int = 1,
+    limit: int = 20,
+    title: str = "",
+    authorization: Optional[str] = Header(default=None),
+):
+    user = _optional_user(authorization)
+    if user is None:
+        return success_response({"data": [], "total": 0, "page": page, "limit": limit})
+    with get_db() as conn:
+        items, total = user_works_service.list_user_works(
+            conn,
+            user["id"],
+            page=page,
+            limit=limit,
+            title=title,
+        )
+    return success_response({"data": items, "total": total, "page": page, "limit": limit})
 
 
 @app.get("/app/shortplay/api/Works/details")
-async def works_details():
-    return success_response({})
+async def works_details(
+    id: str = "",
+    authorization: Optional[str] = Header(default=None),
+):
+    user = _require_user(authorization)
+    with get_db() as conn:
+        work = user_works_service.get_user_work(conn, user["id"], id)
+    if work is None:
+        return error_response(404, "作品不存在")
+    return success_response(work)
 
 
 @app.get("/app/shortplay/api/Works/episode")
 async def works_episode():
     return success_response(_EMPTY_LIST)
+
+
+class DramaDeleteRequest(BaseModel):
+    id: str
+
+
+@app.post("/app/shortplay/api/Drama/delete")
+async def drama_delete(
+    req: DramaDeleteRequest,
+    authorization: Optional[str] = Header(default=None),
+):
+    user = _require_user(authorization)
+    with get_db() as conn:
+        deleted = user_works_service.delete_user_work(conn, user["id"], req.id)
+    if not deleted:
+        return error_response(404, "作品不存在")
+    return success_response({})
 
 
 # --- Scene (桩) ---
