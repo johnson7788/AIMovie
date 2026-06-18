@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.working_dir/
+logs/
+tasks.db
+.env
+tests/
+.idea/
+.DS_Store

@@ -1,0 +1,43 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: aimovie-backend:latest
+    container_name: aimovie-backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      SERVER_PORT: 8666
+    expose:
+      - "8666"
+    ports:
+      - "8666:8666"
+    volumes:
+      # Persist generated artifacts, task DB and logs across restarts
+      - backend-workdir:/app/.working_dir
+      - backend-logs:/app/logs
+      - ./backend/tasks.db:/app/tasks.db
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8666/health').status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: aimovie-frontend:latest
+    container_name: aimovie-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+
+volumes:
+  backend-workdir:
+  backend-logs:
