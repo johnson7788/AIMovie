@@ -704,6 +704,7 @@ def _enrich_models_data(data: dict) -> dict:
 MODELS_DATA = _enrich_models_data({
     "creative_script": [
         {"id": "5", "name": "DeepSeek V4 (GPUGeek)", "provider": "gpugeek", "model": "Vendor3/DeepSeek-V4-Flash", "icon": "", "description": "DeepSeek's latest model via GPUGeek proxy with excellent reasoning and creative writing."},
+        {"id": "6", "name": "P3D", "provider": "p3d", "model": "p3d-codec-engine", "icon": "", "description": "3D codec and engine technologies are designed to significantly improve the performance, efficiency, and controllability of AI-generated video, 3D simulations, and content ecosystems."},
         {"id": "4", "name": "Doubao Pro", "provider": "volcengine", "model": "doubao-seed-2-0-lite-260428", "icon": "", "description": "ByteDance's large language model optimized for Chinese-language creative content."},
         {"id": "1", "name": "Hunyuan (Tencent)", "provider": "tencent", "model": "hunyuan-turbos-latest", "icon": "", "description": "Tencent's powerful large language model with excellent Chinese creative writing and reasoning."},
         {"id": "2", "name": "Gemini 2.5 Pro", "provider": "google", "model": "gemini-2.5-pro", "icon": "", "description": "Google's most capable model for complex reasoning, coding, and creative writing tasks."},
