@@ -36,7 +36,7 @@ services:
     depends_on:
       - backend
     ports:
-      - "8080:80"
+      - "8088:80"
 
 volumes:
   backend-workdir:

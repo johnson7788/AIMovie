@@ -1713,8 +1713,8 @@ CONTROL_CONFIG_DATA = {
     "version": 1,
     "wechat_group_qrcode_url": "",
     "guide_url": "",
-    "project_background_video_url": "/aimovie/static/image/bg.mov",
-    "login_background_image_url": "/aimovie/static/image/login-image.png",
+    "project_background_video_url": "",
+    "login_background_image_url": "",
     "login": {
         "image": "",
         "bg_image": "off",

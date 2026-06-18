@@ -5,7 +5,6 @@ import zhCn from 'element-plus/es/locale/lang/zh-cn';
 import en from 'element-plus/es/locale/lang/en';
 
 import { useI18n } from 'vue-i18n';
-import { Push } from '@/common/push';
 import { $http } from './common/http';
 import { ResponseCode } from './common/const';
 const { locale } = useI18n();
@@ -34,20 +33,6 @@ const { WEBCONFIG } = useRefs(webConfigStore);
 webConfigStore.initWebConfig();
 const modelStore = useModelStore();
 modelStore.initModel();
-const { appContext } = getCurrentInstance()!
-const global = appContext.config.globalProperties
-const createPush = () => {
-	if (WEBCONFIG.value.push && !global.$push) {
-		const host = location.host;
-		// 建立连接
-		global.$push = new Push({
-			url: host === 'short-play-vue.yc.com' ? 'wss://' + host : WEBCONFIG.value.push.url, // websocket地址
-			app_key: WEBCONFIG.value.push.app_key,
-			auth: WEBCONFIG.value.push.auth // 订阅鉴权(仅限于私有频道)
-		});
-	}
-}
-
 const getUserInfo = () => {
 	return new Promise((resolve, reject) => {
 		$http.get('/app/user/api/User/info').then((res: any) => {
@@ -83,14 +68,6 @@ const getWebConfig = () => {
 onMounted(() => {
 	getModelsList();
 	getWebConfig();
-	try {
-		createPush()
-		watch(() => WEBCONFIG.value.push, () => {
-			createPush()
-		})
-	} catch (error) {
-
-	}
 })
 </script>
 

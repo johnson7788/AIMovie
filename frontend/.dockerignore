@@ -3,3 +3,5 @@ dist/
 .DS_Store
 *.log
 .env*
+# Dangling, unused symlink to an absolute host path (breaks vite copyDir)
+public/static/image/login-image.png

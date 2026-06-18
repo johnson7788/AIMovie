@@ -97,7 +97,7 @@ const getVideoType = (url: string): string => {
 
 // 动态获取背景视频地址
 const backgroundVideoUrl = computed(() => {
-    return WEBCONFIG.value?.project_background_video_url || '/aimovie/static/image/bg.mov'
+    return WEBCONFIG.value?.project_background_video_url || ''
 })
 
 // 获取视频类型

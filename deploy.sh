@@ -40,7 +40,7 @@ echo ""
 log "服务已启动："
 $COMPOSE ps
 echo ""
-log "前端地址: http://localhost:8080/aimovie/"
+log "前端地址: http://localhost:8088/aimovie/"
 log "后端地址: http://localhost:8666 (健康检查: /health)"
 echo ""
 log "查看日志: $COMPOSE logs -f"
