@@ -31,7 +31,7 @@ command_exists() {
 }
 
 backend_ready() {
-    curl -fsS "$HEALTH_URL" >/dev/null 2>&1
+    curl -fsS --connect-timeout 3 --max-time 5 "$HEALTH_URL" >/dev/null 2>&1
 }
 
 cleanup() {
