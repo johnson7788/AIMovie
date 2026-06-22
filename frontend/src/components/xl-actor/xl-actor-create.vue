@@ -215,6 +215,9 @@ const handleGenerateImage = () => {
         if (res.code === ResponseCode.SUCCESS) {
             actorForm.status = res.data.status;
             actorForm.status_enum = res.data.status_enum;
+            if (res.data.headimg) actorForm.headimg = res.data.headimg;
+            if (res.data.three_view_image) actorForm.three_view_image = res.data.three_view_image;
+            emit('success');
         } else {
             ElMessage.error(res.msg);
         }

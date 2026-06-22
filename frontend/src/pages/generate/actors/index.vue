@@ -212,6 +212,14 @@ const handleGenerateImage = () => {
         if (res.code === ResponseCode.SUCCESS) {
             currentActor.value.status = res.data.status;
             currentActor.value.status_enum = res.data.status_enum;
+            if (res.data.headimg) {
+                currentActor.value.headimg = res.data.headimg;
+                currentActorForm.value.image = res.data.headimg;
+            }
+            if (res.data.three_view_image) {
+                currentActor.value.three_view_image = res.data.three_view_image;
+                currentActorForm.value.three_view_image = res.data.three_view_image;
+            }
         } else {
             ElMessage.error(res.msg);
         }

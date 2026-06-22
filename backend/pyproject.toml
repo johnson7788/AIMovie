@@ -16,6 +16,7 @@ dependencies = [
     "moviepy>=2.2.1",
     "openai>=1.95.0",
     "opencv-python",
+    "python-multipart>=0.0.9",
     "scenedetect[opencv]>=0.6.7.1",
     "uvicorn>=0.34.0",
 ]

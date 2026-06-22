@@ -74,6 +74,7 @@ if os.name == "nt":
 import asyncio
 import hashlib
 import json as json_module
+import re
 import sqlite3
 import tempfile
 import time
@@ -84,13 +85,15 @@ from typing import Optional
 
 import aiohttp
 import yaml
-from fastapi import FastAPI, HTTPException, Query, Header
+from fastapi import FastAPI, HTTPException, Query, Header, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
 from progress_manager import ProgressManager
 import auth as auth_service
 import user_works as user_works_service
+import actors as actors_service
+import actor_image
 from utils.retry import format_exception
 
 def _import_pipelines():
@@ -275,6 +278,11 @@ app.add_middleware(
 # --- SQLite database ---
 DB_PATH = _backend_path("tasks.db")
 
+# --- Uploaded / generated media storage ---
+UPLOADS_DIR = _backend_path(".uploads")
+_SAFE_DIR_RE = re.compile(r"^[A-Za-z0-9_\-/]+$")
+_ALLOWED_IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".webp", ".gif")
+
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
@@ -296,6 +304,7 @@ def init_db():
         pass  # column already exists
     auth_service.init_auth_tables(conn)
     user_works_service.init_works_tables(conn)
+    actors_service.init_actor_tables(conn)
     conn.commit()
     return conn
 
@@ -1691,11 +1700,77 @@ async def get_voice_list():
     return success_response({"data": VOICE_MODELS, "total": len(VOICE_MODELS)})
 
 
-# --- Upload (stub) ---
+# --- Upload ---
+def _safe_upload_subdir(dir_name: str) -> Optional[str]:
+    safe = (dir_name or "uploads").strip().strip("/")
+    if not safe or ".." in safe or not _SAFE_DIR_RE.match(safe):
+        return None
+    return safe
+
+
+def _resolve_upload_path(url: str) -> Optional[str]:
+    """Map a /api/uploads/... URL back to a local file path (with traversal guard)."""
+    if not url or not url.startswith("/api/uploads/"):
+        return None
+    rel = url[len("/api/uploads/"):]
+    full = os.path.normpath(os.path.join(UPLOADS_DIR, rel))
+    base = os.path.normpath(os.path.abspath(UPLOADS_DIR))
+    if os.path.commonpath([base, os.path.abspath(full)]) != base:
+        return None
+    return full if os.path.exists(full) else None
+
+
+async def _resolve_image_path(url: str) -> Optional[str]:
+    """Resolve a reference image URL to a local path, downloading remote URLs."""
+    if not url:
+        return None
+    local = _resolve_upload_path(url)
+    if local:
+        return local
+    if url.startswith(("http://", "https://")):
+        return await _download_image(url)
+    return None
+
+
 @app.post("/app/shortplay/api/Uploads/upload")
-async def upload_file():
-    """Upload a file (image/video/document). Not implemented."""
-    raise HTTPException(status_code=501, detail="File upload is not implemented yet")
+async def upload_file(
+    file: UploadFile = File(...),
+    dir_name: str = Form("uploads"),
+    dir_title: str = Form(""),
+    authorization: Optional[str] = Header(default=None),
+):
+    """Upload an image and return its servable URL."""
+    _require_user(authorization)
+    safe_dir = _safe_upload_subdir(dir_name)
+    if safe_dir is None:
+        return error_response(400, "非法的上传目录")
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in _ALLOWED_IMAGE_EXTS:
+        return error_response(400, "仅支持 PNG/JPG/JPEG/WEBP/GIF 图片")
+    target_dir = os.path.join(UPLOADS_DIR, safe_dir)
+    os.makedirs(target_dir, exist_ok=True)
+    filename = f"{uuid.uuid4().hex}{ext}"
+    content = await file.read()
+    with open(os.path.join(target_dir, filename), "wb") as f:
+        f.write(content)
+    return success_response({
+        "url": f"/api/uploads/{safe_dir}/{filename}",
+        "dir_name": dir_name,
+        "dir_title": dir_title,
+        "name": filename,
+    })
+
+
+@app.get("/api/uploads/{file_path:path}")
+async def serve_upload(file_path: str):
+    """Serve an uploaded/generated media file."""
+    full = os.path.normpath(os.path.join(UPLOADS_DIR, file_path))
+    base = os.path.normpath(os.path.abspath(UPLOADS_DIR))
+    if os.path.commonpath([base, os.path.abspath(full)]) != base:
+        raise HTTPException(status_code=403, detail="Access denied")
+    if not os.path.exists(full):
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(full)
 
 
 # ===================================================================
@@ -1956,11 +2031,131 @@ async def captcha():
     return error_response(400, "当前仅支持账号密码登录")
 
 
-# --- Actor (桩) ---
+# --- Actor ---
 @app.get("/app/shortplay/api/Actor/index")
-async def actor_list():
-    """演员列表（桩）— returns empty array for frontend list components."""
-    return success_response([])
+async def actor_list(
+    type: str = "all",
+    name: str = "",
+    species_type: Optional[str] = None,
+    gender: Optional[str] = None,
+    age: Optional[str] = None,
+    drama_id: str = "",
+    episode_id: str = "",
+    authorization: Optional[str] = Header(default=None),
+):
+    """演员列表."""
+    user = _optional_user(authorization)
+    if user is None:
+        return success_response([])
+    with get_db() as conn:
+        items = actors_service.list_actors(
+            conn,
+            user["id"],
+            type=type,
+            name=name,
+            species_type=species_type,
+            gender=gender,
+            age=age,
+            drama_id=drama_id,
+            episode_id=episode_id,
+        )
+    return success_response(items)
+
+
+class ActorDeleteRequest(BaseModel):
+    id: str
+
+
+@app.post("/app/shortplay/api/Actor/update")
+async def actor_update(
+    req: Request,
+    authorization: Optional[str] = Header(default=None),
+):
+    """新增或编辑演员."""
+    user = _require_user(authorization)
+    data = await req.json()
+    with get_db() as conn:
+        actor = actors_service.upsert_actor(conn, user["id"], data)
+    return success_response(actor)
+
+
+@app.post("/app/shortplay/api/Actor/delete")
+async def actor_delete(
+    req: ActorDeleteRequest,
+    authorization: Optional[str] = Header(default=None),
+):
+    """删除演员."""
+    user = _require_user(authorization)
+    with get_db() as conn:
+        deleted = actors_service.delete_actor(conn, user["id"], req.id)
+    if not deleted:
+        return error_response(404, "演员不存在或无权删除")
+    return success_response({})
+
+
+@app.post("/app/shortplay/api/Actor/initializing")
+async def actor_initializing(
+    req: Request,
+    authorization: Optional[str] = Header(default=None),
+):
+    """Generate an actor's portrait and/or three-view turnaround (synchronous)."""
+    user = _require_user(authorization)
+    data = await req.json()
+    actor_id = (data.get("id") or "").strip()
+    if not actor_id:
+        return error_response(400, "缺少演员ID")
+
+    with get_db() as conn:
+        actor = actors_service.get_actor(conn, user["id"], actor_id)
+    if actor is None or not actor["is_edit"]:
+        return error_response(404, "演员不存在或无权操作")
+
+    want_image = bool(data.get("image_state")) or bool(data.get("image_model_id"))
+    want_three_view = bool(data.get("three_view_image_state")) or bool(data.get("three_view_model_id"))
+    if not want_image and not want_three_view:
+        return error_response(400, "请至少选择一个出图模型")
+
+    reference_path = None
+    if data.get("image_reference_state") and data.get("reference_headimg"):
+        reference_path = await _resolve_image_path(data.get("reference_headimg"))
+
+    with get_db() as conn:
+        actors_service.set_actor_status(conn, user["id"], actor_id, "pending")
+
+    try:
+        model_id = str(data.get("image_model_id") or data.get("three_view_model_id") or "") or None
+        generator = _get_image_generator(model_id)
+        results = await actor_image.generate_actor_portraits(
+            actor={
+                **actor,
+                "name": data.get("name") or actor["name"],
+                "remarks": data.get("remarks") or actor["remarks"],
+                "species_type": data.get("species_type") if data.get("species_type") not in (None, "") else actor["species_type"],
+            },
+            image_generator=generator,
+            save_dir=os.path.join(UPLOADS_DIR, "actor", "generated"),
+            url_prefix="/api/uploads/actor/generated",
+            want_image=want_image,
+            want_three_view=want_three_view,
+            reference_path=reference_path,
+        )
+        with get_db() as conn:
+            updated = actors_service.update_actor_images(
+                conn, user["id"], actor_id, status="success", **results
+            )
+    except Exception as e:
+        logging.exception("actor image generation failed for %s", actor_id)
+        with get_db() as conn:
+            actors_service.set_actor_status(conn, user["id"], actor_id, "error")
+        return error_response(500, format_exception(e))
+
+    return success_response({
+        "id": actor_id,
+        "status": updated["status"],
+        "status_enum": updated["status_enum"],
+        "headimg": updated["headimg"],
+        "three_view_image": updated["three_view_image"],
+    })
 
 
 # --- Prop (桩) ---

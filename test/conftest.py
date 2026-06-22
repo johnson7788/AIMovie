@@ -1,8 +1,10 @@
 """Shared fixtures and utilities for API tests."""
+import os
+
 import pytest
 import httpx
 
-BASE_URL = "http://127.0.0.1:8666"
+BASE_URL = os.environ.get("TEST_BASE_URL", "http://127.0.0.1:8666")
 
 
 @pytest.fixture(scope="session")
