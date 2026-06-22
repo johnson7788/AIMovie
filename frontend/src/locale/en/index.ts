@@ -99,6 +99,8 @@ const en = {
         noData: 'No data',
         search: 'Search',
         all: 'All',
+        public: 'Public',
+        personal: 'Personal',
         back: 'Back',
         next: 'Next',
         prev: 'Previous',

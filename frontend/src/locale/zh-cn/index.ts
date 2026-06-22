@@ -99,6 +99,8 @@ const zhCn = {
         noData: '暂无数据',
         search: '搜索',
         all: '全部',
+        public: '公共',
+        personal: '个人',
         back: '返回',
         next: '下一步',
         prev: '上一步',
