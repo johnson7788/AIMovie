@@ -72,3 +72,4 @@ ngrok.log
 .working_dir/idea2video
 backend/tasks.db
 backend/logs/
+backend/.uploads
