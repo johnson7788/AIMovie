@@ -9,6 +9,7 @@ from .image_generator_doubao_seedream_gpugeek_api import ImageGeneratorDoubaoSee
 from .image_generator_nanobanana_google_api import ImageGeneratorNanobananaGoogleAPI
 from .image_generator_nanobanana_yunwu_api import ImageGeneratorNanobananaYunwuAPI
 from .image_generator_hunyuan_tencent_api import ImageGeneratorHunyuanTencentAPI
+from .image_generator_agnes_api import ImageGeneratorAgnesAPI
 
 # reranker for rag
 from .reranker_bge_silicon_api import RerankerBgeSiliconapi
@@ -20,6 +21,7 @@ from .video_generator_doubao_seedance_gpugeek_api import VideoGeneratorDoubaoSee
 from .video_generator_vira_gpugeek_api import VideoGeneratorViraGPUGEEKAPI
 from .video_generator_veo_google_api import VideoGeneratorVeoGoogleAPI
 from .video_generator_veo_yunwu_api import VideoGeneratorVeoYunwuAPI
+from .video_generator_agnes_api import VideoGeneratorAgnesAPI
 
 
 __all__ = [
@@ -32,6 +34,7 @@ __all__ = [
     "ImageGeneratorNanobananaGoogleAPI",
     "ImageGeneratorNanobananaYunwuAPI",
     "ImageGeneratorHunyuanTencentAPI",
+    "ImageGeneratorAgnesAPI",
     "RerankerBgeSiliconapi",
     "VideoGeneratorDoubaoSeedanceVolcengineAPI",
     "VideoGeneratorDoubaoSeedanceYunwuAPI",
@@ -39,4 +42,5 @@ __all__ = [
     "VideoGeneratorViraGPUGEEKAPI",
     "VideoGeneratorVeoGoogleAPI",
     "VideoGeneratorVeoYunwuAPI",
+    "VideoGeneratorAgnesAPI",
 ]

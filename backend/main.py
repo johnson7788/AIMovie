@@ -124,6 +124,8 @@ def _get_image_generator(model_id: Optional[str] = None, config_path: str = "con
         config["image_generator"]["class_path"] = "tools.ImageGeneratorHunyuanTencentAPI"
     elif model_id in ("4", "gpugeek"):
         config["image_generator"]["class_path"] = "tools.ImageGeneratorDoubaoSeedreamGPUGEEKAPI"
+    elif model_id in ("5", "agnes"):
+        config["image_generator"]["class_path"] = "tools.ImageGeneratorAgnesAPI"
 
     backend = RenderBackend.from_config(config)
     return backend.image_generator
@@ -162,6 +164,10 @@ def _default_pipeline_config(basename: str) -> str:
         gpugeek_path = f"configs/{basename}_gpugeek.yaml"
         if os.path.exists(_backend_path(gpugeek_path)):
             return gpugeek_path
+    if os.environ.get("AGNES_API_KEY"):
+        agnes_path = f"configs/{basename}_agnes.yaml"
+        if os.path.exists(_backend_path(agnes_path)):
+            return agnes_path
     return f"configs/{basename}.yaml"
 
 
@@ -525,6 +531,9 @@ def _build_provider_image_generator(provider: str):
     elif provider == "gpugeek":
         from tools.image_generator_doubao_seedream_gpugeek_api import ImageGeneratorDoubaoSeedreamGPUGEEKAPI
         return ImageGeneratorDoubaoSeedreamGPUGEEKAPI()
+    elif provider == "agnes":
+        from tools.image_generator_agnes_api import ImageGeneratorAgnesAPI
+        return ImageGeneratorAgnesAPI()
     else:
         from tools.image_generator_doubao_seedream_volcengine_api import ImageGeneratorDoubaoSeedreamVolcengineAPI
         return ImageGeneratorDoubaoSeedreamVolcengineAPI()
@@ -545,6 +554,8 @@ def _get_video_generator(model_id: Optional[str] = None, config_path: str = "con
             config["video_generator"]["class_path"] = "tools.VideoGeneratorVeoGoogleAPI"
         elif provider == "gpugeek":
             config["video_generator"]["class_path"] = "tools.VideoGeneratorDoubaoSeedanceGPUGEEKAPI"
+        elif provider == "agnes":
+            config["video_generator"]["class_path"] = "tools.VideoGeneratorAgnesAPI"
         else:
             config["video_generator"]["class_path"] = "tools.VideoGeneratorDoubaoSeedanceVolcengineAPI"
 
@@ -560,6 +571,9 @@ def _build_provider_video_generator(provider: str):
     elif provider == "gpugeek":
         from tools.video_generator_doubao_seedance_gpugeek_api import VideoGeneratorDoubaoSeedanceGPUGEEKAPI
         return VideoGeneratorDoubaoSeedanceGPUGEEKAPI(generate_audio=True)
+    elif provider == "agnes":
+        from tools.video_generator_agnes_api import VideoGeneratorAgnesAPI
+        return VideoGeneratorAgnesAPI()
     else:
         from tools.video_generator_doubao_seedance_volcengine_api import VideoGeneratorDoubaoSeedanceVolcengineAPI
         return VideoGeneratorDoubaoSeedanceVolcengineAPI()
@@ -683,6 +697,7 @@ _MODEL_ICONS = {
     "google": _model_icon("#4285F4", "#EA4335", "G"),
     "openai": _model_icon("#10A37F", "#074763", "AI"),
     "gpugeek": _model_icon("#6366F1", "#8B5CF6", "DS"),
+    "agnes": _model_icon("#FF6B9D", "#C44DFF", "A"),
 }
 
 
@@ -704,6 +719,7 @@ def _enrich_models_data(data: dict) -> dict:
 MODELS_DATA = _enrich_models_data({
     "creative_script": [
         {"id": "5", "name": "DeepSeek V4 (GPUGeek)", "provider": "gpugeek", "model": "Vendor3/DeepSeek-V4-Flash", "icon": "", "description": "DeepSeek's latest model via GPUGeek proxy with excellent reasoning and creative writing."},
+        {"id": "7", "name": "Agnes 2.0 Flash", "provider": "agnes", "model": "agnes-2.0-flash", "icon": "", "description": "Agnes AI's fast text model for creative scripting and story development."},
         {"id": "6", "name": "P3D", "provider": "p3d", "model": "p3d-codec-engine", "icon": "", "description": "3D codec and engine technologies are designed to significantly improve the performance, efficiency, and controllability of AI-generated video, 3D simulations, and content ecosystems."},
         {"id": "4", "name": "Doubao Pro", "provider": "volcengine", "model": "doubao-seed-2-0-lite-260428", "icon": "", "description": "ByteDance's large language model optimized for Chinese-language creative content."},
         {"id": "1", "name": "Hunyuan (Tencent)", "provider": "tencent", "model": "hunyuan-turbos-latest", "icon": "", "description": "Tencent's powerful large language model with excellent Chinese creative writing and reasoning."},
@@ -724,21 +740,25 @@ MODELS_DATA = _enrich_models_data({
         {"id": "1", "name": "Seedream 4.0", "provider": "volcengine", "model": "seedream-4.0", "icon": "", "description": "ByteDance's high-quality image generation model for cinematic scene creation."},
         {"id": "2", "name": "Nanobanana (Google)", "provider": "google", "model": "nanobanana", "icon": "", "description": "Google's efficient image generation model with fast inference speeds."},
         {"id": "4", "name": "Seedream 5.0 (GPUGeek)", "provider": "gpugeek", "model": "Volcengine/Doubao-Seedream-5.0-lite", "icon": "", "description": "ByteDance's Seedream via GPUGeek proxy for high-quality image generation."},
+        {"id": "5", "name": "Agnes Image 2.1 Flash", "provider": "agnes", "model": "agnes-image-2.1-flash", "icon": "", "description": "Agnes AI's latest image model with excellent detail and composition control."},
     ],
     "actor_image": [
         {"id": "1", "name": "Seedream 4.0", "provider": "volcengine", "model": "seedream-4.0", "icon": "", "description": "High-quality character image generation with consistent facial features."},
         {"id": "2", "name": "Nanobanana (Google)", "provider": "google", "model": "nanobanana", "icon": "", "description": "Fast character portrait generation with good detail preservation."},
         {"id": "4", "name": "Seedream 5.0 (GPUGeek)", "provider": "gpugeek", "model": "Volcengine/Doubao-Seedream-5.0-lite", "icon": "", "description": "ByteDance's Seedream via GPUGeek proxy with consistent facial features."},
+        {"id": "5", "name": "Agnes Image 2.1 Flash", "provider": "agnes", "model": "agnes-image-2.1-flash", "icon": "", "description": "Agnes AI character portraits with strong identity consistency."},
     ],
     "actor_three_view_image": [
         {"id": "1", "name": "Seedream 4.0", "provider": "volcengine", "model": "seedream-4.0", "icon": "", "description": "Generate consistent three-view character reference sheets for animation."},
         {"id": "4", "name": "Seedream 5.0 (GPUGeek)", "provider": "gpugeek", "model": "Volcengine/Doubao-Seedream-5.0-lite", "icon": "", "description": "ByteDance's Seedream via GPUGeek proxy for character reference sheets."},
+        {"id": "5", "name": "Agnes Image 2.1 Flash", "provider": "agnes", "model": "agnes-image-2.1-flash", "icon": "", "description": "Agnes AI three-view character reference sheet generation."},
     ],
     "storyboard_image": [
         {"id": "1", "name": "Seedream 4.0", "provider": "volcengine", "model": "seedream-4.0", "icon": "", "description": "High-quality storyboard frame generation with cinematic composition."},
         {"id": "2", "name": "Nanobanana (Google)", "provider": "google", "model": "nanobanana", "icon": "", "description": "Fast storyboard image generation for rapid prototyping."},
         {"id": "3", "name": "Hunyuan (Tencent)", "provider": "tencent", "model": "hy-image-v3.0", "icon": "", "description": "Tencent's powerful image generation model with strong text-to-image capabilities."},
         {"id": "4", "name": "Seedream 5.0 (GPUGeek)", "provider": "gpugeek", "model": "Volcengine/Doubao-Seedream-5.0-lite", "icon": "", "description": "ByteDance's Seedream via GPUGeek proxy for cinematic storyboard frames."},
+        {"id": "5", "name": "Agnes Image 2.1 Flash", "provider": "agnes", "model": "agnes-image-2.1-flash", "icon": "", "description": "Agnes AI storyboard frames with rich visual detail and composition control."},
     ],
     "character_look_costume": [],
     "actor_costume": [],
@@ -749,6 +769,7 @@ MODELS_DATA = _enrich_models_data({
         {"id": "1", "name": "Seedance 1.5 Pro", "provider": "volcengine", "model": "seedance-1.5-pro", "icon": "", "description": "ByteDance's professional video generation model with smooth motion and high fidelity."},
         {"id": "2", "name": "Veo 3 (Google)", "provider": "google", "model": "veo-3", "icon": "", "description": "Google's state-of-the-art video generation model with exceptional quality and consistency."},
         {"id": "3", "name": "Seedance 2.0 (GPUGeek)", "provider": "gpugeek", "model": "Volcengine/Doubao-Seedance-2.0-fast", "icon": "", "description": "ByteDance's Seedance via GPUGeek proxy for smooth video generation."},
+        {"id": "4", "name": "Agnes Video V2.0", "provider": "agnes", "model": "agnes-video-v2.0", "icon": "", "description": "Agnes AI video generation with keyframe animation and visual consistency."},
     ],
     "dialogue_voice": [],
     "storyboard_narration_voice": [],
@@ -758,6 +779,7 @@ MODELS_DATA = _enrich_models_data({
         {"id": "1", "name": "Seedance 1.5 Pro", "provider": "volcengine", "model": "seedance-1.5-pro", "icon": "", "description": "Professional video generation with flexible style control and high output quality."},
         {"id": "2", "name": "Veo 3 (Google)", "provider": "google", "model": "veo-3", "icon": "", "description": "Google's flagship video model, excelling at complex scenes and natural motion."},
         {"id": "3", "name": "Seedance 2.0 (GPUGeek)", "provider": "gpugeek", "model": "Volcengine/Doubao-Seedance-2.0-fast", "icon": "", "description": "ByteDance's Seedance via GPUGeek proxy with professional video generation quality."},
+        {"id": "4", "name": "Agnes Video V2.0", "provider": "agnes", "model": "agnes-video-v2.0", "icon": "", "description": "Agnes AI creative video with image-to-video and keyframe support."},
     ],
 })
 

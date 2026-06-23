@@ -80,6 +80,15 @@ PROVIDER_PRESETS: Dict[str, Dict[str, Any]] = {
         ],
         "temperature_range": (0.0, 2.0),
     },
+    "agnes": {
+        "base_url": "https://apihub.agnes-ai.com/v1",
+        "env_key": "AGNES_API_KEY",
+        "default_model": "agnes-2.0-flash",
+        "models": [
+            "agnes-2.0-flash",
+        ],
+        "temperature_range": (0.0, 2.0),
+    },
 }
 
 

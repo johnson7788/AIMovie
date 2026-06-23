@@ -1,0 +1,32 @@
+# Configuration using Agnes AI as the provider (Idea2Video pipeline).
+# Chat model: agnes-2.0-flash (OpenAI-compatible text API)
+# Image model: agnes-image-2.1-flash (OpenAI-compatible Images API)
+# Video model: agnes-video-v2.0 (async task-based Video API)
+#
+# Set your API key here or export AGNES_API_KEY in the environment.
+
+chat_model:
+  init_args:
+    model: agnes-2.0-flash
+    model_provider: agnes
+    api_key:
+  max_requests_per_minute: 500
+  max_requests_per_day: 2000
+
+image_generator:
+  class_path: tools.ImageGeneratorAgnesAPI
+  init_args:
+    api_key:
+    model: agnes-image-2.1-flash
+  max_requests_per_minute: 10
+  max_requests_per_day: 500
+
+video_generator:
+  class_path: tools.VideoGeneratorAgnesAPI
+  init_args:
+    api_key:
+    model: agnes-video-v2.0
+  max_requests_per_minute: 5
+  max_requests_per_day: 100
+
+working_dir: .working_dir/idea2video
