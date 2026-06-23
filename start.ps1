@@ -43,6 +43,22 @@ function Test-BackendReady {
     }
 }
 
+function Clear-Port {
+    # Kill any non-backend process occupying the backend port (e.g. IDE port forwarding)
+    $connections = Get-NetTCPConnection -LocalPort $BackendPort -State Listen -ErrorAction SilentlyContinue
+    foreach ($conn in $connections) {
+        $pid = $conn.OwningProcess
+        try {
+            $proc = Get-Process -Id $pid -ErrorAction SilentlyContinue
+            if ($proc -and $proc.ProcessName -ne "python") {
+                Write-Step "Port $BackendPort is occupied by $($proc.ProcessName) (PID $pid). Killing it..."
+                Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
+                Start-Sleep -Seconds 1
+            }
+        } catch {}
+    }
+}
+
 try {
     foreach ($cmd in @("uv", "node", "npm")) {
         if (-not (Test-CommandExists $cmd)) {
@@ -65,6 +81,9 @@ try {
         throw "Backend dependency verification failed"
     }
     Pop-Location
+
+    Write-Step "Checking port $BackendPort..."
+    Clear-Port
 
     if (Test-BackendReady) {
         Write-Step "Backend is already running on port $BackendPort; reusing it."

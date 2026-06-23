@@ -37,6 +37,21 @@ backend_ready() {
     echo "$body" | grep -q '"status"' && echo "$body" | grep -q '"ok"'
 }
 
+clear_port() {
+    # Kill any non-python process occupying the backend port (e.g. IDE port forwarding)
+    local pids
+    pids=$(lsof -ti ":$BACKEND_PORT" 2>/dev/null) || true
+    for pid in $pids; do
+        local pname
+        pname=$(ps -p "$pid" -o comm= 2>/dev/null) || true
+        if [ -n "$pname" ] && [ "$pname" != "python" ] && [ "$pname" != "python3" ]; then
+            log_step "端口 $BACKEND_PORT 被 $pname (PID $pid) 占用，正在清理..."
+            kill -9 "$pid" 2>/dev/null || true
+            sleep 1
+        fi
+    done
+}
+
 cleanup() {
     echo ""
     log_step "收到中断信号，正在停止本次脚本启动的服务..."
@@ -70,6 +85,9 @@ uv sync --index-url https://pypi.tuna.tsinghua.edu.cn/simple
 log_step "校验后端运行时依赖 (ffmpeg / last-frame) ..."
 uv run python -c "from utils.video import _resolve_ffmpeg_exe; p=_resolve_ffmpeg_exe(); print('ffmpeg:', p); import os; assert os.path.isfile(p)"
 export PYTHONUTF8=1
+
+log_step "检查端口 $BACKEND_PORT ..."
+clear_port
 
 if backend_ready; then
     log_step "后端已在端口 $BACKEND_PORT 运行，复用现有后端。"
