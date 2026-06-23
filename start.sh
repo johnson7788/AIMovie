@@ -31,7 +31,10 @@ command_exists() {
 }
 
 backend_ready() {
-    curl -fsS "$HEALTH_URL" >/dev/null 2>&1
+    local body
+    body=$(curl -fsS "$HEALTH_URL" 2>/dev/null) || return 1
+    # Verify the response is from our backend (not a random process on the same port)
+    echo "$body" | grep -q '"status"' && echo "$body" | grep -q '"ok"'
 }
 
 cleanup() {

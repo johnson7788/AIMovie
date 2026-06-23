@@ -32,7 +32,12 @@ function Test-CommandExists([string]$Name) {
 function Test-BackendReady {
     try {
         $response = Invoke-WebRequest -Uri $HealthUrl -UseBasicParsing -TimeoutSec 2
-        return $response.StatusCode -eq 200
+        if ($response.StatusCode -eq 200) {
+            # Verify the response is from our backend (not a random process on the same port)
+            $body = $response.Content
+            return ($body -match '"status"' -and $body -match '"ok"')
+        }
+        return $false
     } catch {
         return $false
     }
