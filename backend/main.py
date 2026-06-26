@@ -94,6 +94,7 @@ import auth as auth_service
 import user_works as user_works_service
 import actors as actors_service
 import actor_image
+import pixabay
 from utils.retry import format_exception
 
 def _import_pipelines():
@@ -305,6 +306,7 @@ def init_db():
     auth_service.init_auth_tables(conn)
     user_works_service.init_works_tables(conn)
     actors_service.init_actor_tables(conn)
+    actors_service.seed_public_actors(conn)
     conn.commit()
     return conn
 
@@ -2156,6 +2158,36 @@ async def actor_initializing(
         "headimg": updated["headimg"],
         "three_view_image": updated["three_view_image"],
     })
+
+
+# --- Pixabay Image Search ---
+@app.get("/app/shortplay/api/Pixabay/search")
+async def pixabay_search(
+    q: str = "",
+    image_type: str = "photo",
+    orientation: str = "",
+    category: str = "",
+    per_page: int = 20,
+    page: int = 1,
+    authorization: Optional[str] = Header(default=None),
+):
+    """Search images via Pixabay API."""
+    _require_user(authorization)
+    if not q.strip():
+        return success_response({"total": 0, "totalHits": 0, "hits": []})
+    try:
+        result = await pixabay.search_images(
+            q.strip(),
+            image_type=image_type,
+            orientation=orientation,
+            category=category,
+            per_page=per_page,
+            page=page,
+        )
+        return success_response(result)
+    except Exception as e:
+        logging.exception("pixabay search failed")
+        return error_response(500, format_exception(e))
 
 
 # --- Prop (桩) ---

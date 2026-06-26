@@ -84,7 +84,11 @@ export default defineConfig((env: ConfigEnv) => {
           target: apiProxyTarget,
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/local/, ""),
-        }
+        },
+        "/api/uploads": {
+          target: apiProxyTarget,
+          changeOrigin: true,
+        },
       },
     },
   }

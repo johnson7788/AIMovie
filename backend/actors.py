@@ -237,3 +237,64 @@ def delete_actor(conn: sqlite3.Connection, user_id: str, actor_id: str) -> bool:
         (actor_id, user_id),
     )
     return cursor.rowcount > 0
+
+
+# ---------------------------------------------------------------------------
+# Seed preset public actors (called once at startup)
+# ---------------------------------------------------------------------------
+
+_SEED_ACTORS = [
+    {
+        "name": "示例人物",
+        "species_type": 1,
+        "gender": 2,
+        "age": 2,
+        "remarks": "公共示例角色 - 人物肖像",
+        "headimg": "/api/uploads/actor/generated/public_person.jpg",
+    },
+    {
+        "name": "示例动作",
+        "species_type": 1,
+        "gender": 1,
+        "age": 2,
+        "remarks": "公共示例角色 - 动作场景",
+        "headimg": "/api/uploads/actor/generated/public_action.jpg",
+    },
+    {
+        "name": "示例其它",
+        "species_type": 3,
+        "gender": None,
+        "age": None,
+        "remarks": "公共示例角色 - 机器人/科幻角色",
+        "headimg": "/api/uploads/actor/generated/public_other.jpg",
+    },
+]
+
+
+def seed_public_actors(conn: sqlite3.Connection) -> None:
+    """Insert preset public actors if none exist."""
+    count = conn.execute(
+        "SELECT COUNT(*) FROM actors WHERE scope = 'public'"
+    ).fetchone()[0]
+    if count > 0:
+        return
+    for seed in _SEED_ACTORS:
+        actor_id = str(uuid.uuid4())
+        conn.execute(
+            """INSERT INTO actors
+               (id, user_id, scope, name, species_type, gender, age,
+                remarks, headimg, status, created_at, updated_at)
+               VALUES (?, ?, 'public', ?, ?, ?, ?, ?, ?, 'success',
+                       CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)""",
+            (
+                actor_id,
+                "system",
+                seed["name"],
+                seed["species_type"],
+                seed["gender"],
+                seed["age"],
+                seed["remarks"],
+                seed["headimg"],
+            ),
+        )
+    conn.commit()

@@ -48,7 +48,7 @@ const actorFormRules = reactive({
     remarks: [{ required: true, message: t('actor.inputRemarks'), trigger: 'change' }],
 })
 const showForm=ref(false);
-const openActorCreateDialog = (actor?: any, drama_id?: string | number, episode_id?: string | number) => {
+const openActorCreateDialog = (actor?: any, drama_id?: string | number, episode_id?: string | number, reference_headimg?: string) => {
     showForm.value = true;
     actorImageModel.value = 'remarks';
     actorDialogVisible.value = true;
@@ -71,6 +71,10 @@ const openActorCreateDialog = (actor?: any, drama_id?: string | number, episode_
         } else {
             actorForm.drama_id = drama_id;
             actorForm.episode_id = episode_id;
+        }
+        if (reference_headimg) {
+            actorForm.reference_headimg = reference_headimg;
+            actorForm.image_reference_state = true;
         }
     })
 }
